@@ -1,0 +1,19 @@
+ignoredBuiltDependencies:
+  - esbuild
+
+onlyBuiltDependencies:
+  - ','
+  - '-'
+  - '3'
+  - b
+  - c
+  - e
+  - electron
+  - i
+  - l
+  - n
+  - o
+  - q
+  - r
+  - s
+  - t
