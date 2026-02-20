@@ -23,11 +23,13 @@ type ExtractOptions = {
 };
 
 function getFfmpegPath(): string {
-  if (!ffmpegPath) throw new Error('ffmpeg-static binary not found');
-  // In packaged app, the binary is in resources/
+  // In packaged app, ffmpeg is in extraResources
   if (app.isPackaged) {
-    return ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    const resourcePath = path.join(process.resourcesPath, 'ffmpeg');
+    return resourcePath;
   }
+  // In development, use ffmpeg-static from node_modules
+  if (!ffmpegPath) throw new Error('ffmpeg-static binary not found');
   return ffmpegPath;
 }
 

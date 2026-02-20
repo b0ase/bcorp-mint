@@ -1,6 +1,10 @@
 .DS_Store
 .env
+.env.local
 *.log
 node_modules
 dist
 out
+release
+*.dmg
+*.tgz
