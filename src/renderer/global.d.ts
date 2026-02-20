@@ -4,7 +4,7 @@ export {};
 
 declare global {
   interface Window {
-    npg: {
+    mint: {
       selectFolder: () => Promise<{ folder: string; files: string[] } | null>;
       openImages: () => Promise<string[] | null>;
       openLogo: () => Promise<string | null>;

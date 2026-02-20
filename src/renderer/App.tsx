@@ -56,7 +56,7 @@ export default function App() {
   const [logos, setLogos] = useState<LogoAsset[]>(initialLogos);
   const [isExporting, setIsExporting] = useState(false);
   const [logoForm, setLogoForm] = useState({
-    text: 'NPG',
+    text: 'MINT',
     color: '#ffffff',
     style: 'solid' as GeneratedLogoStyle
   });
@@ -80,7 +80,7 @@ export default function App() {
   const [playingVideo, setPlayingVideo] = useState(false);
 
   // Stamp state
-  const [stampPath, setStampPath] = useState('$NPG/SERIES-01/ISSUE-1');
+  const [stampPath, setStampPath] = useState('$MINT/SERIES-01/ISSUE-1');
   const [walletState, setWalletState] = useState<WalletState>({ connected: false, handle: null, authToken: null, balance: null });
   const [lastReceipt, setLastReceipt] = useState<StampReceipt | null>(null);
   const [isStamping, setIsStamping] = useState(false);
@@ -158,10 +158,10 @@ export default function App() {
   // --- Issue management (in-memory, folder-based) ---
 
   const handleNewIssue = async () => {
-    const parentDir = await window.npg.chooseExportFolder();
+    const parentDir = await window.mint.chooseExportFolder();
     if (!parentDir) return;
-    const num = await window.npg.nextIssueNumber(parentDir);
-    const name = `npgx-${String(num).padStart(3, '0')}`;
+    const num = await window.mint.nextIssueNumber(parentDir);
+    const name = `mint-${String(num).padStart(3, '0')}`;
     const id = crypto.randomUUID();
 
     const newIssue: ActiveIssue = { id, name, num, parentDir, enabledIds: new Set() };
@@ -213,22 +213,22 @@ export default function App() {
 
   const loadFilePaths = useCallback(async (filePaths: string[]) => {
     if (filePaths.length === 0) return;
-    const defaultLogoId = logos[0]?.id ?? 'npg-outline';
+    const defaultLogoId = logos[0]?.id ?? 'mint-outline';
 
     const results = await Promise.all(
       filePaths.map(async (filePath): Promise<ImageItem | null> => {
         try {
-          const name = await window.npg.basename(filePath);
+          const name = await window.mint.basename(filePath);
 
           if (isAudioFile(filePath)) {
             // Probe audio metadata
-            const probe = await window.npg.probeMedia(filePath);
+            const probe = await window.mint.probeMedia(filePath);
             // Generate waveform thumbnail
             let waveformUrl = '';
             try {
               const tempPath = `${filePath}.waveform.png`;
-              await window.npg.generateWaveform({ filePath, outputPath: tempPath, width: 400, height: 80 });
-              waveformUrl = await window.npg.fileUrl(tempPath);
+              await window.mint.generateWaveform({ filePath, outputPath: tempPath, width: 400, height: 80 });
+              waveformUrl = await window.mint.fileUrl(tempPath);
             } catch {
               // Fallback: use a placeholder
             }
@@ -254,7 +254,7 @@ export default function App() {
             // Probe video metadata
             let probe: { duration: number; fps: number; } | undefined;
             try {
-              probe = await window.npg.probeMedia(filePath);
+              probe = await window.mint.probeMedia(filePath);
             } catch { /* non-critical */ }
             return {
               id: crypto.randomUUID(),
@@ -271,7 +271,7 @@ export default function App() {
             };
           }
 
-          const url = await window.npg.fileUrl(filePath);
+          const url = await window.mint.fileUrl(filePath);
           const img = await loadImage(url);
           return {
             id: crypto.randomUUID(),
@@ -296,13 +296,13 @@ export default function App() {
   }, [logos]);
 
   const handleSelectFolder = async () => {
-    const result = await window.npg.selectFolder();
+    const result = await window.mint.selectFolder();
     if (!result) return;
     await loadFilePaths(result.files);
   };
 
   const handleSelectFiles = async () => {
-    const result = await window.npg.openImages();
+    const result = await window.mint.openImages();
     if (!result) return;
     await loadFilePaths(result);
   };
@@ -476,10 +476,10 @@ export default function App() {
   useEffect(() => {
     const check = async () => {
       try {
-        const connected = await window.npg.comfyCheck();
+        const connected = await window.mint.comfyCheck();
         setComfyConnected(connected);
         if (connected) {
-          const models = await window.npg.comfyListModels();
+          const models = await window.mint.comfyListModels();
           setComfyModels(models);
           setSelectedModel((prev) => prev && models.includes(prev) ? prev : models[0] ?? null);
         } else {
@@ -497,7 +497,7 @@ export default function App() {
 
   // Listen for ComfyUI progress events
   useEffect(() => {
-    const cleanup = window.npg.onComfyProgress((data) => {
+    const cleanup = window.mint.onComfyProgress((data) => {
       setAnimateProgress(data);
     });
     return cleanup;
@@ -507,7 +507,7 @@ export default function App() {
   useEffect(() => {
     const check = async () => {
       try {
-        const state = await window.npg.walletStatus();
+        const state = await window.mint.walletStatus();
         setWalletState(state);
       } catch { /* ignore */ }
     };
@@ -522,7 +522,7 @@ export default function App() {
     if (!selectedImage || isStamping) return;
     setIsStamping(true);
     try {
-      const { hash, size } = await window.npg.hashFile(selectedImage.path);
+      const { hash, size } = await window.mint.hashFile(selectedImage.path);
       const timestamp = new Date().toISOString();
 
       const receipt: StampReceipt = {
@@ -538,15 +538,15 @@ export default function App() {
         metadata: {}
       };
 
-      await window.npg.saveStampReceipt(JSON.stringify(receipt));
+      await window.mint.saveStampReceipt(JSON.stringify(receipt));
       setLastReceipt(receipt);
 
       // Inscribe if wallet has a key
       try {
-        const hasKey = await window.npg.keystoreHasKey();
+        const hasKey = await window.mint.keystoreHasKey();
         if (hasKey) {
-          const { txid } = await window.npg.inscribeStamp({ path: stampPath, hash, timestamp });
-          const updated = await window.npg.updateStampReceipt(receipt.id, { txid });
+          const { txid } = await window.mint.inscribeStamp({ path: stampPath, hash, timestamp });
+          const updated = await window.mint.updateStampReceipt(receipt.id, { txid });
           setLastReceipt(updated);
         }
       } catch (err) {
@@ -564,12 +564,12 @@ export default function App() {
     if (!lastReceipt || isMinting) return;
     setIsMinting(true);
     try {
-      const { tokenId } = await window.npg.mintStampToken({
+      const { tokenId } = await window.mint.mintStampToken({
         path: lastReceipt.path,
         hash: lastReceipt.hash,
         name: stampPath.split('/').pop() || 'STAMP'
       });
-      const updated = await window.npg.updateStampReceipt(lastReceipt.id, { tokenId });
+      const updated = await window.mint.updateStampReceipt(lastReceipt.id, { tokenId });
       setLastReceipt(updated);
     } catch (err) {
       console.error('Mint failed:', err);
@@ -584,7 +584,7 @@ export default function App() {
     setIsStamping(true);
     try {
       const paths = enabledImages.map((img) => img.path);
-      const results = await window.npg.hashFilesBatch(paths);
+      const results = await window.mint.hashFilesBatch(paths);
 
       for (let i = 0; i < results.length; i++) {
         const { hash, size } = results[i];
@@ -606,13 +606,13 @@ export default function App() {
           metadata: {}
         };
 
-        await window.npg.saveStampReceipt(JSON.stringify(receipt));
+        await window.mint.saveStampReceipt(JSON.stringify(receipt));
 
         try {
-          const hasKey = await window.npg.keystoreHasKey();
+          const hasKey = await window.mint.keystoreHasKey();
           if (hasKey) {
-            const { txid } = await window.npg.inscribeStamp({ path: pagePath, hash, timestamp });
-            await window.npg.updateStampReceipt(receipt.id, { txid });
+            const { txid } = await window.mint.inscribeStamp({ path: pagePath, hash, timestamp });
+            await window.mint.updateStampReceipt(receipt.id, { txid });
           }
         } catch { /* continue with next */ }
       }
@@ -647,7 +647,7 @@ export default function App() {
   useEffect(() => {
     if (!selectedImage || selectedImage.mediaType !== 'audio') return;
     if (audioPeaks.has(selectedImage.id)) return;
-    window.npg.getAudioPeaks(selectedImage.path, 2000).then((peaks) => {
+    window.mint.getAudioPeaks(selectedImage.path, 2000).then((peaks) => {
       setAudioPeaks((prev) => new Map(prev).set(selectedImage.id, peaks));
     }).catch(console.error);
   }, [selectedImage, audioPeaks]);
@@ -664,8 +664,8 @@ export default function App() {
           ? currentFrames.filter((f) => tokenisation.selectedPieceIds.has(f.id))
           : currentFrames;
         const paths = frames.map((f) => f.path);
-        const results = await window.npg.hashFilesBatch(paths);
-        const sourceHash = (await window.npg.hashFile(selectedImage.path)).hash;
+        const results = await window.mint.hashFilesBatch(paths);
+        const sourceHash = (await window.mint.hashFile(selectedImage.path)).hash;
 
         for (let i = 0; i < results.length; i++) {
           const { hash, size } = results[i];
@@ -686,23 +686,23 @@ export default function App() {
             tokenId: null,
             metadata: { parentHash: sourceHash, pieceIndex: String(frame.frameIndex), totalPieces: String(currentFrames.length) }
           };
-          await window.npg.saveStampReceipt(JSON.stringify(receipt));
+          await window.mint.saveStampReceipt(JSON.stringify(receipt));
 
           try {
-            const hasKey = await window.npg.keystoreHasKey();
+            const hasKey = await window.mint.keystoreHasKey();
             if (hasKey) {
-              const { txid } = await window.npg.inscribeStamp({
+              const { txid } = await window.mint.inscribeStamp({
                 path: piecePath, hash, timestamp,
                 parentHash: sourceHash, pieceIndex: frame.frameIndex, totalPieces: currentFrames.length
               });
-              await window.npg.updateStampReceipt(receipt.id, { txid });
+              await window.mint.updateStampReceipt(receipt.id, { txid });
             }
           } catch { /* continue */ }
         }
         setLastReceipt({ id: '', path: stampPath, hash: `${frames.length} frames`, algorithm: 'sha256', sourceFile: selectedImage.name, sourceSize: 0, timestamp: new Date().toISOString(), txid: null, tokenId: null, metadata: {} });
       } else if (isAudio && currentSegments.length > 0) {
         // Extract and hash audio segments
-        const sourceHash = (await window.npg.hashFile(selectedImage.path)).hash;
+        const sourceHash = (await window.mint.hashFile(selectedImage.path)).hash;
         for (let i = 0; i < currentSegments.length; i++) {
           const seg = currentSegments[i];
           const timestamp = new Date().toISOString();
@@ -711,8 +711,8 @@ export default function App() {
 
           // Extract segment to temp file, then hash
           const tempPath = `${selectedImage.path}.seg-${padded}.wav`;
-          await window.npg.extractAudioSegment({ filePath: selectedImage.path, outputPath: tempPath, startTime: seg.startTime, endTime: seg.endTime });
-          const { hash, size } = await window.npg.hashFile(tempPath);
+          await window.mint.extractAudioSegment({ filePath: selectedImage.path, outputPath: tempPath, startTime: seg.startTime, endTime: seg.endTime });
+          const { hash, size } = await window.mint.hashFile(tempPath);
 
           const receipt: StampReceipt = {
             id: crypto.randomUUID(),
@@ -726,16 +726,16 @@ export default function App() {
             tokenId: null,
             metadata: { parentHash: sourceHash, pieceIndex: String(seg.segmentIndex), totalPieces: String(currentSegments.length) }
           };
-          await window.npg.saveStampReceipt(JSON.stringify(receipt));
+          await window.mint.saveStampReceipt(JSON.stringify(receipt));
 
           try {
-            const hasKey = await window.npg.keystoreHasKey();
+            const hasKey = await window.mint.keystoreHasKey();
             if (hasKey) {
-              const { txid } = await window.npg.inscribeStamp({
+              const { txid } = await window.mint.inscribeStamp({
                 path: piecePath, hash, timestamp,
                 parentHash: sourceHash, pieceIndex: seg.segmentIndex, totalPieces: currentSegments.length
               });
-              await window.npg.updateStampReceipt(receipt.id, { txid });
+              await window.mint.updateStampReceipt(receipt.id, { txid });
             }
           } catch { /* continue */ }
         }
@@ -777,7 +777,7 @@ export default function App() {
           };
         });
 
-        await window.npg.batchMintTokens(pieces);
+        await window.mint.batchMintTokens(pieces);
       } else {
         // Single item
         await handleMintToken();
@@ -793,16 +793,16 @@ export default function App() {
 
   const handleWalletConnect = async () => {
     if (walletState.connected) {
-      await window.npg.walletDisconnect();
+      await window.mint.walletDisconnect();
       setWalletState({ connected: false, handle: null, authToken: null, balance: null });
     } else {
-      const state = await window.npg.walletConnect();
+      const state = await window.mint.walletConnect();
       setWalletState(state);
     }
   };
 
   const loadReceipts = async () => {
-    const receipts = await window.npg.listStampReceipts();
+    const receipts = await window.mint.listStampReceipts();
     setAllReceipts(receipts);
     setShowReceiptViewer(true);
   };
@@ -818,11 +818,11 @@ export default function App() {
       if (currentIssue) {
         outputDir = `${currentIssue.parentDir}/${currentIssue.name}`;
       } else {
-        const picked = await window.npg.chooseExportFolder();
+        const picked = await window.mint.chooseExportFolder();
         if (!picked) { setIsAnimating(false); return; }
         outputDir = picked;
       }
-      const result = await window.npg.comfyAnimate(selectedImage.path, outputDir, {
+      const result = await window.mint.comfyAnimate(selectedImage.path, outputDir, {
         frames: 25,
         fps: 8,
         motionStrength: 0.5,
@@ -842,10 +842,10 @@ export default function App() {
   // --- Logo / Export ---
 
   const handleImportLogo = async () => {
-    const filePath = await window.npg.openLogo();
+    const filePath = await window.mint.openLogo();
     if (!filePath) return;
-    const src = await window.npg.fileUrl(filePath);
-    const name = await window.npg.basename(filePath);
+    const src = await window.mint.fileUrl(filePath);
+    const name = await window.mint.basename(filePath);
 
     const newLogo: LogoAsset = {
       id: `import-${crypto.randomUUID()}`,
@@ -885,7 +885,7 @@ export default function App() {
     try {
       const cover = enabledImages[0];
       const body = enabledImages.slice(1);
-      await window.npg.createIssue(
+      await window.mint.createIssue(
         currentIssue.parentDir,
         currentIssue.num,
         cover.path,
@@ -1312,7 +1312,7 @@ export default function App() {
               </div>
 
               <div className="section">
-                <h3>Create NPG Logo</h3>
+                <h3>Create Logo</h3>
                 <div className="control-group">
                   <label className="control-row">
                     <span>Text</span>
@@ -1363,7 +1363,7 @@ export default function App() {
                           });
                         }
                       }}
-                      placeholder="$NPG/SERIES-01/ISSUE-1"
+                      placeholder="$MINT/SERIES-01/ISSUE-1"
                     />
                   </label>
                   <label className="control-row">

@@ -150,7 +150,7 @@ export const COLOR_SCHEMES: ColorScheme[] = [
   { name: 'Silver Standard', background: '#0a0a0a', primary: '#c0c0c0', secondary: '#808080', accent: '#e0e0e0', text: '#f5f5f5' },
   { name: 'Swiss Red', background: '#1a0a0a', primary: '#d32f2f', secondary: '#ef5350', accent: '#ffffff', text: '#ffebee' },
   { name: 'Noir', background: '#000000', primary: '#333333', secondary: '#555555', accent: '#888888', text: '#cccccc' },
-  { name: 'NPG Neon', background: '#0a0010', primary: '#ff2d78', secondary: '#00e5ff', accent: '#ffd700', text: '#e0f7fa' },
+  { name: 'Neon', background: '#0a0010', primary: '#ff2d78', secondary: '#00e5ff', accent: '#ffd700', text: '#e0f7fa' },
 ];
 
 // --- Document Templates ---

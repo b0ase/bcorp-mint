@@ -22,7 +22,7 @@ export function isAudioFile(filePath: string): boolean {
 }
 
 export function mediaStreamUrl(filePath: string): string {
-  return `npg-media://media?path=${encodeURIComponent(filePath)}`;
+  return `mint-media://media?path=${encodeURIComponent(filePath)}`;
 }
 
 export const loadVideoThumbnail = (

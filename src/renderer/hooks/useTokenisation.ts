@@ -16,7 +16,7 @@ export function useTokenisation() {
 
   // Listen for extraction progress
   useEffect(() => {
-    const cleanup = window.npg.onExtractionProgress((data) => {
+    const cleanup = window.mint.onExtractionProgress((data) => {
       setExtractionProgress(data);
     });
     return cleanup;
@@ -29,7 +29,7 @@ export function useTokenisation() {
   ) => {
     setExtractionProgress({ completed: 0, total: options.maxFrames ?? 500, stage: 'Starting...' });
 
-    const result = await window.npg.extractVideoFrames({
+    const result = await window.mint.extractVideoFrames({
       filePath,
       interval: options.interval ?? 1,
       maxFrames: options.maxFrames ?? 500,
@@ -41,7 +41,7 @@ export function useTokenisation() {
     // Load frame thumbnails as data URLs
     const frames: ExtractedFrame[] = await Promise.all(
       result.frames.map(async (f) => {
-        const url = await window.npg.fileUrl(f.path);
+        const url = await window.mint.fileUrl(f.path);
         return {
           id: `${sourceId}-frame-${f.index}`,
           parentId: sourceId,
@@ -99,7 +99,7 @@ export function useTokenisation() {
       // Cleanup temp directory
       const frameDir = frames[0].path.split('/').slice(0, -1).join('/');
       if (frameDir) {
-        await window.npg.cleanupExtraction(frameDir);
+        await window.mint.cleanupExtraction(frameDir);
         tempDirs.current.delete(frameDir);
       }
     }
@@ -124,7 +124,7 @@ export function useTokenisation() {
   useEffect(() => {
     return () => {
       for (const dir of tempDirs.current) {
-        window.npg.cleanupExtraction(dir).catch(() => {});
+        window.mint.cleanupExtraction(dir).catch(() => {});
       }
     };
   }, []);

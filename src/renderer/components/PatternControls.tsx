@@ -185,9 +185,9 @@ function ImageControls({ layer, onConfigChange }: Props) {
   const c = layer.config as { src: string; fit: string; x: number; y: number; scale: number };
 
   const handlePickImage = async () => {
-    const filePath = await window.npg.openLogo();
+    const filePath = await window.mint.openLogo();
     if (!filePath) return;
-    const src = await window.npg.fileUrl(filePath);
+    const src = await window.mint.fileUrl(filePath);
     onConfigChange({ src });
   };
 

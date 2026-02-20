@@ -58,7 +58,7 @@ src/
     token-mint.ts — BSV-21 token minting (single + batch, custom icons)
     media-extract.ts — ffmpeg operations (probe, frame extraction, audio segmentation, waveform)
   preload/
-    index.ts      — contextBridge (window.npg)
+    index.ts      — contextBridge (window.mint)
   renderer/
     App.tsx        — Root component, mode routing, state management
     hooks/
@@ -85,8 +85,8 @@ src/
 | Type | Extensions | How Loaded |
 |------|-----------|------------|
 | Images | .jpg .jpeg .png .webp .tif .tiff .bmp | Base64 data URL via IPC (`file-url`) |
-| Videos | .mp4 .mov .webm .avi | Streaming via `npg-media://` custom protocol |
-| Audio | .mp3 .wav .flac .aac .ogg .m4a | Streaming via `npg-media://` protocol + waveform thumbnail |
+| Videos | .mp4 .mov .webm .avi | Streaming via `mint-media://` custom protocol |
+| Audio | .mp3 .wav .flac .aac .ogg .m4a | Streaming via `mint-media://` protocol + waveform thumbnail |
 
 Videos extract their first frame as a JPEG thumbnail for canvas rendering. The thumbnail goes through the same framing/logo/vignette pipeline as images. Playback uses the streaming protocol directly.
 
@@ -115,8 +115,8 @@ The Mint has two modes, toggled in the topbar: **Stamp** (original flow) and **T
 ### Token Path Convention
 
 ```
-Video:  {rootPath}/FRAME-{NNN}     e.g. $NPG/VIDEO-01/FRAME-042
-Audio:  {rootPath}/SEGMENT-{NNN}   e.g. $NPG/AUDIO-01/SEGMENT-003
+Video:  {rootPath}/FRAME-{NNN}     e.g. $MINT/VIDEO-01/FRAME-042
+Audio:  {rootPath}/SEGMENT-{NNN}   e.g. $MINT/AUDIO-01/SEGMENT-003
 ```
 
 ### Extended OP_RETURN
@@ -151,9 +151,9 @@ What differs per branded variant (all else is shared core):
 
 | Config | Example (NPG profile) | Example (Magazine profile) |
 |--------|----------------------|--------------------------|
-| Default logo text | `NPG` | `MINT` |
-| Stamp path prefix | `$NPG/SERIES-01/ISSUE-1` | `$MINT/SERIES-01/ISSUE-1` |
-| Issue folder pattern | `npgx-NNN` | `mint-NNN` |
+| Default logo text | `MINT` | `MINT` |
+| Stamp path prefix | `$MINT/SERIES-01/ISSUE-1` | `$MINT/SERIES-01/ISSUE-1` |
+| Issue folder pattern | `mint-NNN` | `mint-NNN` |
 
 The app name is always **"The Mint"**. Profiles are stamp configurations, not app identities.
 

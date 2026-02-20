@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-contextBridge.exposeInMainWorld('npg', {
+contextBridge.exposeInMainWorld('mint', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openImages: () => ipcRenderer.invoke('open-images'),
   openLogo: () => ipcRenderer.invoke('open-logo'),

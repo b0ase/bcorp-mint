@@ -15,10 +15,10 @@ const __dirname = path.dirname(__filename);
 
 const isDev = !app.isPackaged;
 
-// Must be called BEFORE app.ready — allows renderer to load from npg-media:// URLs
+// Must be called BEFORE app.ready — allows renderer to load from mint-media:// URLs
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: 'npg-media',
+    scheme: 'mint-media',
     privileges: {
       standard: true,
       secure: true,
@@ -92,7 +92,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   // Register custom protocol for streaming local media files (used for video playback)
-  protocol.handle('npg-media', async (request) => {
+  protocol.handle('mint-media', async (request) => {
     try {
       const url = new URL(request.url);
       const filePath = url.searchParams.get('path');
@@ -104,7 +104,7 @@ app.whenReady().then(() => {
       headers.set('Access-Control-Allow-Origin', '*');
       return new Response(response.body, { status: response.status, headers });
     } catch (err) {
-      console.error('[npg-media] protocol error:', err);
+      console.error('[mint-media] protocol error:', err);
       return new Response('File not found', { status: 404 });
     }
   });
@@ -266,7 +266,7 @@ ipcMain.handle('next-issue-number', async (_e, parentDir: string) => {
   let max = 0;
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const match = entry.name.match(/^npgx-(\d+)$/);
+    const match = entry.name.match(/^mint-(\d+)$/);
     if (match) {
       const num = parseInt(match[1], 10);
       if (num > max) max = num;
@@ -282,7 +282,7 @@ ipcMain.handle('create-issue', async (_e, payload: {
   bodyPaths: string[];
 }) => {
   const padded = String(payload.issueNum).padStart(3, '0');
-  const issueDir = path.join(payload.parentDir, `npgx-${padded}`);
+  const issueDir = path.join(payload.parentDir, `mint-${padded}`);
   await fs.mkdir(issueDir, { recursive: true });
 
   // Copy cover
@@ -628,7 +628,7 @@ ipcMain.handle('comfyui-list-models', async () => {
 async function comfyUploadImage(filePath: string): Promise<string> {
   const fileBuffer = await fs.readFile(filePath);
   const filename = path.basename(filePath);
-  const boundary = '----NPGBoundary' + Date.now();
+  const boundary = '----MintBoundary' + Date.now();
 
   let body = '';
   body += `--${boundary}\r\n`;
@@ -737,7 +737,7 @@ function buildWanWorkflow(imageName: string, frames: number, fps: number, modelN
       class_type: 'SaveVideo',
       inputs: {
         video: ['12', 0],
-        filename_prefix: 'npg_animate',
+        filename_prefix: 'mint_animate',
         format: 'mp4',
         codec: 'h264'
       }
@@ -797,7 +797,7 @@ function buildSvdWorkflow(imageName: string, frames: number, fps: number, motion
       class_type: 'SaveVideo',
       inputs: {
         video: ['6', 0],
-        filename_prefix: 'npg_animate',
+        filename_prefix: 'mint_animate',
         format: 'mp4',
         codec: 'h264'
       }
@@ -813,7 +813,7 @@ function sendAnimateProgress(stage: string, percent: number, elapsed: number, de
 
 // Queue a prompt and wait for it to complete, return output info
 async function comfyQueueAndWait(workflow: Record<string, unknown>): Promise<{ images: string[]; videos: string[] }> {
-  const clientId = 'npg-maker-' + Date.now();
+  const clientId = 'bcorp-mint-' + Date.now();
   const startTime = Date.now();
 
   sendAnimateProgress('Queuing prompt...', 5, 0);

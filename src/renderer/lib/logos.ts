@@ -1,12 +1,12 @@
 import type { LogoAsset } from './types';
-import npgOutline from '../assets/logos/npg-outline.svg';
-import npgSolid from '../assets/logos/npg-solid.svg';
-import npgStamp from '../assets/logos/npg-stamp.svg';
+import mintOutline from '../assets/logos/mint-outline.svg';
+import mintSolid from '../assets/logos/mint-solid.svg';
+import mintStamp from '../assets/logos/mint-stamp.svg';
 
 export const initialLogos: LogoAsset[] = [
-  { id: 'npg-outline', name: 'Outline', src: npgOutline, kind: 'builtin' },
-  { id: 'npg-solid', name: 'Solid', src: npgSolid, kind: 'builtin' },
-  { id: 'npg-stamp', name: 'Stamp', src: npgStamp, kind: 'builtin' }
+  { id: 'mint-outline', name: 'Outline', src: mintOutline, kind: 'builtin' },
+  { id: 'mint-solid', name: 'Solid', src: mintSolid, kind: 'builtin' },
+  { id: 'mint-stamp', name: 'Stamp', src: mintStamp, kind: 'builtin' }
 ];
 
 export type GeneratedLogoStyle = 'solid' | 'outline' | 'stamp';
@@ -15,7 +15,7 @@ const encodeSvg = (svg: string) =>
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
 export const createTextLogo = (text: string, color: string, style: GeneratedLogoStyle): LogoAsset => {
-  const safeText = text.trim() || 'NPG';
+  const safeText = text.trim() || 'MINT';
   const id = `gen-${crypto.randomUUID()}`;
   const font = "'Space Grotesk', 'Helvetica Neue', Arial, sans-serif";
 
@@ -112,7 +112,7 @@ export const FONT_OPTIONS = [
 ] as const;
 
 export const defaultDesignerConfig: LogoDesignerConfig = {
-  text: 'NPG',
+  text: 'MINT',
   subtitleText: '',
   layout: 'horizontal',
   fontFamily: 'Space Grotesk',
@@ -281,7 +281,7 @@ const buildStars = (cx: number, cy: number, radius: number, count: number, c: Lo
 
 const buildHorizontal = (c: LogoDesignerConfig): string => {
   const w = 900, h = 300;
-  const safeText = escapeXml(c.text || 'NPG');
+  const safeText = escapeXml(c.text || 'MINT');
   const safeSub = escapeXml(c.subtitleText);
   const sc = c.subtitleColor || c.color;
   const font = fontStack(c.fontFamily);
@@ -310,7 +310,7 @@ const buildHorizontal = (c: LogoDesignerConfig): string => {
 const buildCircular = (c: LogoDesignerConfig): string => {
   const w = 600, h = 600;
   const cx = 300, cy = 300;
-  const safeText = escapeXml(c.text || 'NPG');
+  const safeText = escapeXml(c.text || 'MINT');
   const bc = c.borderColor || c.color;
   const outerAttrs = buildOuterStrokeAttrs(c);
   const outerText = outerAttrs ? `<text ${outerAttrs} text-anchor="middle"><textPath href="#arc" startOffset="50%">${safeText}</textPath></text>` : '';
@@ -336,7 +336,7 @@ const buildCircular = (c: LogoDesignerConfig): string => {
 
 const buildStacked = (c: LogoDesignerConfig): string => {
   const w = 600, h = 500;
-  const safeText = escapeXml(c.text || 'NPG');
+  const safeText = escapeXml(c.text || 'MINT');
   const safeSub = escapeXml(c.subtitleText);
   const sc = c.subtitleColor || c.color;
   const font = fontStack(c.fontFamily);
@@ -368,7 +368,7 @@ const buildStacked = (c: LogoDesignerConfig): string => {
 
 const buildBadge = (c: LogoDesignerConfig): string => {
   const w = 500, h = 600;
-  const safeText = escapeXml(c.text || 'NPG');
+  const safeText = escapeXml(c.text || 'MINT');
   const safeSub = escapeXml(c.subtitleText);
   const sc = c.subtitleColor || c.color;
   const font = fontStack(c.fontFamily);
@@ -410,7 +410,7 @@ export const designerLogoToAsset = (config: LogoDesignerConfig): LogoAsset => {
   const svg = generateDesignerLogo(config);
   return {
     id: `designer-${crypto.randomUUID()}`,
-    name: `${config.layout} / ${config.fillMode} / ${config.text || 'NPG'}`,
+    name: `${config.layout} / ${config.fillMode} / ${config.text || 'MINT'}`,
     src: encodeSvg(svg),
     kind: 'generated',
   };

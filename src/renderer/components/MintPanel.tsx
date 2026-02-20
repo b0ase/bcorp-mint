@@ -86,7 +86,7 @@ export default function MintPanel({
   const [stampResult, setStampResult] = useState('');
 
   const refreshSavedDocs = useCallback(async () => {
-    const docs = await window.npg.listMintDocuments();
+    const docs = await window.mint.listMintDocuments();
     setSavedDocs(docs);
   }, []);
 
@@ -97,7 +97,7 @@ export default function MintPanel({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await window.npg.saveMintDocument(JSON.stringify(doc));
+      await window.mint.saveMintDocument(JSON.stringify(doc));
       await refreshSavedDocs();
     } catch (err) {
       console.error('Save failed:', err);
@@ -108,7 +108,7 @@ export default function MintPanel({
 
   const handleLoad = async (filePath: string) => {
     try {
-      const json = await window.npg.loadMintDocument(filePath);
+      const json = await window.mint.loadMintDocument(filePath);
       const loaded = JSON.parse(json) as MintDocument;
       onLoadDocument(loaded);
       setShowSaveLoad(false);
@@ -119,7 +119,7 @@ export default function MintPanel({
 
   const handleDeleteDoc = async (filePath: string) => {
     try {
-      await window.npg.deleteMintDocument(filePath);
+      await window.mint.deleteMintDocument(filePath);
       await refreshSavedDocs();
     } catch (err) {
       console.error('Delete failed:', err);
@@ -130,7 +130,7 @@ export default function MintPanel({
     setIsExporting(true);
     try {
       const dataUrl = onExportPng();
-      if (dataUrl) await window.npg.exportMintPng({ dataUrl, defaultName: doc.name || 'mint-design' });
+      if (dataUrl) await window.mint.exportMintPng({ dataUrl, defaultName: doc.name || 'mint-design' });
     } catch (err) { console.error('Export PNG failed:', err); }
     finally { setIsExporting(false); }
   };
@@ -141,7 +141,7 @@ export default function MintPanel({
       const dataUrl = onExportPng();
       if (dataUrl) {
         const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${doc.width}" height="${doc.height}"><image href="${dataUrl}" width="${doc.width}" height="${doc.height}"/></svg>`;
-        await window.npg.exportMintSvg({ svgContent, defaultName: doc.name || 'mint-design' });
+        await window.mint.exportMintSvg({ svgContent, defaultName: doc.name || 'mint-design' });
       }
     } catch (err) { console.error('Export SVG failed:', err); }
     finally { setIsExporting(false); }
@@ -171,7 +171,7 @@ export default function MintPanel({
     setIsExporting(true);
     setBatchStatus('Choosing folder...');
     try {
-      const folder = await window.npg.chooseExportFolder();
+      const folder = await window.mint.chooseExportFolder();
       if (!folder) { setIsExporting(false); setBatchStatus(''); return; }
       const startNum = (serialLayer.config as { startNumber: number }).startNumber;
       const dataUrls: { name: string; dataUrl: string }[] = [];
@@ -184,7 +184,7 @@ export default function MintPanel({
         }
       }
       setBatchStatus(`Saving ${dataUrls.length} files...`);
-      await window.npg.exportMintBatch({ folder, dataUrls });
+      await window.mint.exportMintBatch({ folder, dataUrls });
       setBatchStatus(`Exported ${dataUrls.length} variants`);
     } catch (err) { console.error('Batch export failed:', err); setBatchStatus('Failed'); }
     finally { setIsExporting(false); }
@@ -198,9 +198,9 @@ export default function MintPanel({
       const dataUrl = onExportPng();
       if (!dataUrl) throw new Error('Export failed');
       // Save to temp and hash
-      const filePath = await window.npg.exportMintPng({ dataUrl, defaultName: doc.name || 'mint-stamp' });
+      const filePath = await window.mint.exportMintPng({ dataUrl, defaultName: doc.name || 'mint-stamp' });
       if (!filePath) { setIsStamping(false); return; }
-      const { hash } = await window.npg.hashFile(filePath);
+      const { hash } = await window.mint.hashFile(filePath);
       const timestamp = new Date().toISOString();
       const stampPath = `$MINT/${doc.name || 'DESIGN'}`;
       const receipt = {
@@ -208,13 +208,13 @@ export default function MintPanel({
         sourceFile: filePath.split('/').pop() || 'mint.png', sourceSize: 0,
         timestamp, txid: null, tokenId: null, metadata: {}
       };
-      await window.npg.saveStampReceipt(JSON.stringify(receipt));
+      await window.mint.saveStampReceipt(JSON.stringify(receipt));
       // Try to inscribe
       try {
-        const hasKey = await window.npg.keystoreHasKey();
+        const hasKey = await window.mint.keystoreHasKey();
         if (hasKey) {
-          const { txid } = await window.npg.inscribeStamp({ path: stampPath, hash, timestamp });
-          await window.npg.updateStampReceipt(receipt.id, { txid });
+          const { txid } = await window.mint.inscribeStamp({ path: stampPath, hash, timestamp });
+          await window.mint.updateStampReceipt(receipt.id, { txid });
           setStampResult(`Inscribed: ${txid.slice(0, 12)}...`);
         } else {
           setStampResult(`Hashed: ${hash.slice(0, 16)}... (no key)`);
@@ -233,10 +233,10 @@ export default function MintPanel({
       if (!dataUrl) throw new Error('Export failed');
       const match = dataUrl.match(/^data:(.+);base64,(.*)$/);
       if (!match) throw new Error('Invalid data URL');
-      const filePath = await window.npg.exportMintPng({ dataUrl, defaultName: doc.name || 'mint-token' });
+      const filePath = await window.mint.exportMintPng({ dataUrl, defaultName: doc.name || 'mint-token' });
       if (!filePath) { setIsStamping(false); return; }
-      const { hash } = await window.npg.hashFile(filePath);
-      const { tokenId } = await window.npg.mintStampToken({
+      const { hash } = await window.mint.hashFile(filePath);
+      const { tokenId } = await window.mint.mintStampToken({
         path: `$MINT/${doc.name || 'TOKEN'}`, hash,
         name: doc.name || 'MINT TOKEN',
         iconDataB64: match[2], iconContentType: match[1]
@@ -251,7 +251,7 @@ export default function MintPanel({
     const name = doc.name || 'Custom Template';
     // Templates are just saved documents that users can re-load
     const templateDoc = { ...doc, name: `Template: ${name}` };
-    await window.npg.saveMintDocument(JSON.stringify(templateDoc));
+    await window.mint.saveMintDocument(JSON.stringify(templateDoc));
     setBatchStatus(`Saved as template: ${name}`);
     setTimeout(() => setBatchStatus(''), 2000);
   };
