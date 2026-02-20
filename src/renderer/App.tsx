@@ -7,6 +7,7 @@ import MintCanvas from './components/MintCanvas';
 import MintPanel from './components/MintPanel';
 import ModeToggle from './components/ModeToggle';
 import PageStrip from './components/PageStrip';
+import SplashScreen from './components/SplashScreen';
 import TokenisePanel from './components/TokenisePanel';
 import WaveformEditor from './components/WaveformEditor';
 import { createDefaultSettings } from './lib/defaults';
@@ -96,6 +97,7 @@ export default function App() {
   const mint = useMintDesigner();
   const [showMintGrid, setShowMintGrid] = useState(false);
   const [mintAnimate, setMintAnimate] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const canvasPanelRef = useRef<HTMLElement>(null);
   const swipeRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -956,7 +958,10 @@ export default function App() {
           <h2>Images</h2>
           <div className="image-list">
             {images.length === 0 ? (
-              <div className="small">No images loaded.</div>
+              <div className="empty-sidebar">
+                <div className="empty-sidebar-icon">{'\u25C8'}</div>
+                <div className="small">Drop files here or use the buttons above to load media.</div>
+              </div>
             ) : (
               images.map((image) => {
                 const inIssue = isImageInIssue(image.id);
@@ -1044,6 +1049,22 @@ export default function App() {
               onSegmentsChange={handleAudioSegmentsChange}
               parentId={selectedImage.id}
             />
+          ) : images.length === 0 ? (
+            <div className={`canvas-empty-state ${tokenisation.mode === 'tokenise' ? 'tokenise-empty' : 'stamp-empty'}`}>
+              <div className="canvas-empty-content">
+                <div className="canvas-empty-icon">
+                  {tokenisation.mode === 'tokenise' ? '\u2699' : '\u2756'}
+                </div>
+                <div className="canvas-empty-title">
+                  {tokenisation.mode === 'tokenise' ? 'Tokenise Media' : 'Load Media to Begin'}
+                </div>
+                <div className="canvas-empty-hint">
+                  {tokenisation.mode === 'tokenise'
+                    ? 'Load video or audio files to extract frames and segments for tokenisation.'
+                    : 'Drop files here, or use Load Folder / Add Media above to start framing and stamping.'}
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <div className="canvas-video-wrap">
@@ -1510,6 +1531,8 @@ export default function App() {
           }}
         />
       )}
+
+      {showSplash && <SplashScreen onEnter={() => setShowSplash(false)} />}
 
       {showReceiptViewer && (
         <div className="logo-designer-overlay" onClick={() => setShowReceiptViewer(false)}>

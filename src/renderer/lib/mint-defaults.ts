@@ -25,11 +25,11 @@ import type {
 export const defaultTransform = (): MintLayerTransform => ({ x: 0, y: 0, rotation: 0, scale: 1 });
 
 export function defaultGuillocheConfig(): GuillocheConfig {
-  return { waves: 3, frequency: 8, amplitude: 60, lines: 30, strokeWidth: 0.8, color: '#ff2d78', phase: 0, damping: 0.4 };
+  return { waves: 3, frequency: 8, amplitude: 60, lines: 30, strokeWidth: 0.8, color: '#c9a84c', phase: 0, damping: 0.4 };
 }
 
 export function defaultRosetteConfig(): RosetteConfig {
-  return { petals: 12, rings: 8, radius: 0.35, strokeWidth: 0.6, color: '#ff69b4', rotation: 0, innerRadius: 0.3 };
+  return { petals: 12, rings: 8, radius: 0.35, strokeWidth: 0.6, color: '#daa520', rotation: 0, innerRadius: 0.3 };
 }
 
 export function defaultFineLineConfig(): FineLineConfig {
@@ -37,7 +37,7 @@ export function defaultFineLineConfig(): FineLineConfig {
 }
 
 export function defaultBorderConfig(): BorderConfig {
-  return { style: 'classic', thickness: 40, color: '#ff2d78', cornerStyle: 'square', innerBorder: true, innerGap: 8 };
+  return { style: 'classic', thickness: 40, color: '#c9a84c', cornerStyle: 'square', innerBorder: true, innerGap: 8 };
 }
 
 export function defaultMicroprintConfig(): MicroprintConfig {
@@ -65,7 +65,7 @@ export function defaultLatheConfig(): LatheConfig {
 }
 
 export function defaultGradientConfig(): GradientConfig {
-  return { type: 'linear', colors: ['#1a0030', '#0a0a2e', '#1a0030'], angle: 90, opacity: 0.5 };
+  return { type: 'linear', colors: ['#1a1000', '#0a0800', '#1a1000'], angle: 90, opacity: 0.5 };
 }
 
 export function defaultQRCodeConfig(): QRCodeConfig {
@@ -93,7 +93,7 @@ export function defaultWatermarkPatternConfig(): WatermarkPatternConfig {
 }
 
 export function defaultHologramConfig(): HologramConfig {
-  return { colors: ['#ff0080', '#8000ff', '#0080ff', '#00ff80', '#ffff00', '#ff0080'], angle: 45, stripWidth: 8, shimmer: 0.5, x: 0.05, y: 0.05, width: 0.2, height: 0.15 };
+  return { colors: ['#c9a84c', '#e6c665', '#daa520', '#b8860b', '#ffd700', '#c9a84c'], angle: 45, stripWidth: 8, shimmer: 0.5, x: 0.05, y: 0.05, width: 0.2, height: 0.15 };
 }
 
 export function makeLayer(type: MintLayer['type'], name: string, config: MintLayer['config']): MintLayer {
@@ -119,10 +119,11 @@ export function defaultMintDocument(): MintDocument {
     description: '',
     width: 1200,
     height: 600,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0a0800',
     layers: [
-      makeLayer('border', 'Border', defaultBorderConfig()),
-      makeLayer('guilloche', 'Guilloche', defaultGuillocheConfig())
+      makeLayer('fine-line', 'Background Lines', { angle: 30, spacing: 8, strokeWidth: 0.3, color: 'rgba(201,168,76,0.06)', wave: false, waveAmplitude: 3, waveFrequency: 4 } as FineLineConfig),
+      makeLayer('guilloche', 'Guilloche', defaultGuillocheConfig()),
+      makeLayer('border', 'Border', defaultBorderConfig())
     ],
     circleMask: false,
     rimPattern: defaultRimPattern()
@@ -141,16 +142,16 @@ export type ColorScheme = {
 };
 
 export const COLOR_SCHEMES: ColorScheme[] = [
-  { name: 'Mint Pink', background: '#0a0a0a', primary: '#ff2d78', secondary: '#ff69b4', accent: '#ffd700', text: '#ffffff' },
+  { name: 'Gold Reserve', background: '#0a0800', primary: '#c9a84c', secondary: '#daa520', accent: '#e6c665', text: '#fff8dc' },
   { name: 'USD Green', background: '#0a1a0a', primary: '#2d8f4e', secondary: '#1a6b37', accent: '#4caf50', text: '#d4e8d0' },
   { name: 'Euro Blue', background: '#0a0a1a', primary: '#1565c0', secondary: '#42a5f5', accent: '#ffd54f', text: '#e3f2fd' },
   { name: 'GBP Purple', background: '#1a0a1a', primary: '#7b1fa2', secondary: '#ab47bc', accent: '#ffd700', text: '#f3e5f5' },
   { name: 'BTC Orange', background: '#1a0f0a', primary: '#f7931a', secondary: '#ff9800', accent: '#ffffff', text: '#fff3e0' },
-  { name: 'Gold Reserve', background: '#0a0800', primary: '#ffd700', secondary: '#daa520', accent: '#ffffff', text: '#fff8dc' },
   { name: 'Silver Standard', background: '#0a0a0a', primary: '#c0c0c0', secondary: '#808080', accent: '#e0e0e0', text: '#f5f5f5' },
   { name: 'Swiss Red', background: '#1a0a0a', primary: '#d32f2f', secondary: '#ef5350', accent: '#ffffff', text: '#ffebee' },
   { name: 'Noir', background: '#000000', primary: '#333333', secondary: '#555555', accent: '#888888', text: '#cccccc' },
-  { name: 'Neon', background: '#0a0010', primary: '#ff2d78', secondary: '#00e5ff', accent: '#ffd700', text: '#e0f7fa' },
+  { name: 'Neon', background: '#0a0010', primary: '#00e5ff', secondary: '#7b2dff', accent: '#ffd700', text: '#e0f7fa' },
+  { name: 'Rose', background: '#0a0a0a', primary: '#ff2d78', secondary: '#ff69b4', accent: '#ffd700', text: '#ffffff' },
 ];
 
 // --- Document Templates ---
@@ -222,8 +223,8 @@ export const MINT_TEMPLATES: MintTemplate[] = [
     name: 'Token Icon',
     description: 'BSV-21 token icon (512x512)',
     factory: () => docBase('Token Icon', 512, 512, '#0a0a0a', [
-      makeLayer('gradient', 'Background', { type: 'radial', colors: ['#1a0030', '#0a0a0a'], angle: 0, opacity: 1 } as GradientConfig),
-      makeLayer('rosette', 'Pattern', { petals: 8, rings: 5, radius: 0.45, strokeWidth: 0.8, color: '#ff2d78', rotation: 0, innerRadius: 0.2 } as RosetteConfig),
+      makeLayer('gradient', 'Background', { type: 'radial', colors: ['#1a1000', '#0a0a0a'], angle: 0, opacity: 1 } as GradientConfig),
+      makeLayer('rosette', 'Pattern', { petals: 8, rings: 5, radius: 0.45, strokeWidth: 0.8, color: '#c9a84c', rotation: 0, innerRadius: 0.2 } as RosetteConfig),
       makeLayer('text', 'Symbol', { text: '$TOKEN', fontFamily: 'Space Grotesk', fontSize: 72, fontWeight: 700, color: '#ffffff', letterSpacing: 4, align: 'center', x: 0.5, y: 0.5 } as TextLayerConfig),
     ])
   },
@@ -231,11 +232,11 @@ export const MINT_TEMPLATES: MintTemplate[] = [
     id: 'stamp',
     name: 'Postage Stamp',
     description: 'Compact stamp design (400x500)',
-    factory: () => docBase('Postage Stamp', 400, 500, '#1a0020', [
-      makeLayer('gradient', 'Tint', { type: 'linear', colors: ['#200040', '#1a0030', '#200040'], angle: 45, opacity: 1 } as GradientConfig),
+    factory: () => docBase('Postage Stamp', 400, 500, '#0a0800', [
+      makeLayer('gradient', 'Tint', { type: 'linear', colors: ['#1a1000', '#0a0800', '#1a1000'], angle: 45, opacity: 1 } as GradientConfig),
       makeLayer('fine-line', 'Background', { angle: 60, spacing: 4, strokeWidth: 0.2, color: 'rgba(255,255,255,0.05)', wave: true, waveAmplitude: 2, waveFrequency: 6 } as FineLineConfig),
-      makeLayer('border', 'Frame', { style: 'geometric', thickness: 25, color: '#ff2d78', cornerStyle: 'square', innerBorder: true, innerGap: 6 } as BorderConfig),
-      makeLayer('microprint', 'Border Text', { text: 'BSV POSTAGE', fontSize: 2, color: 'rgba(255,45,120,0.2)', rows: 20, angle: 0, spacing: 4 } as MicroprintConfig),
+      makeLayer('border', 'Frame', { style: 'geometric', thickness: 25, color: '#c9a84c', cornerStyle: 'square', innerBorder: true, innerGap: 6 } as BorderConfig),
+      makeLayer('microprint', 'Border Text', { text: 'BSV POSTAGE', fontSize: 2, color: 'rgba(201,168,76,0.2)', rows: 20, angle: 0, spacing: 4 } as MicroprintConfig),
       makeLayer('text', 'Value', { text: '1 SAT', fontFamily: 'Bebas Neue', fontSize: 48, fontWeight: 700, color: '#ffffff', letterSpacing: 4, align: 'center', x: 0.5, y: 0.85 } as TextLayerConfig),
     ])
   },
