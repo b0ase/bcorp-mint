@@ -1,14 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CanvasPreview from './components/CanvasPreview';
 import FlipBookView from './components/FlipBookView';
+import FrameBrowser from './components/FrameBrowser';
 import LogoDesigner from './components/LogoDesigner';
+import MintCanvas from './components/MintCanvas';
+import MintPanel from './components/MintPanel';
+import ModeToggle from './components/ModeToggle';
 import PageStrip from './components/PageStrip';
+import TokenisePanel from './components/TokenisePanel';
+import WaveformEditor from './components/WaveformEditor';
 import { createDefaultSettings } from './lib/defaults';
-import { loadImage } from './lib/image-utils';
+import { isAudioFile, isVideoFile, loadImage, loadVideoThumbnail, mediaStreamUrl } from './lib/image-utils';
 import { createTextLogo, initialLogos, type GeneratedLogoStyle } from './lib/logos';
-import type { ActiveIssue, ImageItem, ImageSettings, LogoAsset, Spread, StampReceipt, WalletState } from './lib/types';
+import type { ActiveIssue, AppMode, AudioSegment, ExtractedFrame, ImageItem, ImageSettings, LogoAsset, Spread, StampReceipt, WalletState } from './lib/types';
+import { useMintDesigner } from './hooks/useMintDesigner';
+import { useTokenisation } from './hooks/useTokenisation';
 
-const SUPPORTED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp']);
+const SUPPORTED_EXT = new Set([
+  '.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp',
+  '.mp4', '.mov', '.webm', '.avi',
+  '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'
+]);
 
 function buildSpreads(images: ImageItem[]): Spread[] {
   const spreads: Spread[] = [];
@@ -64,6 +76,8 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animateResult, setAnimateResult] = useState<string | null>(null);
+  const [animateProgress, setAnimateProgress] = useState<{ stage: string; percent: number; elapsed: number; detail?: string } | null>(null);
+  const [playingVideo, setPlayingVideo] = useState(false);
 
   // Stamp state
   const [stampPath, setStampPath] = useState('$NPG/SERIES-01/ISSUE-1');
@@ -73,6 +87,15 @@ export default function App() {
   const [isMinting, setIsMinting] = useState(false);
   const [showReceiptViewer, setShowReceiptViewer] = useState(false);
   const [allReceipts, setAllReceipts] = useState<StampReceipt[]>([]);
+
+  // Tokenisation state
+  const tokenisation = useTokenisation();
+  const [audioPeaks, setAudioPeaks] = useState<Map<string, number[]>>(new Map());
+
+  // Mint (Currency Designer) state
+  const mint = useMintDesigner();
+  const [showMintGrid, setShowMintGrid] = useState(false);
+  const [mintAnimate, setMintAnimate] = useState(false);
 
   const canvasPanelRef = useRef<HTMLElement>(null);
   const swipeRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -116,6 +139,22 @@ export default function App() {
     return logos.find((logo) => logo.id === selectedImage.settings.logoId) || logos[0] || null;
   }, [logos, selectedImage]);
 
+  // Tokenise mode computations
+  const currentFrames = useMemo(() => {
+    if (!selectedId) return [];
+    return tokenisation.extractedFrames.get(selectedId) ?? [];
+  }, [selectedId, tokenisation.extractedFrames]);
+
+  const currentSegments = useMemo(() => {
+    if (!selectedId) return [];
+    return tokenisation.audioSegments.get(selectedId) ?? [];
+  }, [selectedId, tokenisation.audioSegments]);
+
+  const currentPeaks = useMemo(() => {
+    if (!selectedId) return [];
+    return audioPeaks.get(selectedId) ?? [];
+  }, [selectedId, audioPeaks]);
+
   // --- Issue management (in-memory, folder-based) ---
 
   const handleNewIssue = async () => {
@@ -154,6 +193,11 @@ export default function App() {
     );
   };
 
+  // Stop video playback when selection changes
+  useEffect(() => {
+    setPlayingVideo(false);
+  }, [selectedId]);
+
   // --- Image loading ---
 
   const updateSelectedSettings = (patch: Partial<ImageSettings>) => {
@@ -171,24 +215,81 @@ export default function App() {
     if (filePaths.length === 0) return;
     const defaultLogoId = logos[0]?.id ?? 'npg-outline';
 
-    const items = await Promise.all(
-      filePaths.map(async (filePath) => {
-        const [url, name] = await Promise.all([
-          window.npg.fileUrl(filePath),
-          window.npg.basename(filePath)
-        ]);
-        const img = await loadImage(url);
-        return {
-          id: crypto.randomUUID(),
-          path: filePath,
-          name,
-          url,
-          width: img.naturalWidth || img.width,
-          height: img.naturalHeight || img.height,
-          settings: createDefaultSettings(defaultLogoId)
-        } as ImageItem;
+    const results = await Promise.all(
+      filePaths.map(async (filePath): Promise<ImageItem | null> => {
+        try {
+          const name = await window.npg.basename(filePath);
+
+          if (isAudioFile(filePath)) {
+            // Probe audio metadata
+            const probe = await window.npg.probeMedia(filePath);
+            // Generate waveform thumbnail
+            let waveformUrl = '';
+            try {
+              const tempPath = `${filePath}.waveform.png`;
+              await window.npg.generateWaveform({ filePath, outputPath: tempPath, width: 400, height: 80 });
+              waveformUrl = await window.npg.fileUrl(tempPath);
+            } catch {
+              // Fallback: use a placeholder
+            }
+
+            return {
+              id: crypto.randomUUID(),
+              path: filePath,
+              name,
+              url: waveformUrl || 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80"><rect fill="#222" width="400" height="80"/><text x="200" y="45" fill="#666" text-anchor="middle" font-size="14">Audio</text></svg>'),
+              width: 400,
+              height: 80,
+              mediaType: 'audio' as const,
+              duration: probe.duration,
+              sampleRate: probe.sampleRate,
+              channels: probe.channels,
+              settings: createDefaultSettings(defaultLogoId)
+            };
+          }
+
+          if (isVideoFile(filePath)) {
+            const streamUrl = mediaStreamUrl(filePath);
+            const { width, height, thumbnailUrl } = await loadVideoThumbnail(streamUrl);
+            // Probe video metadata
+            let probe: { duration: number; fps: number; } | undefined;
+            try {
+              probe = await window.npg.probeMedia(filePath);
+            } catch { /* non-critical */ }
+            return {
+              id: crypto.randomUUID(),
+              path: filePath,
+              name,
+              url: thumbnailUrl,
+              width,
+              height,
+              mediaType: 'video' as const,
+              duration: probe?.duration,
+              frameRate: probe?.fps,
+              totalFrames: probe ? Math.floor(probe.duration * probe.fps) : undefined,
+              settings: createDefaultSettings(defaultLogoId)
+            };
+          }
+
+          const url = await window.npg.fileUrl(filePath);
+          const img = await loadImage(url);
+          return {
+            id: crypto.randomUUID(),
+            path: filePath,
+            name,
+            url,
+            width: img.naturalWidth || img.width,
+            height: img.naturalHeight || img.height,
+            mediaType: 'image' as const,
+            settings: createDefaultSettings(defaultLogoId)
+          };
+        } catch (err) {
+          console.error(`Failed to load ${filePath}:`, err);
+          return null;
+        }
       })
     );
+    const items = results.filter((item): item is ImageItem => item !== null);
 
     setImages((prev) => [...prev, ...items]);
     setSelectedId((prev) => prev ?? items[0]?.id ?? null);
@@ -257,10 +358,62 @@ export default function App() {
     }
   };
 
-  // Keyboard navigation
+  // Keyboard navigation + Mint mode shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const isMint = tokenisation.mode === 'mint';
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      // Mint mode shortcuts
+      if (isMint) {
+        if (ctrl && e.key === 'z') { e.preventDefault(); mint.undo(); return; }
+        if (ctrl && e.key === 'y') { e.preventDefault(); mint.redo(); return; }
+        if (ctrl && e.key === 'd') { e.preventDefault(); if (mint.selectedLayerId) mint.duplicateLayer(mint.selectedLayerId); return; }
+        if (ctrl && e.key === 's') { e.preventDefault(); /* save handled by panel */ return; }
+        if (ctrl && e.key === 'e') { e.preventDefault(); /* export handled by panel */ return; }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && mint.selectedLayerId) {
+          e.preventDefault(); mint.removeLayer(mint.selectedLayerId); return;
+        }
+        // Bracket keys: reorder layer
+        if (e.key === '[' && mint.selectedLayerId) {
+          e.preventDefault();
+          const idx = mint.doc.layers.findIndex((l) => l.id === mint.selectedLayerId);
+          if (idx > 0) mint.reorderLayer(mint.selectedLayerId, idx - 1);
+          return;
+        }
+        if (e.key === ']' && mint.selectedLayerId) {
+          e.preventDefault();
+          const idx = mint.doc.layers.findIndex((l) => l.id === mint.selectedLayerId);
+          if (idx < mint.doc.layers.length - 1) mint.reorderLayer(mint.selectedLayerId, idx + 1);
+          return;
+        }
+        // Arrow keys: nudge transform
+        if (e.key === 'ArrowLeft' && mint.selectedLayerId) {
+          e.preventDefault();
+          mint.updateLayerTransform(mint.selectedLayerId, { x: (mint.selectedLayer?.transform?.x ?? 0) - (e.shiftKey ? 10 : 1) });
+          return;
+        }
+        if (e.key === 'ArrowRight' && mint.selectedLayerId) {
+          e.preventDefault();
+          mint.updateLayerTransform(mint.selectedLayerId, { x: (mint.selectedLayer?.transform?.x ?? 0) + (e.shiftKey ? 10 : 1) });
+          return;
+        }
+        if (e.key === 'ArrowUp' && mint.selectedLayerId) {
+          e.preventDefault();
+          mint.updateLayerTransform(mint.selectedLayerId, { y: (mint.selectedLayer?.transform?.y ?? 0) - (e.shiftKey ? 10 : 1) });
+          return;
+        }
+        if (e.key === 'ArrowDown' && mint.selectedLayerId) {
+          e.preventDefault();
+          mint.updateLayerTransform(mint.selectedLayerId, { y: (mint.selectedLayer?.transform?.y ?? 0) + (e.shiftKey ? 10 : 1) });
+          return;
+        }
+        return;
+      }
+
+      // Stamp/Tokenise mode navigation
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         handlePrevSpread();
@@ -271,7 +424,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [handlePrevSpread, handleNextSpread]);
+  }, [handlePrevSpread, handleNextSpread, tokenisation.mode, mint]);
 
   // Swipe navigation
   useEffect(() => {
@@ -340,6 +493,14 @@ export default function App() {
     check();
     const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Listen for ComfyUI progress events
+  useEffect(() => {
+    const cleanup = window.npg.onComfyProgress((data) => {
+      setAnimateProgress(data);
+    });
+    return cleanup;
   }, []);
 
   // Poll wallet status
@@ -465,6 +626,171 @@ export default function App() {
     }
   };
 
+  // --- Tokenise handlers ---
+
+  const handleExtractFrames = async (interval: number, maxFrames: number, quality: 'low' | 'medium' | 'high') => {
+    if (!selectedImage || selectedImage.mediaType !== 'video') return;
+    await tokenisation.extractFrames(selectedImage.id, selectedImage.path, { interval, maxFrames, quality });
+  };
+
+  const handleClearFrames = async () => {
+    if (!selectedId) return;
+    await tokenisation.clearFrames(selectedId);
+  };
+
+  const handleAudioSegmentsChange = (segments: AudioSegment[]) => {
+    if (!selectedId) return;
+    tokenisation.addAudioSegments(selectedId, segments);
+  };
+
+  // Load audio peaks when selecting an audio item
+  useEffect(() => {
+    if (!selectedImage || selectedImage.mediaType !== 'audio') return;
+    if (audioPeaks.has(selectedImage.id)) return;
+    window.npg.getAudioPeaks(selectedImage.path, 2000).then((peaks) => {
+      setAudioPeaks((prev) => new Map(prev).set(selectedImage.id, peaks));
+    }).catch(console.error);
+  }, [selectedImage, audioPeaks]);
+
+  const handleStampPieces = async () => {
+    if (!selectedImage || isStamping) return;
+    setIsStamping(true);
+    try {
+      const isVideo = selectedImage.mediaType === 'video';
+      const isAudio = selectedImage.mediaType === 'audio';
+
+      if (isVideo && currentFrames.length > 0) {
+        const frames = tokenisation.selectedPieceIds.size > 0
+          ? currentFrames.filter((f) => tokenisation.selectedPieceIds.has(f.id))
+          : currentFrames;
+        const paths = frames.map((f) => f.path);
+        const results = await window.npg.hashFilesBatch(paths);
+        const sourceHash = (await window.npg.hashFile(selectedImage.path)).hash;
+
+        for (let i = 0; i < results.length; i++) {
+          const { hash, size } = results[i];
+          const frame = frames[i];
+          const timestamp = new Date().toISOString();
+          const padded = String(frame.frameIndex).padStart(3, '0');
+          const piecePath = `${stampPath}/FRAME-${padded}`;
+
+          const receipt: StampReceipt = {
+            id: crypto.randomUUID(),
+            path: piecePath,
+            hash,
+            algorithm: 'sha256',
+            sourceFile: selectedImage.name,
+            sourceSize: size,
+            timestamp,
+            txid: null,
+            tokenId: null,
+            metadata: { parentHash: sourceHash, pieceIndex: String(frame.frameIndex), totalPieces: String(currentFrames.length) }
+          };
+          await window.npg.saveStampReceipt(JSON.stringify(receipt));
+
+          try {
+            const hasKey = await window.npg.keystoreHasKey();
+            if (hasKey) {
+              const { txid } = await window.npg.inscribeStamp({
+                path: piecePath, hash, timestamp,
+                parentHash: sourceHash, pieceIndex: frame.frameIndex, totalPieces: currentFrames.length
+              });
+              await window.npg.updateStampReceipt(receipt.id, { txid });
+            }
+          } catch { /* continue */ }
+        }
+        setLastReceipt({ id: '', path: stampPath, hash: `${frames.length} frames`, algorithm: 'sha256', sourceFile: selectedImage.name, sourceSize: 0, timestamp: new Date().toISOString(), txid: null, tokenId: null, metadata: {} });
+      } else if (isAudio && currentSegments.length > 0) {
+        // Extract and hash audio segments
+        const sourceHash = (await window.npg.hashFile(selectedImage.path)).hash;
+        for (let i = 0; i < currentSegments.length; i++) {
+          const seg = currentSegments[i];
+          const timestamp = new Date().toISOString();
+          const padded = String(seg.segmentIndex).padStart(3, '0');
+          const piecePath = `${stampPath}/SEGMENT-${padded}`;
+
+          // Extract segment to temp file, then hash
+          const tempPath = `${selectedImage.path}.seg-${padded}.wav`;
+          await window.npg.extractAudioSegment({ filePath: selectedImage.path, outputPath: tempPath, startTime: seg.startTime, endTime: seg.endTime });
+          const { hash, size } = await window.npg.hashFile(tempPath);
+
+          const receipt: StampReceipt = {
+            id: crypto.randomUUID(),
+            path: piecePath,
+            hash,
+            algorithm: 'sha256',
+            sourceFile: selectedImage.name,
+            sourceSize: size,
+            timestamp,
+            txid: null,
+            tokenId: null,
+            metadata: { parentHash: sourceHash, pieceIndex: String(seg.segmentIndex), totalPieces: String(currentSegments.length) }
+          };
+          await window.npg.saveStampReceipt(JSON.stringify(receipt));
+
+          try {
+            const hasKey = await window.npg.keystoreHasKey();
+            if (hasKey) {
+              const { txid } = await window.npg.inscribeStamp({
+                path: piecePath, hash, timestamp,
+                parentHash: sourceHash, pieceIndex: seg.segmentIndex, totalPieces: currentSegments.length
+              });
+              await window.npg.updateStampReceipt(receipt.id, { txid });
+            }
+          } catch { /* continue */ }
+        }
+        setLastReceipt({ id: '', path: stampPath, hash: `${currentSegments.length} segments`, algorithm: 'sha256', sourceFile: selectedImage.name, sourceSize: 0, timestamp: new Date().toISOString(), txid: null, tokenId: null, metadata: {} });
+      } else {
+        // Single image — same as stamp mode
+        await handleHashAndInscribe();
+        return;
+      }
+    } catch (err) {
+      console.error('Tokenise stamp failed:', err);
+      alert(`Stamp failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setIsStamping(false);
+    }
+  };
+
+  const handleMintPieces = async () => {
+    if (!selectedImage || isMinting) return;
+    setIsMinting(true);
+    try {
+      const isVideo = selectedImage.mediaType === 'video';
+
+      if (isVideo && currentFrames.length > 0) {
+        const frames = tokenisation.selectedPieceIds.size > 0
+          ? currentFrames.filter((f) => tokenisation.selectedPieceIds.has(f.id))
+          : currentFrames;
+
+        const pieces = frames.map((f) => {
+          const padded = String(f.frameIndex).padStart(3, '0');
+          // Extract base64 from frame data URL for icon
+          const b64Match = f.url.match(/^data:(.+);base64,(.*)$/);
+          return {
+            path: `${stampPath}/FRAME-${padded}`,
+            hash: f.hash || '',
+            name: `FRAME-${padded}`,
+            iconDataB64: b64Match?.[2],
+            iconContentType: b64Match?.[1]
+          };
+        });
+
+        await window.npg.batchMintTokens(pieces);
+      } else {
+        // Single item
+        await handleMintToken();
+        return;
+      }
+    } catch (err) {
+      console.error('Tokenise mint failed:', err);
+      alert(`Mint failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setIsMinting(false);
+    }
+  };
+
   const handleWalletConnect = async () => {
     if (walletState.connected) {
       await window.npg.walletDisconnect();
@@ -485,6 +811,7 @@ export default function App() {
     if (!selectedImage || isAnimating) return;
     setIsAnimating(true);
     setAnimateResult(null);
+    setAnimateProgress(null);
     try {
       // Output to the issue folder or prompt for one
       let outputDir: string;
@@ -508,6 +835,7 @@ export default function App() {
       alert(`Animation failed: ${err instanceof Error ? err.message : err}`);
     } finally {
       setIsAnimating(false);
+      setAnimateProgress(null);
     }
   };
 
@@ -578,7 +906,7 @@ export default function App() {
     <div className="app" onDrop={handleDrop} onDragOver={handleDragOver}>
       <header className="topbar">
         <div className="topbar-left">
-          <h1 className="brand-title">NPGX Stamp</h1>
+          <h1 className="brand-title">The Bitcoin Corporation <span className="brand-accent">Mint</span></h1>
           <button className="wallet-status" onClick={handleWalletConnect} title={walletState.handle || 'Connect wallet'}>
             <span className={`wallet-dot ${walletState.connected ? 'connected' : ''}`} />
             {walletState.connected ? walletState.handle || 'Connected' : 'Connect Wallet'}
@@ -603,11 +931,12 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-actions">
+          <ModeToggle mode={tokenisation.mode} onChange={tokenisation.setMode} />
           <button className="secondary" onClick={handleSelectFolder}>
             Load Folder
           </button>
           <button className="secondary" onClick={handleSelectFiles}>
-            Add Images
+            Add Media
           </button>
           <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
             {isExporting ? 'Printing\u2026' : 'Print'}
@@ -651,11 +980,20 @@ export default function App() {
                       setSelectedId(image.id);
                     }}
                   >
-                    <img src={image.url} alt={image.name} />
+                    <div style={{ position: 'relative' }}>
+                      <img src={image.url} alt={image.name} />
+                      {image.mediaType === 'video' && (
+                        <span className="video-badge">VID</span>
+                      )}
+                      {image.mediaType === 'audio' && (
+                        <span className="video-badge" style={{ background: 'rgba(100, 149, 237, 0.85)' }}>AUD</span>
+                      )}
+                    </div>
                     <div className="image-meta">
                       <strong>{image.name}</strong>
                       <span>
-                        {image.width > image.height ? 'L' : 'P'}
+                        {image.mediaType === 'video' ? 'Video' : image.mediaType === 'audio' ? 'Audio' : (image.width > image.height ? 'L' : 'P')}
+                        {image.duration ? ` \u00b7 ${Math.floor(image.duration)}s` : ''}
                         {isPaired ? ' \u00b7 Paired' : ''}
                         {currentIssue ? (inIssue ? ' \u00b7 In' : '') : ''}
                       </span>
@@ -677,70 +1015,183 @@ export default function App() {
         </aside>
 
         <section className="canvas-panel" ref={canvasPanelRef}>
-          {turnMode === 'slide' ? (
-            <CanvasPreview
-              spread={currentSpread}
-              selectedId={selectedId}
-              logos={logos}
-              pageNumber={currentSpread ? currentSpreadIndex + 1 : undefined}
-              onLogoPosChange={(pos) => updateSelectedSettings({ logoPos: pos })}
-              onSelectImage={(id) => setSelectedId(id)}
-              wrapperClassName={canvasWrapperClass}
+          {/* Mint mode: Currency Designer canvas */}
+          {tokenisation.mode === 'mint' ? (
+            <MintCanvas
+              doc={mint.doc}
+              selectedLayerId={mint.selectedLayerId}
+              renderToCanvas={mint.renderToCanvas}
+              onSelectLayer={mint.selectLayer}
+              showGrid={showMintGrid}
+              animatePreview={mintAnimate}
+            />
+          ) : /* Tokenise mode: show FrameBrowser or WaveformEditor */
+          tokenisation.mode === 'tokenise' && selectedImage?.mediaType === 'video' && currentFrames.length > 0 ? (
+            <FrameBrowser
+              frames={currentFrames}
+              selectedIds={tokenisation.selectedPieceIds}
+              onSelectFrame={(id, multi) => tokenisation.selectPiece(id, multi)}
+              onSelectRange={(ids) => tokenisation.selectPieceRange(ids)}
+              onSelectEveryNth={(n) => selectedId && tokenisation.selectEveryNth(selectedId, n)}
+              onSelectAll={() => selectedId && tokenisation.selectAllPieces(selectedId)}
+            />
+          ) : tokenisation.mode === 'tokenise' && selectedImage?.mediaType === 'audio' && currentPeaks.length > 0 ? (
+            <WaveformEditor
+              filePath={selectedImage.path}
+              duration={selectedImage.duration || 0}
+              peaks={currentPeaks}
+              segments={currentSegments}
+              onSegmentsChange={handleAudioSegmentsChange}
+              parentId={selectedImage.id}
             />
           ) : (
-            <FlipBookView
-              spreads={spreads}
-              logos={logos}
-              activeIndex={currentSpreadIndex}
-              onPageChange={(idx) => {
-                const spread = spreads[idx];
-                if (spread) {
-                  const imgs = spreadImages(spread);
-                  setSelectedId(imgs[0].id);
-                  setActiveSpreadIndex(idx);
-                }
-              }}
-            />
-          )}
-          <div className="canvas-helper">
-            <button
-              className="ghost spread-nav"
-              onClick={handlePrevSpread}
-              disabled={currentSpreadIndex <= 0}
-            >
-              Prev
-            </button>
-            <span>
-              {currentSpread
-                ? `Page ${currentSpreadIndex + 1} of ${spreads.length}`
-                : 'Select an image to edit.'}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div className="turn-toggle">
-                <button
-                  className={`turn-toggle-btn ${turnMode === 'slide' ? 'active' : ''}`}
-                  onClick={() => setTurnMode('slide')}
-                >
-                  Slide
-                </button>
-                <button
-                  className={`turn-toggle-btn ${turnMode === 'turn' ? 'active' : ''}`}
-                  onClick={() => setTurnMode('turn')}
-                >
-                  Turn
-                </button>
+            <>
+              <div className="canvas-video-wrap">
+                {turnMode === 'slide' ? (
+                  <CanvasPreview
+                    spread={currentSpread}
+                    selectedId={selectedId}
+                    logos={logos}
+                    pageNumber={currentSpread ? currentSpreadIndex + 1 : undefined}
+                    onLogoPosChange={(pos) => updateSelectedSettings({ logoPos: pos })}
+                    onSelectImage={(id) => setSelectedId(id)}
+                    wrapperClassName={canvasWrapperClass}
+                  />
+                ) : (
+                  <FlipBookView
+                    spreads={spreads}
+                    logos={logos}
+                    activeIndex={currentSpreadIndex}
+                    onPageChange={(idx) => {
+                      const spread = spreads[idx];
+                      if (spread) {
+                        const imgs = spreadImages(spread);
+                        setSelectedId(imgs[0].id);
+                        setActiveSpreadIndex(idx);
+                      }
+                    }}
+                  />
+                )}
+                {selectedImage?.mediaType === 'video' && !playingVideo && (
+                  <button
+                    className="video-play-overlay"
+                    onClick={() => setPlayingVideo(true)}
+                    title="Play video"
+                  >
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                      <circle cx="24" cy="24" r="23" stroke="rgba(255,255,255,0.6)" strokeWidth="2" fill="rgba(0,0,0,0.5)" />
+                      <path d="M19 14L35 24L19 34V14Z" fill="rgba(255,255,255,0.9)" />
+                    </svg>
+                  </button>
+                )}
+                {selectedImage?.mediaType === 'video' && playingVideo && (
+                  <div className="video-player-overlay">
+                    <video
+                      src={mediaStreamUrl(selectedImage.path)}
+                      controls
+                      autoPlay
+                    />
+                    <button className="video-close-btn" onClick={() => setPlayingVideo(false)}>
+                      Close
+                    </button>
+                  </div>
+                )}
               </div>
-              <button
-                className="ghost spread-nav"
-                onClick={handleNextSpread}
-                disabled={currentSpreadIndex >= spreads.length - 1}
-              >
-                Next
-              </button>
-            </div>
-          </div>
+              <div className="canvas-helper">
+                <button
+                  className="ghost spread-nav"
+                  onClick={handlePrevSpread}
+                  disabled={currentSpreadIndex <= 0}
+                >
+                  Prev
+                </button>
+                <span>
+                  {currentSpread
+                    ? `Page ${currentSpreadIndex + 1} of ${spreads.length}`
+                    : 'Select an image to edit.'}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="turn-toggle">
+                    <button
+                      className={`turn-toggle-btn ${turnMode === 'slide' ? 'active' : ''}`}
+                      onClick={() => setTurnMode('slide')}
+                    >
+                      Slide
+                    </button>
+                    <button
+                      className={`turn-toggle-btn ${turnMode === 'turn' ? 'active' : ''}`}
+                      onClick={() => setTurnMode('turn')}
+                    >
+                      Turn
+                    </button>
+                  </div>
+                  <button
+                    className="ghost spread-nav"
+                    onClick={handleNextSpread}
+                    disabled={currentSpreadIndex >= spreads.length - 1}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </section>
 
+        {tokenisation.mode === 'mint' ? (
+          <MintPanel
+            doc={mint.doc}
+            selectedLayer={mint.selectedLayer}
+            selectedLayerId={mint.selectedLayerId}
+            canUndo={mint.canUndo}
+            canRedo={mint.canRedo}
+            uvMode={mint.uvMode}
+            onAddLayer={mint.addLayer}
+            onRemoveLayer={mint.removeLayer}
+            onReorderLayer={mint.reorderLayer}
+            onUpdateConfig={mint.updateLayerConfig}
+            onUpdateMeta={mint.updateLayerMeta}
+            onUpdateTransform={mint.updateLayerTransform}
+            onDuplicateLayer={mint.duplicateLayer}
+            onSelectLayer={mint.selectLayer}
+            onSetCanvasSize={mint.setCanvasSize}
+            onSetBackgroundColor={mint.setBackgroundColor}
+            onSetDocMeta={mint.setDocMeta}
+            onSetUvMode={mint.setUvMode}
+            onUndo={mint.undo}
+            onRedo={mint.redo}
+            onLoadDocument={mint.loadDocument}
+            onExportPng={mint.exportPng}
+            onExportBatchPng={mint.exportBatchPng}
+            showGrid={showMintGrid}
+            onToggleGrid={() => setShowMintGrid((prev) => !prev)}
+            animatePreview={mintAnimate}
+            onToggleAnimate={() => setMintAnimate((prev) => !prev)}
+            getThumbnailSrc={mint.getLayerThumbnailSrc}
+          />
+        ) : tokenisation.mode === 'tokenise' ? (
+          <TokenisePanel
+            selectedImage={selectedImage}
+            stampPath={stampPath}
+            onStampPathChange={setStampPath}
+            extractedFrames={currentFrames}
+            extractionProgress={tokenisation.extractionProgress}
+            onExtractFrames={handleExtractFrames}
+            onClearFrames={handleClearFrames}
+            audioSegments={currentSegments}
+            selectedPieceCount={tokenisation.selectedPieceIds.size}
+            totalPieces={
+              selectedImage?.mediaType === 'video' ? currentFrames.length :
+              selectedImage?.mediaType === 'audio' ? currentSegments.length : 1
+            }
+            isStamping={isStamping}
+            onStampPieces={handleStampPieces}
+            onMintPieces={handleMintPieces}
+            isMinting={isMinting}
+            mintingProgress={tokenisation.mintingProgress}
+            lastReceipt={lastReceipt}
+          />
+        ) : (
         <aside className="panel right-panel">
           <h2>Settings</h2>
           {selectedImage ? (
@@ -819,7 +1270,7 @@ export default function App() {
                     <input
                       type="range"
                       min="0.05"
-                      max="0.4"
+                      max="1.0"
                       step="0.01"
                       value={selectedImage.settings.logoScale}
                       onChange={(event) =>
@@ -1028,6 +1479,7 @@ export default function App() {
             <div className="small">Pick an image to edit its settings.</div>
           )}
         </aside>
+        )}
       </div>
 
       <PageStrip
@@ -1042,6 +1494,7 @@ export default function App() {
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
         isAnimating={isAnimating}
+        animateProgress={animateProgress}
         onAnimate={handleAnimate}
       />
 

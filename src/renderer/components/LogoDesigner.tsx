@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import {
   defaultDesignerConfig,
   designerLogoToAsset,
+  FONT_OPTIONS,
   generateDesignerLogo,
+  type LogoBgShape,
   type LogoBorderStyle,
   type LogoDesignerConfig,
   type LogoFillMode,
@@ -92,6 +94,16 @@ export default function LogoDesigner({ onSave, onClose }: LogoDesignerProps) {
               <h3>Typography</h3>
               <div className="control-group">
                 <label className="control-row">
+                  <span>Font</span>
+                  <select value={config.fontFamily} onChange={(e) => patch({ fontFamily: e.target.value })}>
+                    {FONT_OPTIONS.map((f) => (
+                      <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="control-row">
                   <span>Weight</span>
                   <input type="range" min="300" max="900" step="100" value={config.fontWeight} onChange={(e) => patch({ fontWeight: Number(e.target.value) })} />
                 </label>
@@ -160,6 +172,28 @@ export default function LogoDesigner({ onSave, onClose }: LogoDesignerProps) {
             </div>
 
             <div className="section">
+              <h3>Outer Stroke</h3>
+              <div className="control-group">
+                <label className="control-row">
+                  <span>Enabled</span>
+                  <input type="checkbox" checked={config.outerStrokeEnabled} onChange={(e) => patch({ outerStrokeEnabled: e.target.checked })} />
+                </label>
+                {config.outerStrokeEnabled && (
+                  <>
+                    <label className="control-row">
+                      <span>Color</span>
+                      <input type="color" value={config.outerStrokeColor} onChange={(e) => patch({ outerStrokeColor: e.target.value })} />
+                    </label>
+                    <label className="control-row">
+                      <span>Width</span>
+                      <input type="range" min="2" max="30" step="1" value={config.outerStrokeWidth} onChange={(e) => patch({ outerStrokeWidth: Number(e.target.value) })} />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="section">
               <h3>Background</h3>
               <div className="control-group">
                 <label className="control-row">
@@ -175,6 +209,39 @@ export default function LogoDesigner({ onSave, onClose }: LogoDesignerProps) {
                     <label className="control-row">
                       <span>Opacity</span>
                       <input type="range" min="0.05" max="1" step="0.05" value={config.bgOpacity} onChange={(e) => patch({ bgOpacity: Number(e.target.value) })} />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="section">
+              <h3>Background Shape</h3>
+              <div className="control-group">
+                <label className="control-row">
+                  <span>Shape</span>
+                  <select value={config.bgShape} onChange={(e) => patch({ bgShape: e.target.value as LogoBgShape })}>
+                    <option value="none">None</option>
+                    <option value="rect">Rectangle</option>
+                    <option value="circle">Circle</option>
+                    <option value="diamond">Diamond</option>
+                    <option value="star">Star</option>
+                    <option value="hexagon">Hexagon</option>
+                  </select>
+                </label>
+                {config.bgShape !== 'none' && (
+                  <>
+                    <label className="control-row">
+                      <span>Color</span>
+                      <input type="color" value={config.bgShapeColor} onChange={(e) => patch({ bgShapeColor: e.target.value })} />
+                    </label>
+                    <label className="control-row">
+                      <span>Opacity</span>
+                      <input type="range" min="0.05" max="1" step="0.05" value={config.bgShapeOpacity} onChange={(e) => patch({ bgShapeOpacity: Number(e.target.value) })} />
+                    </label>
+                    <label className="control-row">
+                      <span>Scale</span>
+                      <input type="range" min="0.5" max="1.5" step="0.05" value={config.bgShapeScale} onChange={(e) => patch({ bgShapeScale: Number(e.target.value) })} />
                     </label>
                   </>
                 )}

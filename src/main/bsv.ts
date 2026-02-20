@@ -35,6 +35,9 @@ export async function inscribeStamp(payload: {
   path: string;
   hash: string;
   timestamp: string;
+  parentHash?: string;
+  pieceIndex?: number;
+  totalPieces?: number;
 }): Promise<{ txid: string }> {
   const wif = await loadPrivateKey();
   const privateKey = PrivateKey.fromWif(wif);
@@ -54,13 +57,24 @@ export async function inscribeStamp(payload: {
     unlockingScriptTemplate: new P2PKH().unlock(privateKey)
   });
 
-  // Build OP_RETURN: STAMP | path | hash | timestamp
+  // Build OP_RETURN: STAMP | path | hash | timestamp [| PARENT:hash | INDEX:n | TOTAL:n]
   const opReturn = new Script();
   opReturn.writeOpCode(106); // OP_RETURN
   opReturn.writeBin(Array.from(Buffer.from('STAMP', 'utf8')));
   opReturn.writeBin(Array.from(Buffer.from(payload.path, 'utf8')));
   opReturn.writeBin(Array.from(Buffer.from(payload.hash, 'utf8')));
   opReturn.writeBin(Array.from(Buffer.from(payload.timestamp, 'utf8')));
+
+  // Extended metadata for tokenised pieces
+  if (payload.parentHash) {
+    opReturn.writeBin(Array.from(Buffer.from(`PARENT:${payload.parentHash}`, 'utf8')));
+  }
+  if (payload.pieceIndex !== undefined) {
+    opReturn.writeBin(Array.from(Buffer.from(`INDEX:${payload.pieceIndex}`, 'utf8')));
+  }
+  if (payload.totalPieces !== undefined) {
+    opReturn.writeBin(Array.from(Buffer.from(`TOTAL:${payload.totalPieces}`, 'utf8')));
+  }
 
   tx.addOutput({ lockingScript: opReturn, satoshis: 0 });
 

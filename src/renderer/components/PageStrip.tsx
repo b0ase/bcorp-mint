@@ -1,6 +1,13 @@
 import React from 'react';
 import type { ImageItem, Spread } from '../lib/types';
 
+type AnimateProgress = {
+  stage: string;
+  percent: number;
+  elapsed: number;
+  detail?: string;
+};
+
 type PageStripProps = {
   spreads: Spread[];
   allImages: ImageItem[];
@@ -13,10 +20,17 @@ type PageStripProps = {
   selectedModel: string | null;
   onModelChange: (model: string) => void;
   isAnimating: boolean;
+  animateProgress: AnimateProgress | null;
   onAnimate: () => void;
 };
 
-export default function PageStrip({ spreads, allImages, activeIndex, enabledIds, onPageClick, onToggleImage, comfyConnected, comfyModels, selectedModel, onModelChange, isAnimating, onAnimate }: PageStripProps) {
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}s`;
+}
+
+export default function PageStrip({ spreads, allImages, activeIndex, enabledIds, onPageClick, onToggleImage, comfyConnected, comfyModels, selectedModel, onModelChange, isAnimating, animateProgress, onAnimate }: PageStripProps) {
   const notInIssue = enabledIds ? allImages.filter((img) => !enabledIds.has(img.id)) : [];
 
   return (
@@ -57,6 +71,23 @@ export default function PageStrip({ spreads, allImages, activeIndex, enabledIds,
       )}
 
       <div className="page-strip-spacer" />
+
+      {isAnimating && animateProgress && (
+        <div className="animate-progress">
+          <div className="animate-progress-bar">
+            <div
+              className="animate-progress-fill"
+              style={{ width: `${animateProgress.percent}%` }}
+            />
+          </div>
+          <span className="animate-progress-text">
+            {animateProgress.stage}
+            {' '}
+            {formatElapsed(animateProgress.elapsed)}
+            {animateProgress.detail ? ` \u00b7 ${animateProgress.detail}` : ''}
+          </span>
+        </div>
+      )}
 
       {comfyConnected && comfyModels.length > 0 && (
         <select

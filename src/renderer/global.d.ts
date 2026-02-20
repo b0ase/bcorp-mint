@@ -28,6 +28,46 @@ declare global {
         motionStrength?: number;
         modelName?: string;
       }) => Promise<{ videoPath: string; filename: string }>;
+      onComfyProgress: (callback: (data: { stage: string; percent: number; elapsed: number; detail?: string }) => void) => () => void;
+
+      // Media extraction
+      probeMedia: (filePath: string) => Promise<{
+        duration: number;
+        width: number;
+        height: number;
+        fps: number;
+        sampleRate: number;
+        channels: number;
+        codec: string;
+        hasVideo: boolean;
+        hasAudio: boolean;
+      }>;
+      extractVideoFrames: (payload: {
+        filePath: string;
+        outputDir?: string;
+        interval?: number;
+        maxFrames?: number;
+        quality?: 'low' | 'medium' | 'high';
+      }) => Promise<{
+        frames: Array<{ path: string; index: number; timestamp: number }>;
+        outputDir: string;
+      }>;
+      extractAudioSegment: (payload: {
+        filePath: string;
+        outputPath: string;
+        startTime: number;
+        endTime: number;
+      }) => Promise<string>;
+      getAudioPeaks: (filePath: string, numSamples?: number) => Promise<number[]>;
+      generateWaveform: (payload: {
+        filePath: string;
+        outputPath: string;
+        width?: number;
+        height?: number;
+        color?: string;
+      }) => Promise<string>;
+      cleanupExtraction: (dir: string) => Promise<void>;
+      onExtractionProgress: (callback: (data: { completed: number; total: number; stage: string }) => void) => () => void;
 
       // Hashing
       hashFile: (filePath: string) => Promise<{ hash: string; size: number }>;
@@ -44,15 +84,43 @@ declare global {
       walletDisconnect: () => Promise<void>;
 
       // Blockchain
-      inscribeStamp: (payload: { path: string; hash: string; timestamp: string }) =>
-        Promise<{ txid: string }>;
-      mintStampToken: (payload: { path: string; hash: string; name: string }) =>
-        Promise<{ tokenId: string }>;
+      inscribeStamp: (payload: {
+        path: string;
+        hash: string;
+        timestamp: string;
+        parentHash?: string;
+        pieceIndex?: number;
+        totalPieces?: number;
+      }) => Promise<{ txid: string }>;
+      mintStampToken: (payload: {
+        path: string;
+        hash: string;
+        name: string;
+        iconDataB64?: string;
+        iconContentType?: string;
+      }) => Promise<{ tokenId: string }>;
+      batchMintTokens: (pieces: Array<{
+        path: string;
+        hash: string;
+        name: string;
+        iconDataB64?: string;
+        iconContentType?: string;
+      }>) => Promise<Array<{ tokenId: string; txid: string; index: number }>>;
+      onMintProgress: (callback: (data: { completed: number; total: number; stage: string }) => void) => () => void;
 
       // Keystore
       keystoreHasKey: () => Promise<boolean>;
       keystoreSaveKey: (wif: string) => Promise<void>;
       keystoreDeleteKey: () => Promise<void>;
+
+      // Mint documents
+      listMintDocuments: () => Promise<{ id: string; name: string; filePath: string; updatedAt: string }[]>;
+      saveMintDocument: (docJson: string) => Promise<string>;
+      loadMintDocument: (filePath: string) => Promise<string>;
+      deleteMintDocument: (filePath: string) => Promise<void>;
+      exportMintPng: (payload: { dataUrl: string; defaultName?: string }) => Promise<string | null>;
+      exportMintSvg: (payload: { svgContent: string; defaultName?: string }) => Promise<string | null>;
+      exportMintBatch: (payload: { folder: string; dataUrls: { name: string; dataUrl: string }[] }) => Promise<string[]>;
     };
   }
 }

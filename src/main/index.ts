@@ -1,22 +1,43 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, protocol, net } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey } from './keystore';
 import { inscribeStamp } from './bsv';
 import { getRedirectUrl, getWalletState, disconnect as walletDisconnect } from './handcash';
-import { mintStampToken } from './token-mint';
+import { mintStampToken, batchMintTokens } from './token-mint';
+import { probeMedia, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isDev = !app.isPackaged;
 
-const SUPPORTED_EXT = new Set([
-  '.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp'
+// Must be called BEFORE app.ready — allows renderer to load from npg-media:// URLs
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'npg-media',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      corsEnabled: true,
+      bypassCSP: true
+    }
+  }
 ]);
+
+const SUPPORTED_EXT = new Set([
+  '.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp',
+  '.mp4', '.mov', '.webm', '.avi',
+  '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'
+]);
+
+const VIDEO_EXT = new Set(['.mp4', '.mov', '.webm', '.avi']);
+const AUDIO_EXT = new Set(['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a']);
 
 const MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -26,18 +47,29 @@ const MIME: Record<string, string> = {
   '.tif': 'image/tiff',
   '.tiff': 'image/tiff',
   '.bmp': 'image/bmp',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+  '.avi': 'video/x-msvideo',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.flac': 'audio/flac',
+  '.aac': 'audio/aac',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4'
 };
 
 function createWindow() {
   const preloadPath = path.join(__dirname, '../preload/index.cjs');
 
   const win = new BrowserWindow({
+    title: 'The Bitcoin Corporation Mint',
     width: 1280,
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#030303',
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -59,6 +91,24 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Register custom protocol for streaming local media files (used for video playback)
+  protocol.handle('npg-media', async (request) => {
+    try {
+      const url = new URL(request.url);
+      const filePath = url.searchParams.get('path');
+      if (!filePath) return new Response('Missing path', { status: 400 });
+      const fileUrl = pathToFileURL(filePath).href;
+      const response = await net.fetch(fileUrl);
+      // Add CORS headers so renderer can access from any origin (dev server, file://)
+      const headers = new Headers(response.headers);
+      headers.set('Access-Control-Allow-Origin', '*');
+      return new Response(response.body, { status: response.status, headers });
+    } catch (err) {
+      console.error('[npg-media] protocol error:', err);
+      return new Response('File not found', { status: 404 });
+    }
+  });
+
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -68,6 +118,9 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+// Register temp directory cleanup on quit (privacy)
+registerCleanupOnQuit();
 
 // --------------- IPC handlers ---------------
 
@@ -88,7 +141,12 @@ ipcMain.handle('select-folder', async () => {
 ipcMain.handle('open-images', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
-    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff', 'bmp'] }]
+    filters: [
+      { name: 'All Media', extensions: ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff', 'bmp', 'mp4', 'mov', 'webm', 'avi', 'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'] },
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff', 'bmp'] },
+      { name: 'Videos', extensions: ['mp4', 'mov', 'webm', 'avi'] },
+      { name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'] }
+    ]
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths;
@@ -324,12 +382,86 @@ ipcMain.handle('wallet-disconnect', async () => {
 
 // --------------- Blockchain handlers ---------------
 
-ipcMain.handle('inscribe-stamp', async (_e, payload: { path: string; hash: string; timestamp: string }) => {
+ipcMain.handle('inscribe-stamp', async (_e, payload: {
+  path: string;
+  hash: string;
+  timestamp: string;
+  parentHash?: string;
+  pieceIndex?: number;
+  totalPieces?: number;
+}) => {
   return inscribeStamp(payload);
 });
 
-ipcMain.handle('mint-stamp-token', async (_e, payload: { path: string; hash: string; name: string }) => {
+ipcMain.handle('mint-stamp-token', async (_e, payload: {
+  path: string;
+  hash: string;
+  name: string;
+  iconDataB64?: string;
+  iconContentType?: string;
+}) => {
   return mintStampToken(payload);
+});
+
+ipcMain.handle('batch-mint-tokens', async (_e, pieces: Array<{
+  path: string;
+  hash: string;
+  name: string;
+  iconDataB64?: string;
+  iconContentType?: string;
+}>) => {
+  return batchMintTokens(pieces);
+});
+
+// --------------- Media extraction handlers ---------------
+
+ipcMain.handle('probe-media', async (_e, filePath: string) => {
+  return probeMedia(filePath);
+});
+
+ipcMain.handle('extract-video-frames', async (_e, payload: {
+  filePath: string;
+  outputDir?: string;
+  interval?: number;
+  maxFrames?: number;
+  quality?: 'low' | 'medium' | 'high';
+}) => {
+  return extractVideoFrames(payload.filePath, payload.outputDir || '', {
+    interval: payload.interval,
+    maxFrames: payload.maxFrames,
+    quality: payload.quality
+  });
+});
+
+ipcMain.handle('extract-audio-segment', async (_e, payload: {
+  filePath: string;
+  outputPath: string;
+  startTime: number;
+  endTime: number;
+}) => {
+  return extractAudioSegment(payload.filePath, payload.outputPath, payload.startTime, payload.endTime);
+});
+
+ipcMain.handle('get-audio-peaks', async (_e, payload: { filePath: string; numSamples?: number }) => {
+  return getAudioPeaks(payload.filePath, payload.numSamples);
+});
+
+ipcMain.handle('generate-waveform', async (_e, payload: {
+  filePath: string;
+  outputPath: string;
+  width?: number;
+  height?: number;
+  color?: string;
+}) => {
+  return generateWaveformImage(payload.filePath, payload.outputPath, {
+    width: payload.width,
+    height: payload.height,
+    color: payload.color
+  });
+});
+
+ipcMain.handle('cleanup-extraction', async (_e, dir: string) => {
+  return cleanupTempDir(dir);
 });
 
 // --------------- Keystore handlers ---------------
@@ -337,6 +469,83 @@ ipcMain.handle('mint-stamp-token', async (_e, payload: { path: string; hash: str
 ipcMain.handle('keystore-has-key', async () => hasPrivateKey());
 ipcMain.handle('keystore-save-key', async (_e, wif: string) => savePrivateKey(wif));
 ipcMain.handle('keystore-delete-key', async () => deletePrivateKey());
+
+// --------------- Mint document handlers ---------------
+
+const getMintDocsDir = () => path.join(app.getPath('userData'), 'mint-documents');
+
+ipcMain.handle('list-mint-documents', async () => {
+  const dir = getMintDocsDir();
+  await fs.mkdir(dir, { recursive: true });
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const results: { id: string; name: string; filePath: string; updatedAt: string }[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.mint.json')) continue;
+    try {
+      const raw = await fs.readFile(path.join(dir, entry.name), 'utf-8');
+      const data = JSON.parse(raw);
+      results.push({ id: data.id, name: data.name, filePath: path.join(dir, entry.name), updatedAt: data.updatedAt });
+    } catch { /* skip corrupt */ }
+  }
+  results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return results;
+});
+
+ipcMain.handle('save-mint-document', async (_e, docJson: string) => {
+  const dir = getMintDocsDir();
+  await fs.mkdir(dir, { recursive: true });
+  const data = JSON.parse(docJson);
+  const filePath = path.join(dir, `${data.id}.mint.json`);
+  await fs.writeFile(filePath, docJson, 'utf-8');
+  return filePath;
+});
+
+ipcMain.handle('load-mint-document', async (_e, filePath: string) => {
+  const raw = await fs.readFile(filePath, 'utf-8');
+  return raw;
+});
+
+ipcMain.handle('delete-mint-document', async (_e, filePath: string) => {
+  await fs.unlink(filePath);
+});
+
+ipcMain.handle('export-mint-png', async (_e, payload: { dataUrl: string; defaultName?: string }) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: payload.defaultName,
+    filters: [
+      { name: 'PNG Image', extensions: ['png'] },
+      { name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }
+    ]
+  });
+  if (result.canceled || !result.filePath) return null;
+  const match = payload.dataUrl.match(/^data:(.+);base64,(.*)$/);
+  if (!match) throw new Error('Invalid data URL');
+  await fs.writeFile(result.filePath, Buffer.from(match[2], 'base64'));
+  return result.filePath;
+});
+
+ipcMain.handle('export-mint-svg', async (_e, payload: { svgContent: string; defaultName?: string }) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: payload.defaultName,
+    filters: [{ name: 'SVG Image', extensions: ['svg'] }]
+  });
+  if (result.canceled || !result.filePath) return null;
+  await fs.writeFile(result.filePath, payload.svgContent, 'utf-8');
+  return result.filePath;
+});
+
+ipcMain.handle('export-mint-batch', async (_e, payload: { folder: string; dataUrls: { name: string; dataUrl: string }[] }) => {
+  await fs.mkdir(payload.folder, { recursive: true });
+  const results: string[] = [];
+  for (const item of payload.dataUrls) {
+    const match = item.dataUrl.match(/^data:(.+);base64,(.*)$/);
+    if (!match) continue;
+    const filePath = path.join(payload.folder, item.name);
+    await fs.writeFile(filePath, Buffer.from(match[2], 'base64'));
+    results.push(filePath);
+  }
+  return results;
+});
 
 // --------------- ComfyUI integration ---------------
 
@@ -369,10 +578,16 @@ ipcMain.handle('comfyui-check', async () => {
   }
 });
 
+// Track which loader each model belongs to
+const unetModels = new Set<string>();
+const checkpointModels = new Set<string>();
+
 // List available video models from ComfyUI (checks both checkpoint and UNET loaders)
 ipcMain.handle('comfyui-list-models', async () => {
   try {
     const models: string[] = [];
+    unetModels.clear();
+    checkpointModels.clear();
 
     // Check ImageOnlyCheckpointLoader (SVD-style models)
     try {
@@ -380,17 +595,26 @@ ipcMain.handle('comfyui-list-models', async () => {
       if (res.status === 200) {
         const data = JSON.parse(res.body.toString());
         const names = data.ImageOnlyCheckpointLoader?.input?.required?.ckpt_name?.[0];
-        if (Array.isArray(names)) models.push(...names);
+        if (Array.isArray(names)) {
+          names.forEach((n: string) => checkpointModels.add(n));
+          models.push(...names);
+        }
       }
     } catch { /* ignore */ }
 
     // Check UNETLoader (Wan 2.1, etc.)
+    // Filter out CLIP/encoder models (qwen, clip, text_encoder) — only include video diffusion models
+    const nonVideoPatterns = /qwen|clip|text.?enc|vae|lora/i;
     try {
       const res = await comfyFetch('/object_info/UNETLoader');
       if (res.status === 200) {
         const data = JSON.parse(res.body.toString());
         const names = data.UNETLoader?.input?.required?.unet_name?.[0];
-        if (Array.isArray(names)) models.push(...names);
+        if (Array.isArray(names)) {
+          const videoModels = names.filter((n: string) => !nonVideoPatterns.test(n));
+          videoModels.forEach((n: string) => unetModels.add(n));
+          models.push(...videoModels);
+        }
       }
     } catch { /* ignore */ }
 
@@ -426,10 +650,14 @@ async function comfyUploadImage(filePath: string): Promise<string> {
   return data.name;
 }
 
-// Detect model type from filename
+// Detect model type: if the model came from UNETLoader it's a Wan/UNET workflow,
+// if from ImageOnlyCheckpointLoader it's SVD. Fall back to filename detection.
 function detectModelType(modelName: string): 'wan' | 'svd' {
+  if (unetModels.has(modelName)) return 'wan';
+  if (checkpointModels.has(modelName)) return 'svd';
+  // Fallback to filename heuristic
   const lower = modelName.toLowerCase();
-  if (lower.includes('wan')) return 'wan';
+  if (lower.includes('wan') || lower.includes('qwen')) return 'wan';
   return 'svd';
 }
 
@@ -577,9 +805,18 @@ function buildSvdWorkflow(imageName: string, frames: number, fps: number, motion
   };
 }
 
+// Send progress updates to the renderer
+function sendAnimateProgress(stage: string, percent: number, elapsed: number, detail?: string) {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('comfyui-progress', { stage, percent, elapsed, detail });
+}
+
 // Queue a prompt and wait for it to complete, return output info
-async function comfyQueueAndWait(workflow: Record<string, unknown>, onProgress?: (pct: number) => void): Promise<{ images: string[]; videos: string[] }> {
+async function comfyQueueAndWait(workflow: Record<string, unknown>): Promise<{ images: string[]; videos: string[] }> {
   const clientId = 'npg-maker-' + Date.now();
+  const startTime = Date.now();
+
+  sendAnimateProgress('Queuing prompt...', 5, 0);
 
   // Queue the prompt
   const promptPayload = JSON.stringify({ prompt: workflow, client_id: clientId });
@@ -595,10 +832,13 @@ async function comfyQueueAndWait(workflow: Record<string, unknown>, onProgress?:
   }
 
   const { prompt_id } = JSON.parse(queueRes.body.toString());
+  sendAnimateProgress('Loading model...', 10, 0);
 
   // Poll for completion
+  let lastNodeCount = 0;
   for (let attempt = 0; attempt < 600; attempt++) { // up to 10 minutes
     await new Promise((r) => setTimeout(r, 1000));
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
 
     const histRes = await comfyFetch(`/history/${prompt_id}`);
     if (histRes.status !== 200) continue;
@@ -606,31 +846,43 @@ async function comfyQueueAndWait(workflow: Record<string, unknown>, onProgress?:
     const history = JSON.parse(histRes.body.toString());
     const entry = history[prompt_id];
     if (!entry) {
-      // Check queue position for progress
-      if (onProgress) {
-        try {
-          const qRes = await comfyFetch('/queue');
-          const qData = JSON.parse(qRes.body.toString());
-          const running = qData.queue_running?.length ?? 0;
-          const pending = qData.queue_pending?.length ?? 0;
-          if (running > 0) onProgress(0.5); // rough progress
-          else if (pending === 0) onProgress(0.9);
-        } catch { /* ignore */ }
-      }
+      // Check execution progress via WebSocket-style polling
+      try {
+        const qRes = await comfyFetch('/queue');
+        const qData = JSON.parse(qRes.body.toString());
+        const running = qData.queue_running?.length ?? 0;
+        const pending = qData.queue_pending?.length ?? 0;
+
+        if (pending > 0) {
+          sendAnimateProgress('Queued...', 8, elapsed, `${pending} job(s) ahead`);
+        } else if (running > 0) {
+          // Estimate progress based on elapsed time (typical 3-8 min range)
+          const estimatedPct = Math.min(85, 15 + (elapsed / 360) * 70);
+          const stage = elapsed < 30 ? 'Loading model...' : 'Generating frames...';
+          sendAnimateProgress(stage, Math.round(estimatedPct), elapsed);
+        }
+      } catch { /* ignore */ }
       continue;
     }
 
+    // Check for execution error
+    const status = entry.status as { status_str?: string; messages?: unknown[][] } | undefined;
+    if (status?.status_str === 'error') {
+      const errMsg = status.messages?.find((m: unknown[]) => m[0] === 'execution_error');
+      const detail = errMsg ? (errMsg[1] as { exception_message?: string })?.exception_message : 'Unknown error';
+      throw new Error(`ComfyUI execution error: ${detail}`);
+    }
+
     // Done! Collect outputs
+    sendAnimateProgress('Processing output...', 90, elapsed);
     const outputs: { images: string[]; videos: string[] } = { images: [], videos: [] };
     for (const nodeOutput of Object.values(entry.outputs || {})) {
       const out = nodeOutput as Record<string, unknown[]>;
-      // VHS-style video output
       if (out.gifs) {
         for (const gif of out.gifs as Array<{ filename: string; subfolder: string; type: string }>) {
           outputs.videos.push(gif.filename);
         }
       }
-      // Built-in SaveVideo output
       if (out.videos) {
         for (const vid of out.videos as Array<{ filename: string; subfolder: string; type: string }>) {
           outputs.videos.push(vid.filename);
@@ -662,7 +914,10 @@ ipcMain.handle('comfyui-animate', async (_e, payload: {
   const motionStrength = payload.motionStrength ?? 0.5;
   const modelName = payload.modelName ?? 'svd_xt_1_1.safetensors';
 
+  const startTime = Date.now();
+
   // 1. Upload the source image
+  sendAnimateProgress('Uploading image...', 2, 0);
   const uploadedName = await comfyUploadImage(payload.imagePath);
 
   // 2. Build and queue the workflow (pick based on model type)
@@ -676,6 +931,9 @@ ipcMain.handle('comfyui-animate', async (_e, payload: {
   const videoFile = result.videos[0];
   if (!videoFile) throw new Error('No video output from ComfyUI');
 
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  sendAnimateProgress('Downloading video...', 95, elapsed);
+
   const viewRes = await comfyFetch(`/view?filename=${encodeURIComponent(videoFile)}&type=output`);
   if (viewRes.status !== 200) throw new Error('Failed to download video from ComfyUI');
 
@@ -684,5 +942,6 @@ ipcMain.handle('comfyui-animate', async (_e, payload: {
   const outPath = path.join(payload.outputDir, videoFile);
   await fs.writeFile(outPath, viewRes.body);
 
+  sendAnimateProgress('Done!', 100, Math.floor((Date.now() - startTime) / 1000));
   return { videoPath: outPath, filename: videoFile };
 });
