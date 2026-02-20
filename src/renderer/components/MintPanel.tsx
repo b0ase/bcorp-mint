@@ -202,7 +202,7 @@ export default function MintPanel({
       if (!filePath) { setIsStamping(false); return; }
       const { hash } = await window.mint.hashFile(filePath);
       const timestamp = new Date().toISOString();
-      const stampPath = `$MINT/${doc.name || 'DESIGN'}`;
+      const stampPath = `$STAMP/${doc.name || 'DESIGN'}`;
       const receipt = {
         id: crypto.randomUUID(), path: stampPath, hash, algorithm: 'sha256' as const,
         sourceFile: filePath.split('/').pop() || 'mint.png', sourceSize: 0,
@@ -237,8 +237,8 @@ export default function MintPanel({
       if (!filePath) { setIsStamping(false); return; }
       const { hash } = await window.mint.hashFile(filePath);
       const { tokenId } = await window.mint.mintStampToken({
-        path: `$MINT/${doc.name || 'TOKEN'}`, hash,
-        name: doc.name || 'MINT TOKEN',
+        path: `$STAMP/${doc.name || 'TOKEN'}`, hash,
+        name: doc.name || 'TOKEN',
         iconDataB64: match[2], iconContentType: match[1]
       });
       setStampResult(`Minted: ${tokenId}`);

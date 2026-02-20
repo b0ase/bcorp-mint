@@ -186,7 +186,7 @@ export default function TokenisePanel({
               type="text"
               value={stampPath}
               onChange={(e) => onStampPathChange(e.target.value)}
-              placeholder="$MINT/VIDEO-01"
+              placeholder="$TOKEN/VIDEO-01"
             />
           </label>
           <div className="small" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>

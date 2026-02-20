@@ -375,7 +375,7 @@ export default function LogoDesigner({ onSave, onClose }: LogoDesignerProps) {
 
         <div className="logo-designer-footer">
           <span className="small">
-            {config.layout} / {config.fillMode}{config.strokeEnabled ? '+stroke' : ''} / {config.text || 'MINT'}
+            {config.layout} / {config.fillMode}{config.strokeEnabled ? '+stroke' : ''} / {config.text || 'LOGO'}
             {config.skewX || config.skewY ? ` / skew(${config.skewX}, ${config.skewY})` : ''}
           </span>
           <div style={{ display: 'flex', gap: '8px' }}>

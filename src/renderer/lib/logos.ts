@@ -15,7 +15,7 @@ const encodeSvg = (svg: string) =>
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
 export const createTextLogo = (text: string, color: string, style: GeneratedLogoStyle): LogoAsset => {
-  const safeText = text.trim() || 'MINT';
+  const safeText = text.trim() || 'LOGO';
   const id = `gen-${crypto.randomUUID()}`;
   const font = "'Space Grotesk', 'Helvetica Neue', Arial, sans-serif";
 
@@ -112,7 +112,7 @@ export const FONT_OPTIONS = [
 ] as const;
 
 export const defaultDesignerConfig: LogoDesignerConfig = {
-  text: 'MINT',
+  text: '',
   subtitleText: '',
   layout: 'horizontal',
   fontFamily: 'Space Grotesk',
@@ -281,7 +281,7 @@ const buildStars = (cx: number, cy: number, radius: number, count: number, c: Lo
 
 const buildHorizontal = (c: LogoDesignerConfig): string => {
   const w = 900, h = 300;
-  const safeText = escapeXml(c.text || 'MINT');
+  const safeText = escapeXml(c.text || 'LOGO');
   const safeSub = escapeXml(c.subtitleText);
   const sc = c.subtitleColor || c.color;
   const font = fontStack(c.fontFamily);
@@ -310,7 +310,7 @@ const buildHorizontal = (c: LogoDesignerConfig): string => {
 const buildCircular = (c: LogoDesignerConfig): string => {
   const w = 600, h = 600;
   const cx = 300, cy = 300;
-  const safeText = escapeXml(c.text || 'MINT');
+  const safeText = escapeXml(c.text || 'LOGO');
   const bc = c.borderColor || c.color;
   const outerAttrs = buildOuterStrokeAttrs(c);
   const outerText = outerAttrs ? `<text ${outerAttrs} text-anchor="middle"><textPath href="#arc" startOffset="50%">${safeText}</textPath></text>` : '';
@@ -336,7 +336,7 @@ const buildCircular = (c: LogoDesignerConfig): string => {
 
 const buildStacked = (c: LogoDesignerConfig): string => {
   const w = 600, h = 500;
-  const safeText = escapeXml(c.text || 'MINT');
+  const safeText = escapeXml(c.text || 'LOGO');
   const safeSub = escapeXml(c.subtitleText);
   const sc = c.subtitleColor || c.color;
   const font = fontStack(c.fontFamily);
@@ -368,7 +368,7 @@ const buildStacked = (c: LogoDesignerConfig): string => {
 
 const buildBadge = (c: LogoDesignerConfig): string => {
   const w = 500, h = 600;
-  const safeText = escapeXml(c.text || 'MINT');
+  const safeText = escapeXml(c.text || 'LOGO');
   const safeSub = escapeXml(c.subtitleText);
   const sc = c.subtitleColor || c.color;
   const font = fontStack(c.fontFamily);
@@ -410,7 +410,7 @@ export const designerLogoToAsset = (config: LogoDesignerConfig): LogoAsset => {
   const svg = generateDesignerLogo(config);
   return {
     id: `designer-${crypto.randomUUID()}`,
-    name: `${config.layout} / ${config.fillMode} / ${config.text || 'MINT'}`,
+    name: `${config.layout} / ${config.fillMode} / ${config.text || 'LOGO'}`,
     src: encodeSvg(svg),
     kind: 'generated',
   };

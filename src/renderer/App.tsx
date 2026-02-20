@@ -56,7 +56,7 @@ export default function App() {
   const [logos, setLogos] = useState<LogoAsset[]>(initialLogos);
   const [isExporting, setIsExporting] = useState(false);
   const [logoForm, setLogoForm] = useState({
-    text: 'MINT',
+    text: '',
     color: '#ffffff',
     style: 'solid' as GeneratedLogoStyle
   });
@@ -80,7 +80,7 @@ export default function App() {
   const [playingVideo, setPlayingVideo] = useState(false);
 
   // Stamp state
-  const [stampPath, setStampPath] = useState('$MINT/SERIES-01/ISSUE-1');
+  const [stampPath, setStampPath] = useState('');
   const [walletState, setWalletState] = useState<WalletState>({ connected: false, handle: null, authToken: null, balance: null });
   const [lastReceipt, setLastReceipt] = useState<StampReceipt | null>(null);
   const [isStamping, setIsStamping] = useState(false);
@@ -1363,7 +1363,7 @@ export default function App() {
                           });
                         }
                       }}
-                      placeholder="$MINT/SERIES-01/ISSUE-1"
+                      placeholder="$TOKEN/SERIES/ISSUE"
                     />
                   </label>
                   <label className="control-row">

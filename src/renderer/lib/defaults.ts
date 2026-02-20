@@ -11,7 +11,7 @@ export const createDefaultSettings = (logoId: string): ImageSettings => ({
   frameColor: '#f5f5f5',
   stampVisual: {
     watermarkEnabled: false,
-    watermarkText: 'MINT',
+    watermarkText: '',
     watermarkOpacity: 0.15,
     watermarkPosition: 'diagonal',
     borderStampEnabled: false,
