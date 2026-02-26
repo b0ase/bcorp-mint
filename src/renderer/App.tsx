@@ -6,16 +6,28 @@ import LogoDesigner from './components/LogoDesigner';
 import MintCanvas from './components/MintCanvas';
 import MintPanel from './components/MintPanel';
 import ModeToggle from './components/ModeToggle';
+import MusicCanvas from './components/MusicCanvas';
+import MusicPanel from './components/MusicPanel';
 import PageStrip from './components/PageStrip';
 import SplashScreen from './components/SplashScreen';
 import TokenisePanel from './components/TokenisePanel';
 import WaveformEditor from './components/WaveformEditor';
+import WalletSelector from './components/WalletSelector';
+import MetaNetTreeView from './components/MetaNetTreeView';
+import FilePreviewCanvas from './components/FilePreviewCanvas';
+import ProtocolConditionPanel from './components/ProtocolConditionPanel';
+import BatchInscriptionPanel from './components/BatchInscriptionPanel';
+import DocumentHashPanel from './components/DocumentHashPanel';
 import { createDefaultSettings } from './lib/defaults';
 import { isAudioFile, isVideoFile, loadImage, loadVideoThumbnail, mediaStreamUrl } from './lib/image-utils';
 import { createTextLogo, initialLogos, type GeneratedLogoStyle } from './lib/logos';
-import type { ActiveIssue, AppMode, AudioSegment, ExtractedFrame, ImageItem, ImageSettings, LogoAsset, Spread, StampReceipt, WalletState } from './lib/types';
+import type { ActiveIssue, AppMode, AudioSegment, ExtractedFrame, ImageItem, ImageSettings, LogoAsset, Spread, StampReceipt, WalletState, WalletProviderType } from './lib/types';
 import { useMintDesigner } from './hooks/useMintDesigner';
+import { useMusicEditor } from './hooks/useMusicEditor';
 import { useTokenisation } from './hooks/useTokenisation';
+import { useWalletManager } from './hooks/useWalletManager';
+import { useMetaNetTree } from './hooks/useMetaNetTree';
+import { conditionToOnChain } from './lib/protocol-conditions';
 
 const SUPPORTED_EXT = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp',
@@ -82,11 +94,12 @@ export default function App() {
 
   // Stamp state
   const [stampPath, setStampPath] = useState('');
-  const [walletState, setWalletState] = useState<WalletState>({ connected: false, handle: null, authToken: null, balance: null });
+  const [walletState, setWalletState] = useState<WalletState>({ connected: false, handle: null, authToken: null, balance: null, provider: 'local', availableProviders: [], masterAddress: null });
   const [lastReceipt, setLastReceipt] = useState<StampReceipt | null>(null);
   const [isStamping, setIsStamping] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
   const [showReceiptViewer, setShowReceiptViewer] = useState(false);
+  const [showDocumentHash, setShowDocumentHash] = useState(false);
   const [allReceipts, setAllReceipts] = useState<StampReceipt[]>([]);
 
   // Tokenisation state
@@ -98,6 +111,13 @@ export default function App() {
   const [showMintGrid, setShowMintGrid] = useState(false);
   const [mintAnimate, setMintAnimate] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+
+  // Music Editor state
+  const music = useMusicEditor();
+
+  // Wallet manager + MetaNet tree (Phase 2+4)
+  const walletMgr = useWalletManager();
+  const metanetTree = useMetaNetTree();
 
   const canvasPanelRef = useRef<HTMLElement>(null);
   const swipeRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -365,11 +385,11 @@ export default function App() {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
 
-      const isMint = tokenisation.mode === 'mint';
+      const isCurrency = tokenisation.mode === 'currency';
       const ctrl = e.ctrlKey || e.metaKey;
 
-      // Mint mode shortcuts
-      if (isMint) {
+      // Currency mode shortcuts
+      if (isCurrency) {
         if (ctrl && e.key === 'z') { e.preventDefault(); mint.undo(); return; }
         if (ctrl && e.key === 'y') { e.preventDefault(); mint.redo(); return; }
         if (ctrl && e.key === 'd') { e.preventDefault(); if (mint.selectedLayerId) mint.duplicateLayer(mint.selectedLayerId); return; }
@@ -909,10 +929,12 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-left">
           <h1 className="brand-title">The Bitcoin Corporation <span className="brand-accent">Mint</span></h1>
-          <button className="wallet-status" onClick={handleWalletConnect} title={walletState.handle || 'Connect wallet'}>
-            <span className={`wallet-dot ${walletState.connected ? 'connected' : ''}`} />
-            {walletState.connected ? walletState.handle || 'Connected' : 'Connect Wallet'}
-          </button>
+          <WalletSelector
+            walletState={walletMgr.walletState}
+            onSwitchProvider={walletMgr.switchProvider}
+            onConnect={walletMgr.connect}
+            onDisconnect={walletMgr.disconnect}
+          />
           <div className="issue-carousel">
             {issues.map((iss) => (
               <button
@@ -938,7 +960,7 @@ export default function App() {
             Load Folder
           </button>
           <button className="secondary" onClick={handleSelectFiles}>
-            Add Media
+            Add Files
           </button>
           <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
             {isExporting ? 'Printing\u2026' : 'Print'}
@@ -1020,8 +1042,8 @@ export default function App() {
         </aside>
 
         <section className="canvas-panel" ref={canvasPanelRef}>
-          {/* Mint mode: Currency Designer canvas */}
-          {tokenisation.mode === 'mint' ? (
+          {/* Currency mode: Currency Designer canvas */}
+          {tokenisation.mode === 'currency' ? (
             <MintCanvas
               doc={mint.doc}
               selectedLayerId={mint.selectedLayerId}
@@ -1029,6 +1051,21 @@ export default function App() {
               onSelectLayer={mint.selectLayer}
               showGrid={showMintGrid}
               animatePreview={mintAnimate}
+            />
+          ) : /* Music mode: Sheet Music Notation Editor */
+          tokenisation.mode === 'music' ? (
+            <MusicCanvas
+              score={music.score}
+              selectedStaffId={music.selectedStaffId}
+              selectedMeasureIdx={music.selectedMeasureIdx}
+              selectedNoteIdx={music.selectedNoteIdx}
+              currentTool={music.currentTool}
+              currentDuration={music.currentDuration}
+              dotted={music.dotted}
+              onAddNote={music.addNote}
+              onSelectNote={music.selectNote}
+              onRemoveNote={music.removeNote}
+              renderToCanvas={music.renderToCanvas}
             />
           ) : /* Tokenise mode: show FrameBrowser or WaveformEditor */
           tokenisation.mode === 'tokenise' && selectedImage?.mediaType === 'video' && currentFrames.length > 0 ? (
@@ -1159,7 +1196,7 @@ export default function App() {
           )}
         </section>
 
-        {tokenisation.mode === 'mint' ? (
+        {tokenisation.mode === 'currency' ? (
           <MintPanel
             doc={mint.doc}
             selectedLayer={mint.selectedLayer}
@@ -1189,6 +1226,35 @@ export default function App() {
             animatePreview={mintAnimate}
             onToggleAnimate={() => setMintAnimate((prev) => !prev)}
             getThumbnailSrc={mint.getLayerThumbnailSrc}
+          />
+        ) : tokenisation.mode === 'music' ? (
+          <MusicPanel
+            score={music.score}
+            selectedStaffId={music.selectedStaffId}
+            selectedMeasureIdx={music.selectedMeasureIdx}
+            selectedNoteIdx={music.selectedNoteIdx}
+            currentTool={music.currentTool}
+            currentDuration={music.currentDuration}
+            dotted={music.dotted}
+            canUndo={music.canUndo}
+            canRedo={music.canRedo}
+            onSetTool={music.setCurrentTool}
+            onSetDuration={music.setCurrentDuration}
+            onSetDotted={music.setDotted}
+            onSetTitle={(title) => music.updateScoreMeta({ title })}
+            onSetComposer={(composer) => music.updateScoreMeta({ composer })}
+            onSetKeySignature={music.setKeySignature}
+            onSetTimeSignature={music.setTimeSignature}
+            onSetTempo={music.setTempo}
+            onAddStaff={music.addStaff}
+            onRemoveStaff={music.removeStaff}
+            onUpdateStaffClef={music.updateStaffClef}
+            onUpdateStaffName={music.updateStaffName}
+            onAddMeasure={music.addMeasure}
+            onUndo={music.undo}
+            onRedo={music.redo}
+            onExportPng={music.exportPng}
+            onExportSvg={music.exportSvg}
           />
         ) : tokenisation.mode === 'tokenise' ? (
           <TokenisePanel
@@ -1476,6 +1542,9 @@ export default function App() {
                     <button className="ghost" onClick={loadReceipts}>
                       Receipts
                     </button>
+                    <button className="ghost" onClick={() => setShowDocumentHash(true)}>
+                      Doc Hashes
+                    </button>
                   </div>
                   {lastReceipt && (
                     <div className="stamp-receipt">
@@ -1533,6 +1602,14 @@ export default function App() {
       )}
 
       {showSplash && <SplashScreen onEnter={() => setShowSplash(false)} />}
+
+      {showDocumentHash && (
+        <DocumentHashPanel
+          walletProvider={walletMgr.walletState.provider === 'handcash' ? 'handcash' : 'local'}
+          walletConnected={walletMgr.walletState.connected}
+          onClose={() => setShowDocumentHash(false)}
+        />
+      )}
 
       {showReceiptViewer && (
         <div className="logo-designer-overlay" onClick={() => setShowReceiptViewer(false)}>
