@@ -26,12 +26,14 @@ export const metadata: Metadata = {
     url: 'https://bitcoin-mint.com',
     siteName: 'Bitcoin Mint',
     type: 'website',
+    images: [{ url: 'https://bitcoin-mint.com/og.jpg', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Bitcoin Mint — The Currency Designer',
     description:
       'Design, print, stamp, and mint currency on BSV. Free desktop app with zero telemetry.',
+    images: ['https://bitcoin-mint.com/og.jpg'],
   },
 };
 
