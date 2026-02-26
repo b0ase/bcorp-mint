@@ -32,9 +32,9 @@ Which means your master key doesn't just hold Bitcoin. It holds an **infinite ga
 
 ## The Dollar Sign
 
-![The $ glyph constructed from /$NPG/$SERIES/$ISSUE/$PAGE paths](/images/blog/the-stamp/dollar-sign-seam.jpg)
+![The $ glyph constructed from /$TOKEN/$SERIES/$ISSUE/$PAGE paths](/images/blog/the-stamp/dollar-sign-seam.jpg)
 
-Look at a URL: `npg.com/$SERIES-01/$ISSUE-1/$PAGE-001`
+Look at a URL: `example.com/$SERIES-01/$ISSUE-1/$PAGE-001`
 
 That dollar sign isn't decoration. It's a **contract**.
 
@@ -62,7 +62,7 @@ This is Proof of Indexing — but it's not passive cataloguing. It's active econ
 
 ## The Claw
 
-![The claw reaches for glowing $NPG, $402, $1SHOT tags across the text field](/images/blog/the-stamp/claw-reaches.jpg)
+![The claw reaches for glowing $TOKEN, $402, $1SHOT tags across the text field](/images/blog/the-stamp/claw-reaches.jpg)
 
 The claw is not a metaphor. It's a competitive mechanism.
 
@@ -85,7 +85,7 @@ The ClawMiner is a stamp.
 Not a metaphor for a stamp. An actual stamp. A device that presses proof into the blockchain the way a seal presses into wax. The device derives a key from your master seed, generates content at that leaf, hashes it, and writes the hash on-chain in a single OP_RETURN:
 
 ```
-OP_RETURN | STAMP | $NPG/SERIES-01/ISSUE-1/PAGE-024 | a3f8c1... | 2026-02-17T14:30:00Z
+OP_RETURN | STAMP | $TOKEN/SERIES-01/ISSUE-1/PAGE-024 | a3f8c1... | 2026-02-17T14:30:00Z
 ```
 
 Protocol identifier. Namespace path. Content fingerprint. Timestamp. Permanently on-chain. Less than a penny.
@@ -102,21 +102,21 @@ The stamp and the crawl are the same motion. Pressing outward — writing new le
 
 This isn't theory. We've been building generative content on Bitcoin keys for years — we just didn't have the language for it.
 
-**Ninja Punk Girls** is a cyberpunk collectible card franchise on BSV. Each character is a "stack" — 29 PNG layers composited on a canvas: background, body, face, hair, weapons, armour, effects. 362 unique assets across those layers. 55,094 total cards. Two factions — NPG and Erobot — fighting across Neo-Tokyo.
+Imagine a collectible card franchise on BSV. Each character is a "stack" — 29 PNG layers composited on a canvas: background, body, face, hair, weapons, armour, effects. Hundreds of unique assets across those layers. Tens of thousands of total cards. Multiple factions fighting across a cyberpunk cityscape.
 
-Every stack is generated procedurally. The system selects one asset from each of the 29 layers, composites them, assigns stats (Strength, Speed, Skill, Stamina, Stealth, Style), and gives the character an authentic Japanese name from a curated pool. Miyuki. Kazuyo. Toki. Each one unique. Each one ownable. Each one a BSV-21 token.
+Every stack is generated procedurally. The system selects one asset from each of the 29 layers, composites them, assigns stats (Strength, Speed, Skill, Stamina, Stealth, Style), and gives the character a name from a curated pool. Each one unique. Each one ownable. Each one a BSV-21 token.
 
-The $NPG token — 2,045,457 supply, 1:1 with NPG Ltd shares, 125 verified shareholders — is the equity layer. The cards are the content layer. The tree connecting them is the derivation path.
+The franchise token — tied 1:1 with company shares — is the equity layer. The cards are the content layer. The tree connecting them is the derivation path.
 
-The original filename convention for every NPG card was literally the character's genome:
+The original filename convention for every card was literally the character's genome:
 
 ```
-07_001_Right-Weapon_Boxing-Glove_Yamarashii_Erobot_x_Uncommon_Strength_2_Speed_0_Skill_1_Stamina_1_Stealth_1_Style_1_.png
+07_001_Right-Weapon_Boxing-Glove_Character_Faction_x_Uncommon_Strength_2_Speed_0_Skill_1_Stamina_1_Stealth_1_Style_1_.png
 ```
 
-Layer number. Asset number. Category. Item name. Character. Faction. Rarity. Six stats. Everything about this card encoded in a string. Now imagine that string isn't stored in a filename — it's derived from a key. The key at `$NPG/CHARACTERS/SLOT-182` deterministically selects all 29 layers. The character's genome IS the key material.
+Layer number. Asset number. Category. Item name. Character. Faction. Rarity. Six stats. Everything about this card encoded in a string. Now imagine that string isn't stored in a filename — it's derived from a key. The key at `$FRANCHISE/CHARACTERS/SLOT-182` deterministically selects all 29 layers. The character's genome IS the key material.
 
-**One-Shot Comics** takes it further. Five series — *Quantum Paradox*, *Cypherpunk Chronicles*, *Street Justice*, *Mystic Realms*, *Ninja Punk Girls* — each with AI-generated covers, characters, and full story scripts. *NPG Red: Digital Shadows* is a 22-page readable comic, cover to cover, generated from AI pipelines. The $1SHOT token wraps the whole thing.
+**One-Shot Comics** takes it further. Multiple series — each with AI-generated covers, characters, and full story scripts. A 22-page readable comic, cover to cover, generated from AI pipelines. The $1SHOT token wraps the whole thing.
 
 These projects already have the pieces: generative content, Bitcoin tokens, namespace paths, on-chain identity. The Stamp is the architecture that connects them.
 
@@ -124,23 +124,23 @@ These projects already have the pieces: generative content, Bitcoin tokens, name
 
 ## The Tree
 
-Here's what the NPG tree actually looks like:
+Here's what a franchise tree actually looks like:
 
 ```
 Master Key
-└── $NPG
+└── $FRANCHISE
     ├── SERIES-01 / Cyberpunk Origins       ← model: 29-layer compositor
     │   ├── ISSUE-1 / The Awakening
     │   │   ├── PAGE-001                    ← derive key → composite → stamp hash
     │   │   ├── PAGE-002
     │   │   └── ... (24 pages)
     │   ├── ISSUE-2 / Neon Shadows          ← 28 pages
-    │   └── ISSUE-3 / Erobot Uprising       ← 32 pages
+    │   └── ISSUE-3 / The Uprising          ← 32 pages
     │
     ├── CHARACTERS
-    │   ├── SLOT-001 / Miyuki               ← 27 cards, Erobot faction
-    │   ├── SLOT-002 / Kazuyo               ← 27 cards, NPG faction
-    │   ├── SLOT-182 / Toki                 ← real NFT, on-chain
+    │   ├── SLOT-001 / Character A          ← 27 cards, Faction 1
+    │   ├── SLOT-002 / Character B          ← 27 cards, Faction 2
+    │   ├── SLOT-182 / Character C          ← real NFT, on-chain
     │   └── ... (3,333 total slots)
     │
     └── $1SHOT
@@ -153,7 +153,7 @@ Master Key
         │   └── ISSUE-1 / Urban Legends
         ├── MYSTIC-REALMS
         │   └── ISSUE-1 / The Ancient Awakening
-        └── NPG-RED
+        └── MATURE-BRANCH
             └── DIGITAL-SHADOWS             ← 22 pages, fully rendered
 ```
 
@@ -167,7 +167,7 @@ The branch defines the style. `SERIES-01/Cyberpunk Origins` routes to the 29-lay
 
 When you generate the full tree — every leaf, every page — what comes out is a complete comic book. Cover to cover. Every page. Every panel. A full narrative, already written, hiding inside your keys.
 
-*NPG Red: Digital Shadows* already exists as a 22-page comic. Miyuki discovers her cybernetic enhancements. The Erobots rise. Neo-Tokyo burns. But those pages were generated individually, assembled manually. With The Stamp, the entire series — every issue of *Cyberpunk Origins*, every episode of *Quantum Paradox*, every page of *Street Justice* — is already in the key tree. Scattered across branches. Waiting to be rendered.
+*Digital Shadows* already exists as a 22-page comic. A protagonist discovers her cybernetic enhancements. The antagonists rise. The city burns. But those pages were generated individually, assembled manually. With The Stamp, the entire series — every issue of *Cyberpunk Origins*, every episode of *Quantum Paradox*, every page of *Street Justice* — is already in the key tree. Scattered across branches. Waiting to be rendered.
 
 The pages are **scattered**. They're leaves on different branches. The story is there but it's in pieces. Shattered across the tree like fragments of broken pottery.
 
@@ -187,11 +187,11 @@ The ClawMiner is a physical device. A small box. Inside: an ARM board, a GPU, a 
 
 It does three things simultaneously:
 
-**1. Stamps.** The box derives a new leaf from your master key. Uses the key material as a seed. Runs the generative model — the 29-layer NPG compositor, Stable Diffusion for comic art, a text model for dialogue. An image appears, deterministically tied to that address. The box stamps the hash on-chain. Moves to the next leaf. Press. Stamp. Next.
+**1. Stamps.** The box derives a new leaf from your master key. Uses the key material as a seed. Runs the generative model — a 29-layer compositor, Stable Diffusion for comic art, a text model for dialogue. An image appears, deterministically tied to that address. The box stamps the hash on-chain. Moves to the next leaf. Press. Stamp. Next.
 
 **2. Crawls.** The box sweeps the web for $ symbols. It follows namespace paths. Catalogs trees. Maps branches. Records leaves. This is Proof of Indexing — real work, finding and organising the world's stamped content. Every $ it finds earns $402 tokens.
 
-**3. Discovers.** Your own tree is full of content you haven't seen. The box renders it, page by page, character by character. You come back to find new images in your gallery. New NPG characters you haven't met. New comic pages from series you haven't read. Generated overnight. Deterministic. Yours. Art you own but hadn't met yet.
+**3. Discovers.** Your own tree is full of content you haven't seen. The box renders it, page by page, character by character. You come back to find new images in your gallery. New characters you haven't met. New comic pages from series you haven't read. Generated overnight. Deterministic. Yours. Art you own but hadn't met yet.
 
 The box is a stamp, an indexer, and a reader. It writes the tree and reads the tree. Same device. Same motion. Same $ paths flowing in both directions.
 
@@ -211,7 +211,7 @@ The more stamps on the network, the denser the constellation. The more claws cra
 
 This architecture has properties that no existing system has:
 
-**You don't need to store images.** Lose the file? Re-derive the key. Re-run the compositor. Same character, same comic page, same image. The key IS the storage. NPG's 55,094 cards don't need a CDN. They need a seed.
+**You don't need to store images.** Lose the file? Re-derive the key. Re-run the compositor. Same character, same comic page, same image. The key IS the storage. A franchise with 55,000 cards doesn't need a CDN. It needs a seed.
 
 **Proof and creation are the same thing.** The key that generates the image is the key that owns the address where the stamp lives. There's no gap between making and proving. They're mathematically identical.
 
@@ -219,27 +219,27 @@ This architecture has properties that no existing system has:
 
 **The tree is navigable on-chain.** Indexers follow the paths. They see the stamps. They can reconstruct the tree structure — every series, every issue, every page, every character. The hierarchy is public. The master key is private.
 
-**Nobody knows what's in the tree until they render it.** Including you. Somewhere in the $NPG tree there's a character you haven't generated yet. She has a name you haven't assigned. She has stats you haven't rolled. She has a face composited from layers you haven't combined. She's determined but undiscovered.
+**Nobody knows what's in the tree until they render it.** Including you. Somewhere in your franchise tree there's a character you haven't generated yet. She has a name you haven't assigned. She has stats you haven't rolled. She has a face composited from layers you haven't combined. She's determined but undiscovered.
 
 ---
 
 ## The Franchise
 
-NPG isn't just a collection of characters. It's a franchise — $NPG token, 2,045,457 supply, 1:1 with company shares, BSV-21 standard. 125 verified shareholders. The token IS the equity.
+A franchise isn't just a collection of characters. It's a tree of tokenised content — a namespace token tied 1:1 with company shares, BSV-21 standard. The token IS the equity.
 
 Every franchise is a tree:
 
 ```
-$NPG     → 3,333 character slots, 5+ comic series, merchandise branches
-$1SHOT   → 5 series, unlimited issues, per-page tokenisation
-$NPGRED  → mature content branch, separate licensing, same master key
+$FRANCHISE → 3,333 character slots, 5+ comic series, merchandise branches
+$1SHOT     → 5 series, unlimited issues, per-page tokenisation
+$MATURE    → mature content branch, separate licensing, same master key
 ```
 
 Each namespace is a franchise. Each branch is a product line. Each leaf is a licensable, tradeable, provable piece of content. The deeper the tree, the richer the body of work, the more valuable the namespace token.
 
 An investor doesn't buy JPEGs. They buy a branch of a tree that hasn't finished growing. The characters at the leaves don't exist yet. But they're deterministic. They're provable. And they belong to whoever holds the key.
 
-**Rarity is structural.** NPG already has this: Legendary (1-50 copies), Epic (51-100), Rare (101-200), Uncommon (201-400), Common (401+). In the key tree, rarity maps to depth. Shallow leaves are common. Deep leaves — three, four, five branches deep — are rare by definition. The deeper you go, the more specific the generative parameters, the more unique the output.
+**Rarity is structural.** Legendary (1-50 copies), Epic (51-100), Rare (101-200), Uncommon (201-400), Common (401+). In the key tree, rarity maps to depth. Shallow leaves are common. Deep leaves — three, four, five branches deep — are rare by definition. The deeper you go, the more specific the generative parameters, the more unique the output.
 
 ---
 
@@ -247,13 +247,13 @@ An investor doesn't buy JPEGs. They buy a branch of a tree that hasn't finished 
 
 The ClawMiner has three revenue streams, all driven by $ contracts:
 
-**Settlement fees.** Every $ contract settled earns a fee. Your box finds a generative content contract at `$NPG/CHARACTERS/SLOT-450` — nobody has rendered that character yet. Your box generates the 29-layer composite, delivers the content, stamps the hash. You earned the settlement. Another ClawMiner was 3 seconds too slow. The competitive pressure keeps settlement costs low and speeds high.
+**Settlement fees.** Every $ contract settled earns a fee. Your box finds a generative content contract at `$FRANCHISE/CHARACTERS/SLOT-450` — nobody has rendered that character yet. Your box generates the 29-layer composite, delivers the content, stamps the hash. You earned the settlement. Another ClawMiner was 3 seconds too slow. The competitive pressure keeps settlement costs low and speeds high.
 
 **$402 tokens.** Earned by Proof of Indexing — the ongoing work of discovering, mapping, and cataloguing $ contracts across the network. More stamps on the network means more $ paths to crawl, more contracts to discover, more $402 earned. The indexing economy funds the content economy.
 
 **Serving revenue.** Once you've settled a contract and hold the content, you can re-serve it. When another node or an AI agent requests that content, you serve it from cache — faster and cheaper than regenerating it. You earn a margin on every serve. Early settlers profit most: they hold content that future buyers need.
 
-**Namespace tokens** ($NPG, $1SHOT, $NPGRED) sit above all of this. The tree of settled $ contracts under a namespace builds the brand. The deeper the tree, the more contracts settled, the more content proven, the more valuable the namespace token.
+**Namespace tokens** sit above all of this. The tree of settled $ contracts under a namespace builds the brand. The deeper the tree, the more contracts settled, the more content proven, the more valuable the namespace token.
 
 The box pays for itself by settling contracts. Your content gets stamped as a side effect of the box competing. The competition drives the network. The network creates more contracts. The claws feed each other.
 
@@ -265,7 +265,7 @@ This is not an NFT marketplace. There's no JPEG on-chain. There's no right-click
 
 This is not a DRM system. It doesn't prevent copying. It proves origination.
 
-This is not generative art in the usual sense. The art isn't random. It's deterministic. It lives in the key. It was always there. NPG's 29 layers, One-Shot's five series, NPG Red's 22-page comic — all of it was hiding in the master key. We just hadn't rendered it yet.
+This is not generative art in the usual sense. The art isn't random. It's deterministic. It lives in the key. It was always there. The 29 compositor layers, One-Shot's five series, a 22-page comic — all of it was hiding in the master key. We just hadn't rendered it yet.
 
 **This is a machine that grows a tree of content from a single seed, stamps each leaf on the blockchain, and lets the world's claws index the branches.** The content is the key. The proof is the stamp. The $ is the signal. The claw is the crawler. The constellation grows with every press.
 
@@ -279,13 +279,13 @@ We considered calling it "The Mint." Minting implies creation from nothing.
 
 We kept **"The Stamp."** Stamping implies authority. The content already exists — in potential, in the key, waiting to be rendered. The stamp is the act of making it real. Pressing the seal into the wax. Collapsing the wavefunction. Saying: this image, at this address, at this time. It was always mine. Now it's proven.
 
-Miyuki was always in the key. Toki was always at slot 182. *Digital Shadows* was always scattered across the branches. The $ was always the signal. The claw was always reaching.
+The characters were always in the key. Slot 182 was always waiting. *Digital Shadows* was always scattered across the branches. The $ was always the signal. The claw was always reaching.
 
 The box is a stamp. The tree grows with every press. The claws find every dollar sign. The scattered pages find their gold seams.
 
 ---
 
-*b0ase / NPGX / 2026*
+*b0ase / 2026*
 
 ---
 
@@ -296,9 +296,9 @@ All images generated from ClawMiner packaging prompts. Orange/black palette. The
 | Image | Description |
 |-------|-------------|
 | stamp-press.jpg | The stamp mid-press — $ radiating from the impact point |
-| dollar-sign-seam.jpg | The $ glyph built from /$NPG/$SERIES/$ISSUE/$PAGE paths |
+| dollar-sign-seam.jpg | The $ glyph built from /$TOKEN/$SERIES/$ISSUE/$PAGE paths |
 | lobster-indexing.jpg | The claw crawling a text field, tracing $ connections |
-| claw-reaches.jpg | Wireframe claw reaching for $NPG, $402, $1SHOT tags |
+| claw-reaches.jpg | Wireframe claw reaching for $TOKEN, $402, $1SHOT tags |
 | stamp-device.jpg | The device at the centre of its radiating $ path network |
 | claw-machine.jpg | The claw descending on blazing $ symbols |
 | constellation.jpg | Top-down: $ constellation across dense text, lobster mapping |

@@ -11,11 +11,11 @@ The Mint is not a metaphor — it is a literal mint. It designs, prints, stamps,
 3. **Stamp** — SHA-256 hash, BSV inscription, on-chain proof of authenticity
 4. **Mint** — BSV-20 token creation, the actual currency
 
-The Mint is infrastructure — a general-purpose minting machine with a totally objective relationship to the brands and media that pass through it. It does not belong to NPG, or any brand. NPG just happens to use it, like a printing press doesn't belong to any one newspaper.
+The Mint is infrastructure — a general-purpose minting machine with a totally objective relationship to the brands and media that pass through it. It does not belong to any single brand. A brand just happens to use it, like a printing press doesn't belong to any one newspaper.
 
 It works with any media — images, video, generative AI output, encrypted packages, identity proofs — and writes certified stamps directly to chain. It is the creation tool that produces assets for the b0ase protocol stack: `$401` (identity), `$402` (payments), `$403` (securities).
 
-Stamp profiles (NPG, Magazine, 1ShotComics, Bitcoin Books, etc.) are configurations loaded into the machine — they are not the machine's identity. The UI says **"The Mint"** at the top. The profiles configure stamp paths, logo defaults, and issue naming.
+Stamp profiles (Magazine, 1ShotComics, Bitcoin Books, etc.) are configurations loaded into the machine — they are not the machine's identity. The UI says **"The Mint"** at the top. The profiles configure stamp paths, logo defaults, and issue naming.
 
 ## Privacy Principle — Non-Negotiable
 
@@ -149,7 +149,7 @@ No extracted data persists beyond the session.
 
 What differs per branded variant (all else is shared core):
 
-| Config | Example (NPG profile) | Example (Magazine profile) |
+| Config | Example (Brand A profile) | Example (Magazine profile) |
 |--------|----------------------|--------------------------|
 | Default logo text | `MINT` | `MINT` |
 | Stamp path prefix | `$MINT/SERIES-01/ISSUE-1` | `$MINT/SERIES-01/ISSUE-1` |
