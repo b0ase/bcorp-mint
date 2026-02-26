@@ -583,32 +583,33 @@ export default function HomePage() {
             FREE
           </p>
 
-          <div className="flex items-center justify-center gap-4 text-xs text-zinc-600 mb-8">
-            <span>macOS</span>
-            <span className="text-white/20">&middot;</span>
-            <span>Windows</span>
-            <span className="text-white/20">&middot;</span>
-            <span>Linux</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
+            {[
+              { label: 'macOS', file: 'The%20Bitcoin%20Corporation%20Mint-0.2.0-arm64.dmg', note: 'Apple Silicon' },
+              { label: 'Windows', file: 'The%20Bitcoin%20Corporation%20Mint%20Setup%200.2.0.exe', note: 'Installer' },
+              { label: 'Linux', file: 'The%20Bitcoin%20Corporation%20Mint-0.2.0-arm64.AppImage', note: 'AppImage' },
+            ].map((platform) => (
+              <a
+                key={platform.label}
+                href={`https://github.com/b0ase/bcorp-mint/releases/download/v0.2.0/${platform.file}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 rounded-xl"
+              >
+                <Download size={14} />
+                <span>{platform.label}</span>
+                <span className="text-[9px] font-normal text-black/60 normal-case tracking-normal">{platform.note}</span>
+              </a>
+            ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
-              href="https://github.com/b0ase/bcorp-mint/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 rounded-full"
-            >
-              <Download size={16} />
-              GitHub Releases
-            </a>
-            <Link
-              href="/hash"
-              className="inline-flex items-center gap-3 px-8 py-3 border border-amber-500/40 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-bold text-sm uppercase tracking-widest transition-all rounded-full"
-            >
-              <Globe size={16} />
-              Hash in Browser
-            </Link>
-          </div>
+          <Link
+            href="/hash"
+            className="inline-flex items-center gap-3 px-8 py-3 border border-amber-500/40 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-bold text-sm uppercase tracking-widest transition-all rounded-full"
+          >
+            <Globe size={16} />
+            Hash in Browser
+          </Link>
         </motion.div>
       </section>
 
