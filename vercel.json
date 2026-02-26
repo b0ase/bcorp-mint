@@ -1,6 +1,5 @@
 {
-  "buildCommand": "cd website && pnpm install && pnpm build",
-  "installCommand": "echo 'skip root install'",
-  "framework": "nextjs",
-  "outputDirectory": "website/.next"
+  "installCommand": "cd website && pnpm install",
+  "buildCommand": "cd website && pnpm build",
+  "outputDirectory": "website/out"
 }
