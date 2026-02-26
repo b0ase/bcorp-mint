@@ -15,7 +15,10 @@ import {
   ChevronRight,
   Hash,
   Github,
+  Globe,
 } from 'lucide-react';
+import { useEffect } from 'react';
+import Link from 'next/link';
 
 /* ── Data ─────────────────────────────────────────────────────── */
 
@@ -105,6 +108,12 @@ const techStack = [
 /* ── Component ────────────────────────────────────────────────── */
 
 export default function HomePage() {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
+
   return (
     <div className="font-[family-name:var(--font-mono)] min-h-screen">
 
@@ -234,6 +243,22 @@ export default function HomePage() {
               <Download size={18} />
               Download Desktop App
             </a>
+          </motion.div>
+
+          {/* Browser CTA */}
+          <motion.div
+            className="mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.75 }}
+          >
+            <Link
+              href="/hash"
+              className="inline-flex items-center gap-3 px-8 py-3 border border-amber-500/40 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-bold text-sm uppercase tracking-widest transition-all rounded-full"
+            >
+              <Globe size={16} />
+              Hash in Browser
+            </Link>
           </motion.div>
 
           {/* Size note */}
@@ -374,6 +399,15 @@ export default function HomePage() {
                 proof goes on-chain, creating an immutable timestamp of existence.
               </p>
             </div>
+          </div>
+          <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-4 mb-6">
+            <p className="text-sm text-amber-400/80">
+              No download required —{' '}
+              <Link href="/hash" className="underline hover:text-amber-300 transition-colors font-bold">
+                hash and inscribe directly from your browser
+              </Link>{' '}
+              with HandCash.
+            </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
@@ -557,15 +591,24 @@ export default function HomePage() {
             <span>Linux</span>
           </div>
 
-          <a
-            href="https://github.com/b0ase/bcorp-mint/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 rounded-full"
-          >
-            <Download size={16} />
-            GitHub Releases
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="https://github.com/b0ase/bcorp-mint/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 rounded-full"
+            >
+              <Download size={16} />
+              GitHub Releases
+            </a>
+            <Link
+              href="/hash"
+              className="inline-flex items-center gap-3 px-8 py-3 border border-amber-500/40 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-bold text-sm uppercase tracking-widest transition-all rounded-full"
+            >
+              <Globe size={16} />
+              Hash in Browser
+            </Link>
+          </div>
         </motion.div>
       </section>
 

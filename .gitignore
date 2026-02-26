@@ -8,3 +8,4 @@ out
 release
 *.dmg
 *.tgz
+website/.next/

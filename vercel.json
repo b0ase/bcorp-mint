@@ -1,5 +1,4 @@
 {
   "installCommand": "cd website && npm install --legacy-peer-deps",
-  "buildCommand": "cd website && npx next build",
-  "outputDirectory": "website/out"
+  "buildCommand": "cd website && npx next build"
 }

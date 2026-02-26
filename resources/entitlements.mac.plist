@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- V8 JIT compilation (required for Electron on macOS 13+) -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
     <!-- Allow loading unsigned dynamic libraries (ffmpeg-static) -->
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>

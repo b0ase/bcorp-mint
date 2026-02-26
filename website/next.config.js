@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   images: { unoptimized: true },
+  serverExternalPackages: ['@handcash/handcash-connect'],
 };
 module.exports = nextConfig;
