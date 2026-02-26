@@ -6,6 +6,7 @@ type Props = {
   onSwitchProvider: (type: WalletProviderType) => void;
   onConnect: () => void;
   onDisconnect: () => void;
+  onOpenWalletView: () => void;
 };
 
 const PROVIDER_ICONS: Record<WalletProviderType, string> = {
@@ -14,7 +15,7 @@ const PROVIDER_ICONS: Record<WalletProviderType, string> = {
   metanet: '\u{1F310}',
 };
 
-export default function WalletSelector({ walletState, onSwitchProvider, onConnect, onDisconnect }: Props) {
+export default function WalletSelector({ walletState, onSwitchProvider, onConnect, onDisconnect, onOpenWalletView }: Props) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const shortAddress = walletState.masterAddress
@@ -23,11 +24,20 @@ export default function WalletSelector({ walletState, onSwitchProvider, onConnec
       ? `@${walletState.handle}`
       : null;
 
+  const handleStatusClick = () => {
+    if (!walletState.connected && !walletState.masterAddress) {
+      // No wallet at all — open wallet view directly
+      onOpenWalletView();
+    } else {
+      setDropdownOpen(!dropdownOpen);
+    }
+  };
+
   return (
     <div className="wallet-selector" style={{ position: 'relative' }}>
       <button
         className="wallet-status"
-        onClick={() => setDropdownOpen(!dropdownOpen)}
+        onClick={handleStatusClick}
       >
         <span className={`wallet-dot ${walletState.connected ? 'connected' : ''}`} />
         <span className="wallet-provider-icon">{PROVIDER_ICONS[walletState.provider]}</span>
@@ -39,7 +49,7 @@ export default function WalletSelector({ walletState, onSwitchProvider, onConnec
             )}
           </span>
         ) : (
-          <span className="wallet-info">No Wallet</span>
+          <span className="wallet-info wallet-info-empty">Set Up Wallet</span>
         )}
       </button>
 
@@ -64,6 +74,13 @@ export default function WalletSelector({ walletState, onSwitchProvider, onConnec
             </button>
           ))}
           <div className="wallet-dropdown-divider" />
+          <button
+            className="wallet-dropdown-item"
+            onClick={() => { onOpenWalletView(); setDropdownOpen(false); }}
+          >
+            <span>&#x2699;</span>
+            <span>Manage Wallet</span>
+          </button>
           {walletState.connected ? (
             <button className="wallet-dropdown-item danger" onClick={() => { onDisconnect(); setDropdownOpen(false); }}>
               Disconnect

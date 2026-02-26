@@ -139,6 +139,9 @@ contextBridge.exposeInMainWorld('mint', {
   keystoreExportBackup: (password: string) => ipcRenderer.invoke('keystore-export-backup', password),
   keystoreImportBackup: (data: string, password: string) =>
     ipcRenderer.invoke('keystore-import-backup', { data, password }),
+  keystoreBuildManifest: (children: Array<{ protocol: string; slug: string }>) =>
+    ipcRenderer.invoke('keystore-build-manifest', children),
+  keystoreDeleteMaster: () => ipcRenderer.invoke('keystore-delete-master'),
 
   // Mint documents
   listMintDocuments: () => ipcRenderer.invoke('list-mint-documents'),

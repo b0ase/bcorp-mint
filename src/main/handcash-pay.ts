@@ -9,6 +9,7 @@
  */
 
 import { getWalletState } from './handcash';
+import { TREASURY_HANDLE, MINT_FEE_USD } from './treasury';
 
 const HC_APP_ID = process.env.HANDCASH_APP_ID || '';
 const HC_APP_SECRET = process.env.HANDCASH_APP_SECRET || '';
@@ -38,10 +39,17 @@ export async function handCashPayWithData(payload: {
 
   // Build the payment request
   // HandCash Pay API: POST /v3/wallet/pay
+  // Treasury receives mint fee; user's wallet pays miner fee + treasury fee
   const paymentBody = {
     description: payload.description,
     appAction: 'ip-hash-inscription',
-    receivers: [],
+    receivers: [
+      {
+        to: TREASURY_HANDLE,
+        amount: MINT_FEE_USD,
+        currencyCode: 'USD',
+      },
+    ],
     attachment: {
       format: 'json',
       value: {

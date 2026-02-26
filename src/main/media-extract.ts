@@ -1,8 +1,8 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { app, BrowserWindow } from 'electron';
-import ffmpegPath from 'ffmpeg-static';
 
 type ProbeResult = {
   duration: number;
@@ -22,15 +22,25 @@ type ExtractOptions = {
   quality?: 'low' | 'medium' | 'high'; // jpeg 60%, jpeg 85%, png
 };
 
+// Lazy-resolved dev path — avoids top-level import that crashes packaged app
+let _devFfmpegPath: string | null = null;
+
 function getFfmpegPath(): string {
   // In packaged app, ffmpeg is in extraResources
   if (app.isPackaged) {
-    const resourcePath = path.join(process.resourcesPath, 'ffmpeg');
-    return resourcePath;
+    return path.join(process.resourcesPath, 'ffmpeg');
   }
-  // In development, use ffmpeg-static from node_modules
-  if (!ffmpegPath) throw new Error('ffmpeg-static binary not found');
-  return ffmpegPath;
+  // In development, resolve ffmpeg-static from node_modules lazily
+  if (_devFfmpegPath === null) {
+    try {
+      const req = createRequire(import.meta.url);
+      _devFfmpegPath = req('ffmpeg-static');
+    } catch {
+      throw new Error('ffmpeg-static not found. Run: pnpm install');
+    }
+  }
+  if (!_devFfmpegPath) throw new Error('ffmpeg-static binary not found');
+  return _devFfmpegPath;
 }
 
 function ffprobe(filePath: string): Promise<string> {

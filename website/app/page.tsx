@@ -585,13 +585,13 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
             {[
-              { label: 'macOS', file: 'The%20Bitcoin%20Corporation%20Mint-0.2.0-arm64.dmg', note: 'Apple Silicon' },
-              { label: 'Windows', file: 'The%20Bitcoin%20Corporation%20Mint%20Setup%200.2.0.exe', note: 'Installer' },
-              { label: 'Linux', file: 'The%20Bitcoin%20Corporation%20Mint-0.2.0-arm64.AppImage', note: 'AppImage' },
+              { label: 'macOS', file: 'The%20Bitcoin%20Corporation%20Mint-0.2.1-arm64.dmg', note: 'Apple Silicon' },
+              { label: 'Windows', file: 'The%20Bitcoin%20Corporation%20Mint%20Setup%200.2.1.exe', note: 'Installer' },
+              { label: 'Linux', file: 'The%20Bitcoin%20Corporation%20Mint-0.2.1-arm64.AppImage', note: 'AppImage' },
             ].map((platform) => (
               <a
                 key={platform.label}
-                href={`https://github.com/b0ase/bcorp-mint/releases/download/v0.2.0/${platform.file}`}
+                href={`https://github.com/b0ase/bcorp-mint/releases/download/v0.2.1/${platform.file}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-col items-center gap-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 rounded-xl"

@@ -13,6 +13,7 @@ import SplashScreen from './components/SplashScreen';
 import TokenisePanel from './components/TokenisePanel';
 import WaveformEditor from './components/WaveformEditor';
 import WalletSelector from './components/WalletSelector';
+import WalletView from './components/WalletView';
 import MetaNetTreeView from './components/MetaNetTreeView';
 import FilePreviewCanvas from './components/FilePreviewCanvas';
 import ProtocolConditionPanel from './components/ProtocolConditionPanel';
@@ -100,6 +101,7 @@ export default function App() {
   const [isMinting, setIsMinting] = useState(false);
   const [showReceiptViewer, setShowReceiptViewer] = useState(false);
   const [showDocumentHash, setShowDocumentHash] = useState(false);
+  const [showWalletView, setShowWalletView] = useState(false);
   const [allReceipts, setAllReceipts] = useState<StampReceipt[]>([]);
 
   // Tokenisation state
@@ -934,6 +936,7 @@ export default function App() {
             onSwitchProvider={walletMgr.switchProvider}
             onConnect={walletMgr.connect}
             onDisconnect={walletMgr.disconnect}
+            onOpenWalletView={() => setShowWalletView(true)}
           />
           <div className="issue-carousel">
             {issues.map((iss) => (
@@ -1610,6 +1613,12 @@ export default function App() {
           onClose={() => setShowDocumentHash(false)}
         />
       )}
+
+      <WalletView
+        open={showWalletView}
+        onClose={() => setShowWalletView(false)}
+        onWalletChanged={walletMgr.refresh}
+      />
 
       {showReceiptViewer && (
         <div className="logo-designer-overlay" onClick={() => setShowReceiptViewer(false)}>

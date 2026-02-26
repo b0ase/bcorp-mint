@@ -1,8 +1,9 @@
-import { PrivateKey } from '@bsv/sdk';
+import { PrivateKey, P2PKH } from '@bsv/sdk';
 import { deployBsv21Token, oneSatBroadcaster, fetchPayUtxos } from 'js-1sat-ord';
 import { BrowserWindow } from 'electron';
 import { loadPrivateKey, loadMasterKey, hasMasterKey } from './keystore';
 import { deriveChildKey } from './wallet-derivation';
+import { getTreasuryAddress, MINT_FEE_SATS } from './treasury';
 
 const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
 
@@ -68,6 +69,15 @@ export async function mintStampToken(payload: {
   const iconType = payload.iconContentType || 'image/png';
   const symbol = payload.name.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 10) || 'STAMP';
 
+  // Resolve treasury fee
+  let additionalPayments: Array<{ to: string; amount: number }> = [];
+  try {
+    const treasuryAddr = await getTreasuryAddress();
+    additionalPayments = [{ to: treasuryAddr, amount: MINT_FEE_SATS }];
+  } catch {
+    // Don't block minting if treasury resolution fails
+  }
+
   const { tx } = await deployBsv21Token({
     symbol,
     icon: { dataB64: iconData, contentType: iconType },
@@ -75,7 +85,8 @@ export async function mintStampToken(payload: {
     initialDistribution: { address, tokens: 1 },
     paymentPk: privateKey,
     destinationAddress: address,
-    satsPerKb: 1
+    satsPerKb: 1,
+    additionalPayments,
   });
 
   return broadcastToken(tx);
@@ -116,6 +127,15 @@ export async function batchMintTokens(pieces: Array<{
       const iconType = piece.iconContentType || 'image/png';
       const symbol = piece.name.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 10) || 'STAMP';
 
+      // Resolve treasury fee (once per batch, cached after first call)
+      let additionalPayments: Array<{ to: string; amount: number }> = [];
+      try {
+        const treasuryAddr = await getTreasuryAddress();
+        additionalPayments = [{ to: treasuryAddr, amount: MINT_FEE_SATS }];
+      } catch {
+        // Skip treasury fee if resolution fails
+      }
+
       const { tx } = await deployBsv21Token({
         symbol,
         icon: { dataB64: iconData, contentType: iconType },
@@ -123,7 +143,8 @@ export async function batchMintTokens(pieces: Array<{
         initialDistribution: { address, tokens: 1 },
         paymentPk: privateKey,
         destinationAddress: address,
-        satsPerKb: 1
+        satsPerKb: 1,
+        additionalPayments,
       });
 
       const result = await broadcastToken(tx);

@@ -2,6 +2,7 @@ import { PrivateKey, Transaction, P2PKH, Script } from '@bsv/sdk';
 import { loadPrivateKey, loadMasterKey, hasMasterKey } from './keystore';
 import { deriveChildKey } from './wallet-derivation';
 import { inscribeHashesViaHandCash } from './handcash-pay';
+import { getTreasuryAddress, MINT_FEE_SATS } from './treasury';
 
 const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
 
@@ -96,9 +97,19 @@ export async function inscribeStamp(payload: {
 
   tx.addOutput({ lockingScript: opReturn, satoshis: 0 });
 
+  // Treasury fee — resolve paymail, skip if resolution fails
+  let treasuryFee = 0;
+  try {
+    const treasuryAddr = await getTreasuryAddress();
+    tx.addOutput({ lockingScript: new P2PKH().lock(treasuryAddr), satoshis: MINT_FEE_SATS });
+    treasuryFee = MINT_FEE_SATS;
+  } catch {
+    // Don't block the user's inscription if treasury resolution fails
+  }
+
   // Change
   const minerFee = 500;
-  const change = utxo.value - minerFee;
+  const change = utxo.value - minerFee - treasuryFee;
   if (change < 0) throw new Error('Insufficient satoshis for miner fee');
   if (change > 0) {
     tx.addOutput({ lockingScript: new P2PKH().lock(address), satoshis: change });
@@ -154,8 +165,18 @@ export async function inscribeDocumentHash(payload: {
 
   tx.addOutput({ lockingScript: opReturn, satoshis: 0 });
 
+  // Treasury fee
+  let treasuryFee = 0;
+  try {
+    const treasuryAddr = await getTreasuryAddress();
+    tx.addOutput({ lockingScript: new P2PKH().lock(treasuryAddr), satoshis: MINT_FEE_SATS });
+    treasuryFee = MINT_FEE_SATS;
+  } catch {
+    // Don't block inscription if treasury resolution fails
+  }
+
   const minerFee = 500;
-  const change = utxo.value - minerFee;
+  const change = utxo.value - minerFee - treasuryFee;
   if (change < 0) throw new Error('Insufficient satoshis for miner fee');
   if (change > 0) {
     tx.addOutput({ lockingScript: new P2PKH().lock(address), satoshis: change });

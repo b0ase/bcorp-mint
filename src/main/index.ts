@@ -524,6 +524,15 @@ ipcMain.handle('keystore-import-backup', async (_e, payload: { data: string; pas
   return getMasterKeyInfo(hex);
 });
 
+ipcMain.handle('keystore-build-manifest', async (_e, children: Array<{ protocol: string; slug: string }>) => {
+  const masterHex = await loadMasterKey();
+  return buildManifest(masterHex, children);
+});
+
+ipcMain.handle('keystore-delete-master', async () => {
+  await deleteMasterKey();
+});
+
 // --------------- Wallet manager handlers ---------------
 
 ipcMain.handle('wallet-list-providers', async () => {
