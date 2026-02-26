@@ -3,7 +3,7 @@
   "description": "The Bitcoin Corporation Mint — Design, print, stamp, and mint currency on BSV",
   "author": "The Bitcoin Corporation",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
