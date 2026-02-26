@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { WalletProviderType, WalletState } from '../lib/types';
+import type { WalletProviderType, WalletState } from '@shared/lib/types';
 
 type Props = {
   walletState: WalletState;

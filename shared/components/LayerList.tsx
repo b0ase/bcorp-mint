@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useRef, useState } from 'react';
-import type { MintLayer } from '../../../lib/types';
+import type { MintLayer } from '../lib/types';
 
 type Props = {
   layers: MintLayer[];

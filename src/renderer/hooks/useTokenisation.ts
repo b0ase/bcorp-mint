@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppMode, AudioSegment, ExtractedFrame } from '../lib/types';
+import type { AppMode, AudioSegment, ExtractedFrame } from '@shared/lib/types';
 
 type ExtractionProgress = { completed: number; total: number; stage: string };
 

@@ -28,6 +28,11 @@ export default defineConfig({
     root: 'src/renderer',
     publicDir: resolve(__dirname, 'public'),
     plugins: [react()],
+    resolve: {
+      alias: {
+        '@shared': resolve(__dirname, 'shared')
+      }
+    },
     build: {
       rollupOptions: {
         input: 'src/renderer/index.html'

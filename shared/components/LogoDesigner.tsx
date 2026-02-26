@@ -11,8 +11,8 @@ import {
   type LogoDesignerConfig,
   type LogoFillMode,
   type LogoLayout,
-} from '../../../lib/logos';
-import type { LogoAsset } from '../../../lib/types';
+} from '../lib/logos';
+import type { LogoAsset } from '../lib/types';
 
 type LogoDesignerProps = {
   onSave: (logo: LogoAsset) => void;

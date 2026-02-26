@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AudioSegment, ExtractedFrame, ImageItem, StampReceipt } from '../lib/types';
+import type { AudioSegment, ExtractedFrame, ImageItem, StampReceipt } from '@shared/lib/types';
 
 type Props = {
   selectedImage: ImageItem | null;

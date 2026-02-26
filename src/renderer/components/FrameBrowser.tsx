@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import type { ExtractedFrame } from '../lib/types';
+import type { ExtractedFrame } from '@shared/lib/types';
 
 type ViewMode = 'grid' | 'timeline';
 

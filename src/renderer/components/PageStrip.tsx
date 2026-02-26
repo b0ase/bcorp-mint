@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ImageItem, Spread } from '../lib/types';
+import type { ImageItem, Spread } from '@shared/lib/types';
 
 type AnimateProgress = {
   stage: string;

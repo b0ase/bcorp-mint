@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { FONT_OPTIONS } from '../../../lib/logos';
-import type { MintLayer } from '../../../lib/types';
+import { FONT_OPTIONS } from '@shared/lib/logos';
+import type { MintLayer } from '@shared/lib/types';
 
 type Props = {
   layer: MintLayer;

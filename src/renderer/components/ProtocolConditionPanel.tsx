@@ -1,5 +1,5 @@
 import React from 'react';
-import type { MetaNetNodeUI } from '../lib/types';
+import type { MetaNetNodeUI } from '@shared/lib/types';
 import type { ProtocolCondition } from '../lib/protocol-conditions';
 import { CONDITION_LABELS, CONDITION_COLORS } from '../lib/protocol-conditions';
 

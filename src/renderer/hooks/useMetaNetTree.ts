@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { MetaNetNodeUI } from '../lib/types';
+import type { MetaNetNodeUI } from '@shared/lib/types';
 import type { ProtocolCondition } from '../lib/protocol-conditions';
 import { DEFAULT_CONDITION } from '../lib/protocol-conditions';
 

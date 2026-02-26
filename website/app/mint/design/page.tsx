@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useMintDesigner } from './useMintDesigner';
-import MintCanvas from './MintCanvas';
+import { useMintDesigner } from '@shared/hooks/useMintDesigner';
+import MintCanvas from '@shared/components/MintCanvas';
 import MintPanel from './MintPanel';
-import LogoDesigner from './LogoDesigner';
+import LogoDesigner from '@shared/components/LogoDesigner';
 
 export default function DesignPage() {
   const designer = useMintDesigner();

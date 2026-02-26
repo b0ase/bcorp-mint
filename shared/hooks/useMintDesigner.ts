@@ -20,9 +20,9 @@ import {
   defaultTextLayerConfig,
   defaultTransform,
   defaultWatermarkPatternConfig
-} from '../../../lib/mint-defaults';
-import { encodeSvg, generators } from '../../../lib/mint-patterns';
-import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '../../../lib/types';
+} from '../lib/mint-defaults';
+import { encodeSvg, generators } from '../lib/mint-patterns';
+import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '../lib/types';
 
 const MAX_UNDO = 50;
 

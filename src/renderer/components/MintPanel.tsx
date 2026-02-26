@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '../lib/mint-defaults';
-import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '../lib/types';
-import LayerList from './LayerList';
+import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '@shared/lib/mint-defaults';
+import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '@shared/lib/types';
+import LayerList from '@shared/components/LayerList';
 import PatternControls from './PatternControls';
 
 type Props = {

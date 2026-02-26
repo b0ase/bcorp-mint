@@ -1,5 +1,5 @@
 import React from 'react';
-import type { MetaNetNodeUI } from '../lib/types';
+import type { MetaNetNodeUI } from '@shared/lib/types';
 import { CONDITION_COLORS } from '../lib/protocol-conditions';
 
 type Props = {

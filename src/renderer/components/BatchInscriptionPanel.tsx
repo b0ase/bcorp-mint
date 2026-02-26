@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { MetaNetNodeUI } from '../lib/types';
+import type { MetaNetNodeUI } from '@shared/lib/types';
 
 type Props = {
   nodes: MetaNetNodeUI[];

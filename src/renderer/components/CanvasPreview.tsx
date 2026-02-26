@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { ImageSettings, LogoAsset, Spread } from '../lib/types';
+import type { ImageSettings, LogoAsset, Spread } from '@shared/lib/types';
 import { loadImage } from '../lib/image-utils';
-import { computeContainFit, drawBorderStamp, drawFrame, drawLogo, drawVignette, drawWatermark, getLogoMetrics, type Fit } from '../lib/render';
+import { computeContainFit, drawBorderStamp, drawFrame, drawLogo, drawVignette, drawWatermark, getLogoMetrics, type Fit } from '@shared/lib/render';
 
 const CANVAS_BG = '#0a0a0a';
 const GUTTER = 0;

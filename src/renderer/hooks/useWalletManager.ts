@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { WalletProviderType, WalletState } from '../lib/types';
+import type { WalletProviderType, WalletState } from '@shared/lib/types';
 
 const DEFAULT_STATE: WalletState = {
   connected: false,

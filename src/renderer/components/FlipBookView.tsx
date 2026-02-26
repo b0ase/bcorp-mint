@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import HTMLFlipBook from 'react-pageflip';
-import type { LogoAsset, Spread } from '../lib/types';
+import type { LogoAsset, Spread } from '@shared/lib/types';
 
 type FlipBookViewProps = {
   spreads: Spread[];

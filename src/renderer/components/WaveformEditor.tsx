@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaStreamUrl } from '../lib/image-utils';
-import type { AudioSegment } from '../lib/types';
+import type { AudioSegment } from '@shared/lib/types';
 
 type Props = {
   filePath: string;
