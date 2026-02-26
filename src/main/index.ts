@@ -4,10 +4,17 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey } from './keystore';
-import { inscribeStamp } from './bsv';
+import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey, hasMasterKey, saveMasterKey, loadMasterKey, deleteMasterKey, migrateLegacyKey, exportMasterKeyBackup, importMasterKeyBackup } from './keystore';
+import { inscribeStamp, inscribeDocumentHash } from './bsv';
 import { getRedirectUrl, getWalletState, disconnect as walletDisconnect } from './handcash';
 import { mintStampToken, batchMintTokens } from './token-mint';
+import { generateMasterKey, deriveChildInfo, getMasterKeyInfo, buildManifest } from './wallet-derivation';
+import { WalletManager } from './wallet-manager';
+import type { WalletProviderType } from './wallet-provider';
+import { estimateTreeCost, buildMetaNetTree, createRootNode, createChildNode } from './metanet';
+import { scanFolder as scanFolderForTokenise, hashFolder, countNodes as countFsNodes } from './fs-tokenise';
+
+const walletManager = new WalletManager();
 import { probeMedia, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -393,6 +400,13 @@ ipcMain.handle('inscribe-stamp', async (_e, payload: {
   return inscribeStamp(payload);
 });
 
+ipcMain.handle('inscribe-document-hash', async (_e, payload: {
+  hashes: Array<{ file: string; sha256: string }>;
+  provider: 'local' | 'handcash';
+}) => {
+  return inscribeDocumentHash(payload);
+});
+
 ipcMain.handle('mint-stamp-token', async (_e, payload: {
   path: string;
   hash: string;
@@ -469,6 +483,139 @@ ipcMain.handle('cleanup-extraction', async (_e, dir: string) => {
 ipcMain.handle('keystore-has-key', async () => hasPrivateKey());
 ipcMain.handle('keystore-save-key', async (_e, wif: string) => savePrivateKey(wif));
 ipcMain.handle('keystore-delete-key', async () => deletePrivateKey());
+
+// --------------- Master key / HD wallet handlers ---------------
+
+ipcMain.handle('keystore-has-master', async () => hasMasterKey());
+
+ipcMain.handle('keystore-setup-master', async (_e, payload?: { importHex?: string }) => {
+  if (payload?.importHex) {
+    await saveMasterKey(payload.importHex);
+  } else {
+    // Try migration first, then generate new
+    const migrated = await migrateLegacyKey();
+    if (!migrated) {
+      const hex = generateMasterKey();
+      await saveMasterKey(hex);
+    }
+  }
+  const masterHex = await loadMasterKey();
+  return getMasterKeyInfo(masterHex);
+});
+
+ipcMain.handle('keystore-get-master-info', async () => {
+  if (!(await hasMasterKey())) return null;
+  const masterHex = await loadMasterKey();
+  return getMasterKeyInfo(masterHex);
+});
+
+ipcMain.handle('keystore-derive-address', async (_e, payload: { protocol: string; slug: string }) => {
+  const masterHex = await loadMasterKey();
+  return deriveChildInfo(masterHex, payload.protocol, payload.slug);
+});
+
+ipcMain.handle('keystore-export-backup', async (_e, password: string) => {
+  return exportMasterKeyBackup(password);
+});
+
+ipcMain.handle('keystore-import-backup', async (_e, payload: { data: string; password: string }) => {
+  const hex = importMasterKeyBackup(payload.data, payload.password);
+  await saveMasterKey(hex);
+  return getMasterKeyInfo(hex);
+});
+
+// --------------- Wallet manager handlers ---------------
+
+ipcMain.handle('wallet-list-providers', async () => {
+  return walletManager.detectAvailableProviders();
+});
+
+ipcMain.handle('wallet-switch-provider', async (_e, type: WalletProviderType) => {
+  return walletManager.switchProvider(type);
+});
+
+ipcMain.handle('wallet-get-status', async () => {
+  return walletManager.getStatus();
+});
+
+// --------------- MetaNet handlers ---------------
+
+ipcMain.handle('metanet-estimate', async (_e, folderPath: string) => {
+  return estimateTreeCost(folderPath);
+});
+
+ipcMain.handle('metanet-create-tree', async (_e, payload: {
+  folderPath: string;
+  stampPath: string;
+  conditions?: Record<string, { condition: string; conditionData: string }>;
+}) => {
+  const masterHex = await loadMasterKey();
+  const conditionsMap = payload.conditions
+    ? new Map(Object.entries(payload.conditions))
+    : undefined;
+  return buildMetaNetTree(masterHex, payload.folderPath, payload.stampPath, conditionsMap);
+});
+
+// --------------- File tokenisation handlers ---------------
+
+ipcMain.handle('scan-folder-tokenise', async (_e, folderPath: string) => {
+  // No SUPPORTED_EXT filter — accepts ALL file types for tokenisation
+  return scanFolderForTokenise(folderPath);
+});
+
+ipcMain.handle('tokenise-estimate', async (_e, folderPath: string) => {
+  const root = await scanFolderForTokenise(folderPath);
+  const nodeCount = countFsNodes(root);
+  return { nodes: nodeCount, estimatedSats: nodeCount * 500 };
+});
+
+ipcMain.handle('tokenise-folder', async (_e, payload: {
+  folderPath: string;
+  stampPath: string;
+  conditions?: Record<string, { condition: string; conditionData: string }>;
+}) => {
+  // Hash all files first, then create MetaNet tree
+  const root = await scanFolderForTokenise(payload.folderPath);
+  const hashed = await hashFolder(root);
+  // MetaNet tree creation is handled by the metanet-create-tree handler
+  const masterHex = await loadMasterKey();
+  const conditionsMap = payload.conditions
+    ? new Map(Object.entries(payload.conditions))
+    : undefined;
+  return buildMetaNetTree(masterHex, payload.folderPath, payload.stampPath, conditionsMap);
+});
+
+ipcMain.handle('metanet-create-node', async (_e, payload: {
+  parentTxid: string;
+  parentPath: string;
+  segment: string;
+  filePath?: string;
+  condition?: string;
+  conditionData?: string;
+}) => {
+  const masterHex = await loadMasterKey();
+  const parentNode = {
+    txid: payload.parentTxid,
+    path: payload.parentPath,
+    segment: '',
+    isDirectory: true,
+    publicKey: '',
+    address: '',
+    parentTxid: '',
+    contentHash: null,
+    contentType: null,
+    condition: '',
+    conditionData: '',
+  };
+  return createChildNode(
+    masterHex,
+    parentNode,
+    payload.segment,
+    payload.filePath ? { filePath: payload.filePath } : undefined,
+    payload.condition || '',
+    payload.conditionData || '',
+  );
+});
 
 // --------------- Mint document handlers ---------------
 
