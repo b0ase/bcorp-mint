@@ -1,5 +1,5 @@
 const CACHE_NAME = 'bitcoin-mint-v1';
-const SHELL = ['/', '/hash', '/manifest.json'];
+const SHELL = ['/', '/hash', '/mint', '/mint/stamp', '/mint/design', '/mint/wallet', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

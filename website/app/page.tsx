@@ -227,12 +227,27 @@ export default function HomePage() {
             Design. Print. Stamp. Mint.
           </motion.p>
 
-          {/* Download CTA */}
+          {/* Open Mint CTA */}
           <motion.div
             className="mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.7 }}
+          >
+            <Link
+              href="/mint"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg text-lg transition-colors"
+            >
+              Open The Mint
+            </Link>
+          </motion.div>
+
+          {/* Download CTA */}
+          <motion.div
+            className="mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.75 }}
           >
             <a
               href="https://github.com/b0ase/bcorp-mint/releases"
@@ -250,7 +265,7 @@ export default function HomePage() {
             className="mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.75 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
           >
             <Link
               href="/hash"

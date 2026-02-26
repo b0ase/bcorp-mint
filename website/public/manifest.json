@@ -1,7 +1,7 @@
 {
   "name": "Bitcoin Mint",
   "short_name": "Mint",
-  "start_url": "/hash",
+  "start_url": "/mint",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
