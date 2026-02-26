@@ -3,9 +3,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '@shared/lib/mint-defaults';
 import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '@shared/lib/types';
-import * as bridge from '../../../lib/mint-bridge';
 import LayerList from '@shared/components/LayerList';
 import PatternControls from './PatternControls';
+import { usePlatform } from '@shared/lib/platform-context';
 
 type Props = {
   doc: MintDocument;
@@ -75,12 +75,13 @@ export default function MintPanel({
   onLoadDocument, onExportPng, onExportBatchPng, showGrid, onToggleGrid,
   animatePreview, onToggleAnimate, getThumbnailSrc
 }: Props) {
+  const platform = usePlatform();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showColorSchemes, setShowColorSchemes] = useState(false);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
-  const [savedDocs, setSavedDocs] = useState<{ id: string; name: string; updatedAt: string }[]>([]);
+  const [savedDocs, setSavedDocs] = useState<{ id: string; name: string; filePath: string; updatedAt: string }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isStamping, setIsStamping] = useState(false);
@@ -89,9 +90,9 @@ export default function MintPanel({
   const [stampResult, setStampResult] = useState('');
 
   const refreshSavedDocs = useCallback(async () => {
-    const docs = await bridge.listMintDocuments();
-    setSavedDocs(docs.map((d) => ({ id: d.id, name: d.name, updatedAt: d.updatedAt })));
-  }, []);
+    const docs = await platform.listMintDocuments();
+    setSavedDocs(docs);
+  }, [platform]);
 
   useEffect(() => {
     if (showSaveLoad) refreshSavedDocs();
@@ -100,7 +101,7 @@ export default function MintPanel({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await bridge.saveMintDocument(JSON.stringify(doc));
+      await platform.saveMintDocument(JSON.stringify(doc));
       await refreshSavedDocs();
     } catch (err) {
       console.error('Save failed:', err);
@@ -109,9 +110,9 @@ export default function MintPanel({
     }
   };
 
-  const handleLoad = async (id: string) => {
+  const handleLoad = async (filePath: string) => {
     try {
-      const json = await bridge.loadMintDocument(id);
+      const json = await platform.loadMintDocument(filePath);
       const loaded = JSON.parse(json) as MintDocument;
       onLoadDocument(loaded);
       setShowSaveLoad(false);
@@ -120,42 +121,31 @@ export default function MintPanel({
     }
   };
 
-  const handleDeleteDoc = async (id: string) => {
+  const handleDeleteDoc = async (filePath: string) => {
     try {
-      await bridge.deleteMintDocument(id);
+      await platform.deleteMintDocument(filePath);
       await refreshSavedDocs();
     } catch (err) {
       console.error('Delete failed:', err);
     }
   };
 
-  const handleExportPng = () => {
+  const handleExportPng = async () => {
     setIsExporting(true);
     try {
       const dataUrl = onExportPng();
-      if (dataUrl) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `${doc.name || 'mint-design'}.png`;
-        a.click();
-      }
+      if (dataUrl) await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-design' });
     } catch (err) { console.error('Export PNG failed:', err); }
     finally { setIsExporting(false); }
   };
 
-  const handleExportSvg = () => {
+  const handleExportSvg = async () => {
     setIsExporting(true);
     try {
       const dataUrl = onExportPng();
       if (dataUrl) {
         const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${doc.width}" height="${doc.height}"><image href="${dataUrl}" width="${doc.width}" height="${doc.height}"/></svg>`;
-        const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${doc.name || 'mint-design'}.svg`;
-        a.click();
-        URL.revokeObjectURL(url);
+        await platform.exportSvg?.({ svgContent, defaultName: doc.name || 'mint-design' });
       }
     } catch (err) { console.error('Export SVG failed:', err); }
     finally { setIsExporting(false); }
@@ -180,55 +170,60 @@ export default function MintPanel({
   };
 
   const handleBatchExport = async () => {
+    if (!platform.isDesktop) { setBatchStatus('Batch export only available in desktop'); return; }
     const serialLayer = doc.layers.find((l) => l.type === 'serial-number');
     if (!serialLayer) { setBatchStatus('Add a Serial Number layer first'); return; }
     setIsExporting(true);
-    setBatchStatus('Rendering...');
+    setBatchStatus('Choosing folder...');
     try {
+      const folder = await platform.chooseExportFolder?.();
+      if (!folder) { setIsExporting(false); setBatchStatus(''); return; }
       const startNum = (serialLayer.config as { startNumber: number }).startNumber;
+      const dataUrls: { name: string; dataUrl: string }[] = [];
       for (let i = 0; i < batchCount; i++) {
         setBatchStatus(`Rendering ${i + 1} of ${batchCount}...`);
         const dataUrl = onExportBatchPng({ layerId: serialLayer.id, number: startNum + i });
         if (dataUrl) {
           const padded = String(startNum + i).padStart(4, '0');
-          const a = document.createElement('a');
-          a.href = dataUrl;
-          a.download = `${doc.name || 'mint'}-${padded}.png`;
-          a.click();
-          await new Promise((r) => setTimeout(r, 100));
+          dataUrls.push({ name: `${doc.name || 'mint'}-${padded}.png`, dataUrl });
         }
       }
-      setBatchStatus(`Exported ${batchCount} variants`);
+      setBatchStatus(`Saving ${dataUrls.length} files...`);
+      await platform.exportMintBatch?.({ folder, dataUrls });
+      setBatchStatus(`Exported ${dataUrls.length} variants`);
     } catch (err) { console.error('Batch export failed:', err); setBatchStatus('Failed'); }
     finally { setIsExporting(false); }
   };
 
   // Stamp & Inscribe the current design
   const handleStampDesign = async () => {
+    if (!platform.isDesktop) { setStampResult('Available in desktop app'); return; }
     setIsStamping(true);
     setStampResult('');
     try {
       const dataUrl = onExportPng();
       if (!dataUrl) throw new Error('Export failed');
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `${doc.name || 'mint-stamp'}.png`, { type: 'image/png' });
-      const { hash } = await bridge.hashFile(file);
+      // Save to temp and hash
+      const filePath = await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-stamp' });
+      if (!filePath) { setIsStamping(false); return; }
+      const { hash } = await platform.hashFile({ type: 'path', path: filePath, name: filePath.split('/').pop() || 'file' });
       const timestamp = new Date().toISOString();
       const stampPath = `$STAMP/${doc.name || 'DESIGN'}`;
       const receipt = {
         id: crypto.randomUUID(), path: stampPath, hash, algorithm: 'sha256' as const,
-        sourceFile: file.name, sourceSize: file.size,
+        sourceFile: filePath.split('/').pop() || 'mint.png', sourceSize: 0,
         timestamp, txid: null, tokenId: null, metadata: {}
       };
-      await bridge.saveStampReceipt(JSON.stringify(receipt));
+      await platform.saveStampReceipt(JSON.stringify(receipt));
+      // Try to inscribe
       try {
-        const hasMaster = await bridge.keystoreHasMaster();
-        if (hasMaster) {
-          // Derive a stamp address and broadcast inscription
-          const child = await bridge.keystoreDeriveAddress('STAMP', doc.name || 'DESIGN');
-          setStampResult(`Stamped: ${hash.slice(0, 16)}... (address: ${child.address.slice(0, 12)}...)`);
+        const hasKey = await platform.keystoreHasKey?.();
+        if (hasKey) {
+          const { txid } = await platform.inscribeStamp({ path: stampPath, hash, timestamp });
+          await platform.updateStampReceipt(receipt.id, { txid });
+          setStampResult(`Inscribed: ${txid.slice(0, 12)}...`);
         } else {
-          setStampResult(`Hashed: ${hash.slice(0, 16)}... (no wallet)`);
+          setStampResult(`Hashed: ${hash.slice(0, 16)}... (no key)`);
         }
       } catch { setStampResult(`Hashed: ${hash.slice(0, 16)}... (local only)`); }
     } catch (err) { setStampResult(`Failed: ${err instanceof Error ? err.message : err}`); }
@@ -237,28 +232,24 @@ export default function MintPanel({
 
   // Mint token from current design
   const handleMintToken = async () => {
+    if (!platform.isDesktop) { setStampResult('Available in desktop app'); return; }
     setIsStamping(true);
     setStampResult('');
     try {
       const dataUrl = onExportPng();
       if (!dataUrl) throw new Error('Export failed');
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `${doc.name || 'mint-token'}.png`, { type: 'image/png' });
-      const { hash } = await bridge.hashFile(file);
-      const hasMaster = await bridge.keystoreHasMaster();
-      if (!hasMaster) {
-        setStampResult('Set up a wallet first (Wallet tab)');
-        return;
-      }
-      const child = await bridge.keystoreDeriveAddress('MINT', doc.name || 'TOKEN');
-      const timestamp = new Date().toISOString();
-      const receipt = {
-        id: crypto.randomUUID(), path: `$MINT/${doc.name || 'TOKEN'}`, hash, algorithm: 'sha256' as const,
-        sourceFile: file.name, sourceSize: file.size,
-        timestamp, txid: null, tokenId: child.address, metadata: {}
-      };
-      await bridge.saveStampReceipt(JSON.stringify(receipt));
-      setStampResult(`Mint ready: ${child.address.slice(0, 16)}...`);
+      const match = dataUrl.match(/^data:(.+);base64,(.*)$/);
+      if (!match) throw new Error('Invalid data URL');
+      const filePath = await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-token' });
+      if (!filePath) { setIsStamping(false); return; }
+      const { hash } = await platform.hashFile({ type: 'path', path: filePath, name: filePath.split('/').pop() || 'file' });
+      const result = await platform.mintStampToken?.({
+        path: `$STAMP/${doc.name || 'TOKEN'}`, hash,
+        name: doc.name || 'TOKEN',
+        iconDataB64: match[2], iconContentType: match[1]
+      });
+      if (!result) throw new Error('Mint not supported on this platform');
+      setStampResult(`Minted: ${result.tokenId}`);
     } catch (err) { setStampResult(`Failed: ${err instanceof Error ? err.message : err}`); }
     finally { setIsStamping(false); }
   };
@@ -268,7 +259,7 @@ export default function MintPanel({
     const name = doc.name || 'Custom Template';
     // Templates are just saved documents that users can re-load
     const templateDoc = { ...doc, name: `Template: ${name}` };
-    await bridge.saveMintDocument(JSON.stringify(templateDoc));
+    await platform.saveMintDocument(JSON.stringify(templateDoc));
     setBatchStatus(`Saved as template: ${name}`);
     setTimeout(() => setBatchStatus(''), 2000);
   };
@@ -349,9 +340,9 @@ export default function MintPanel({
             <div className="mint-saved-docs">
               {savedDocs.map((d) => (
                 <div key={d.id} className="mint-saved-doc">
-                  <button className="ghost mint-doc-name" onClick={() => handleLoad(d.id)}>{d.name || 'Untitled'}</button>
+                  <button className="ghost mint-doc-name" onClick={() => handleLoad(d.filePath)}>{d.name || 'Untitled'}</button>
                   <span className="small">{new Date(d.updatedAt).toLocaleDateString()}</span>
-                  <button className="ghost" style={{ fontSize: 10, padding: '2px 6px', color: 'var(--danger)' }} onClick={() => handleDeleteDoc(d.id)}>x</button>
+                  <button className="ghost" style={{ fontSize: 10, padding: '2px 6px', color: 'var(--danger)' }} onClick={() => handleDeleteDoc(d.filePath)}>x</button>
                 </div>
               ))}
             </div>

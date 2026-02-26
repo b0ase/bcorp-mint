@@ -1,7 +1,10 @@
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
+import { usePlatform } from '@shared/lib/platform-context';
 
 type MasterInfo = { address: string; publicKey: string } | null;
-type DerivedChild = { protocol: string; slug: string; address: string; publicKey: string };
+type DerivedChild = { protocol: string; slug: string; address: string; publicKey: string; derivationPath?: string };
 
 type Props = {
   open: boolean;
@@ -17,6 +20,7 @@ const DEFAULT_DERIVATIONS: Array<{ protocol: string; slug: string }> = [
 ];
 
 export default function WalletView({ open, onClose, onWalletChanged }: Props) {
+  const platform = usePlatform();
   const [view, setView] = useState<'loading' | 'setup' | 'dashboard' | 'import'>('loading');
   const [masterInfo, setMasterInfo] = useState<MasterInfo>(null);
   const [derivedAddresses, setDerivedAddresses] = useState<DerivedChild[]>([]);
@@ -34,16 +38,15 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
 
   const loadWallet = useCallback(async () => {
     try {
-      const hasMaster = await window.mint.keystoreHasMaster();
+      const hasMaster = await platform.keystoreHasMaster();
       if (hasMaster) {
-        const info = await window.mint.keystoreGetMasterInfo();
+        const info = await platform.keystoreGetMasterInfo();
         setMasterInfo(info);
-        // Derive default addresses
         const children: DerivedChild[] = [];
         for (const d of DEFAULT_DERIVATIONS) {
           try {
-            const child = await window.mint.keystoreDeriveAddress(d.protocol, d.slug);
-            children.push(child);
+            const child = await platform.keystoreDeriveAddress(d.protocol, d.slug);
+            children.push({ ...child, protocol: d.protocol, slug: d.slug });
           } catch { /* skip */ }
         }
         setDerivedAddresses(children);
@@ -55,7 +58,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
       console.error('[WalletView] load failed:', err);
       setView('setup');
     }
-  }, []);
+  }, [platform]);
 
   useEffect(() => {
     if (open) {
@@ -69,7 +72,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
     setIsWorking(true);
     setError('');
     try {
-      const info = await window.mint.keystoreSetupMaster();
+      const info = await platform.keystoreSetupMaster();
       setMasterInfo(info);
       onWalletChanged();
       await loadWallet();
@@ -93,8 +96,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
     setIsWorking(true);
     setError('');
     try {
-      const data = await window.mint.keystoreExportBackup(backupPassword);
-      // Download as file
+      const data = await platform.keystoreExportBackup(backupPassword);
       const blob = new Blob([data], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -116,7 +118,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
     setIsWorking(true);
     setError('');
     try {
-      const manifest = await window.mint.keystoreBuildManifest(DEFAULT_DERIVATIONS);
+      const manifest = await platform.keystoreBuildManifest(DEFAULT_DERIVATIONS);
       const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -140,7 +142,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
     setIsWorking(true);
     setError('');
     try {
-      const info = await window.mint.keystoreImportBackup(importData.trim(), importPassword);
+      const info = await platform.keystoreImportBackup(importData.trim(), importPassword);
       setMasterInfo(info);
       onWalletChanged();
       setImportData('');
@@ -158,7 +160,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
     setIsWorking(true);
     setError('');
     try {
-      await window.mint.keystoreDeleteMaster();
+      await platform.keystoreDeleteMaster();
       setMasterInfo(null);
       setDerivedAddresses([]);
       setShowDeleteConfirm(false);
@@ -204,23 +206,21 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
           {error && <div className="wallet-view-error">{error}</div>}
           {success && <div className="wallet-view-success">{success}</div>}
 
-          {/* Loading */}
           {view === 'loading' && (
             <div className="wallet-view-center">
               <div className="wallet-view-spinner" />
             </div>
           )}
 
-          {/* Setup — No wallet yet */}
           {view === 'setup' && (
             <div className="wallet-view-setup">
               <div className="wallet-view-hero">
                 <div className="wallet-view-hero-icon">&#x1F511;</div>
                 <h3>Create Your Wallet</h3>
                 <p>
-                  Generate a local master key secured by your OS keychain.
+                  Generate a local master key secured {platform.isDesktop ? 'by your OS keychain' : 'in your browser'}.
                   All keys are derived deterministically — one master key controls all addresses.
-                  No data leaves your machine.
+                  No data leaves your {platform.isDesktop ? 'machine' : 'browser'}.
                 </p>
               </div>
 
@@ -244,13 +244,13 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
               </button>
 
               <div className="wallet-view-note">
-                Your private key is encrypted with your OS keychain (macOS Keychain / Windows DPAPI).
-                It never leaves this device.
+                {platform.isDesktop
+                  ? 'Your private key is encrypted with your OS keychain (macOS Keychain / Windows DPAPI). It never leaves this device.'
+                  : 'Your private key is encrypted in your browser\'s storage (AES-256-GCM). It never leaves your browser.'}
               </div>
             </div>
           )}
 
-          {/* Import view */}
           {view === 'import' && (
             <div className="wallet-view-import">
               <h3>Restore Wallet</h3>
@@ -300,10 +300,8 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
             </div>
           )}
 
-          {/* Dashboard — Wallet exists */}
           {view === 'dashboard' && masterInfo && (
             <div className="wallet-view-dashboard">
-              {/* Master address */}
               <div className="wallet-view-card">
                 <div className="wallet-view-card-header">
                   <span className="wallet-view-card-label">Master Address</span>
@@ -322,7 +320,6 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
                 </div>
               </div>
 
-              {/* Derived addresses */}
               {derivedAddresses.length > 0 && (
                 <div className="wallet-view-section">
                   <h4>Derived Addresses</h4>
@@ -352,7 +349,6 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
                 </div>
               )}
 
-              {/* Backup section */}
               <div className="wallet-view-section">
                 <h4>Backup</h4>
                 <div className="wallet-view-backup-fields">
@@ -394,7 +390,6 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
                 </div>
               </div>
 
-              {/* Danger zone */}
               <div className="wallet-view-section wallet-view-danger">
                 <h4>Danger Zone</h4>
                 {!showDeleteConfirm ? (
@@ -404,7 +399,7 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
                 ) : (
                   <div className="wallet-view-delete-confirm">
                     <p className="small danger-text">
-                      This permanently removes your master key from this device.
+                      This permanently removes your master key from this {platform.isDesktop ? 'device' : 'browser'}.
                       If you haven't backed up, your funds will be lost forever.
                     </p>
                     <div className="wallet-view-actions">

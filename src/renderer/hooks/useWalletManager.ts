@@ -10,7 +10,8 @@ const DEFAULT_STATE: WalletState = {
   availableProviders: [
     { type: 'local', available: false, label: 'Local Keypair' },
     { type: 'handcash', available: true, label: 'HandCash' },
-    { type: 'metanet', available: false, label: 'MetaNet Desktop' },
+    { type: 'yours', available: true, label: 'Yours Wallet' },
+    { type: 'metanet', available: false, label: 'MetaNet Client' },
   ],
   masterAddress: null,
 };
@@ -82,13 +83,22 @@ export function useWalletManager() {
       } else {
         setWalletState((prev) => ({ ...prev, connected: true }));
       }
+    } else if (walletState.provider === 'yours') {
+      const result = await window.mint.walletConnect();
+      setWalletState((prev) => ({
+        ...prev,
+        connected: result.connected,
+        handle: result.handle,
+        authToken: result.authToken,
+        balance: result.balance,
+      }));
     } else {
       await switchProvider('metanet');
     }
   }, [walletState.provider, switchProvider]);
 
   const disconnect = useCallback(async () => {
-    if (walletState.provider === 'handcash') {
+    if (walletState.provider === 'handcash' || walletState.provider === 'yours') {
       await window.mint.walletDisconnect();
     }
     setWalletState((prev) => ({

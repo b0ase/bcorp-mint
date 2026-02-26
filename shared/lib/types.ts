@@ -20,7 +20,7 @@ export type StampReceipt = {
   metadata: Record<string, string>;
 };
 
-export type WalletProviderType = 'local' | 'handcash' | 'metanet';
+export type WalletProviderType = 'local' | 'handcash' | 'yours' | 'metanet';
 
 export type WalletState = {
   connected: boolean;

@@ -1,7 +1,5 @@
-'use client';
-
-import WalletView from './WalletView';
+import { redirect } from 'next/navigation';
 
 export default function WalletPage() {
-  return <WalletView />;
+  redirect('/mint');
 }

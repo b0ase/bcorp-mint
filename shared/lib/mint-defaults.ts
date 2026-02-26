@@ -154,6 +154,15 @@ export const COLOR_SCHEMES: ColorScheme[] = [
   { name: 'Rose', background: '#0a0a0a', primary: '#ff2d78', secondary: '#ff69b4', accent: '#ffd700', text: '#ffffff' },
 ];
 
+// --- Stamp-specific color schemes ---
+
+export const STAMP_COLOR_SCHEMES: ColorScheme[] = [
+  { name: 'Official Seal', background: '#0a0a1a', primary: '#1a237e', secondary: '#c9a84c', accent: '#ffd700', text: '#e8eaf6' },
+  { name: 'Red Wax', background: '#1a0a0a', primary: '#b71c1c', secondary: '#e53935', accent: '#ffd700', text: '#ffebee' },
+  { name: 'Government Green', background: '#0a1a0a', primary: '#1b5e20', secondary: '#4caf50', accent: '#ffd700', text: '#e8f5e9' },
+  { name: 'Notary Blue', background: '#0a1a2a', primary: '#0d47a1', secondary: '#1976d2', accent: '#ffffff', text: '#e3f2fd' },
+];
+
 // --- Document Templates ---
 
 export type MintTemplate = {
@@ -246,4 +255,77 @@ export const MINT_TEMPLATES: MintTemplate[] = [
     description: 'Empty 1200x600 canvas',
     factory: () => defaultMintDocument()
   }
+];
+
+// --- Stamp Templates ---
+
+export const STAMP_TEMPLATES: MintTemplate[] = [
+  {
+    id: 'document-seal',
+    name: 'Document Seal',
+    description: 'Circular seal with text-arc rim (600x600)',
+    factory: () => docBase('Document Seal', 600, 600, '#0a0a1a', [
+      makeLayer('gradient', 'Background', { type: 'radial', colors: ['#1a237e', '#0a0a1a'], angle: 0, opacity: 1 } as GradientConfig),
+      makeLayer('rosette', 'Center Rosette', { petals: 16, rings: 10, radius: 0.3, strokeWidth: 0.5, color: '#c9a84c', rotation: 0, innerRadius: 0.2 } as RosetteConfig),
+      makeLayer('text-arc', 'Upper Rim', { text: 'THE BITCOIN CORPORATION', fontFamily: 'Space Grotesk', fontSize: 20, fontWeight: 600, color: '#ffd700', letterSpacing: 5, radius: 0.38, startAngle: -90, centerX: 0.5, centerY: 0.5, flipText: false } as TextArcConfig),
+      makeLayer('text-arc', 'Lower Rim', { text: 'OFFICIAL DOCUMENT', fontFamily: 'Space Grotesk', fontSize: 16, fontWeight: 600, color: '#c9a84c', letterSpacing: 6, radius: 0.38, startAngle: 90, centerX: 0.5, centerY: 0.5, flipText: true } as TextArcConfig),
+      makeLayer('lathe', 'Radial Lines', { lineCount: 90, strokeWidth: 0.2, color: 'rgba(201,168,76,0.15)', centerX: 0.5, centerY: 0.5, scale: 1, rotation: 0 } as LatheConfig),
+      makeLayer('text', 'Center Star', { text: '\u2605', fontFamily: 'serif', fontSize: 48, fontWeight: 400, color: '#ffd700', letterSpacing: 0, align: 'center', x: 0.5, y: 0.48 } as TextLayerConfig),
+      makeLayer('serial-number', 'Serial', { prefix: 'SEAL', startNumber: 1, digits: 6, fontFamily: 'IBM Plex Mono', fontSize: 14, color: '#c9a84c', letterSpacing: 3, x: 0.5, y: 0.62 } as SerialNumberConfig),
+    ], { circleMask: true, rimPattern: { enabled: true, teeth: 80, depth: 4, color: '#c9a84c' } })
+  },
+  {
+    id: 'certificate-of-authenticity',
+    name: 'Certificate of Authenticity',
+    description: 'Full authenticity certificate (900x1200)',
+    factory: () => docBase('Certificate of Authenticity', 900, 1200, '#fdf8f0', [
+      makeLayer('fine-line', 'Background Lines', { angle: 0, spacing: 12, strokeWidth: 0.15, color: 'rgba(0,0,0,0.02)', wave: false, waveAmplitude: 3, waveFrequency: 4 } as FineLineConfig),
+      makeLayer('border', 'Ornate Border', { style: 'ornate', thickness: 55, color: '#1a237e', cornerStyle: 'ornament', innerBorder: true, innerGap: 14 } as BorderConfig),
+      makeLayer('watermark-pattern', 'Watermark Grid', { text: 'AUTHENTIC', fontFamily: 'Georgia', fontSize: 16, color: 'rgba(26,35,126,0.04)', angle: -30, spacingX: 160, spacingY: 70 } as WatermarkPatternConfig),
+      makeLayer('guilloche', 'Header Guilloche', { waves: 5, frequency: 12, amplitude: 30, lines: 10, strokeWidth: 0.3, color: 'rgba(26,35,126,0.12)', phase: 0, damping: 0.4 } as GuillocheConfig),
+      makeLayer('text', 'Title', { text: 'CERTIFICATE', fontFamily: 'Georgia', fontSize: 52, fontWeight: 700, color: '#1a237e', letterSpacing: 14, align: 'center', x: 0.5, y: 0.1 } as TextLayerConfig),
+      makeLayer('text', 'Subtitle', { text: 'OF AUTHENTICITY', fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 400, color: '#3949ab', letterSpacing: 10, align: 'center', x: 0.5, y: 0.15 } as TextLayerConfig),
+      makeLayer('rosette', 'Seal', { petals: 12, rings: 5, radius: 0.08, strokeWidth: 0.5, color: '#1a237e', rotation: 0, innerRadius: 0.3 } as RosetteConfig),
+      makeLayer('microprint', 'Security Text', { text: 'CERTIFIED AUTHENTIC DOCUMENT', fontSize: 2.5, color: 'rgba(26,35,126,0.06)', rows: 8, angle: 0, spacing: 5 } as MicroprintConfig),
+      makeLayer('serial-number', 'Certificate No.', { prefix: 'COA', startNumber: 1, digits: 8, fontFamily: 'IBM Plex Mono', fontSize: 18, color: '#3949ab', letterSpacing: 3, x: 0.5, y: 0.9 } as SerialNumberConfig),
+      makeLayer('qr-code', 'Verification QR', { text: 'COA-VERIFY', size: 0.1, x: 0.87, y: 0.87, color: '#1a237e', backgroundColor: 'transparent' } as QRCodeConfig),
+    ])
+  },
+  {
+    id: 'photo-stamp',
+    name: 'Photo Stamp',
+    description: 'Image layer with guilloche border (800x600)',
+    factory: () => docBase('Photo Stamp', 800, 600, '#0a0800', [
+      makeLayer('gradient', 'Background', { type: 'linear', colors: ['#1a1000', '#0a0800', '#1a1000'], angle: 90, opacity: 1 } as GradientConfig),
+      makeLayer('image', 'Photo', { src: '', fit: 'cover', x: 0.5, y: 0.5, scale: 1 } as ImageLayerConfig),
+      makeLayer('guilloche', 'Border Guilloche', { waves: 4, frequency: 14, amplitude: 35, lines: 20, strokeWidth: 0.5, color: 'rgba(201,168,76,0.3)', phase: 0, damping: 0.3 } as GuillocheConfig),
+      makeLayer('border', 'Frame', { style: 'classic', thickness: 35, color: '#c9a84c', cornerStyle: 'ornament', innerBorder: true, innerGap: 8 } as BorderConfig),
+      makeLayer('microprint', 'Bottom Text', { text: 'STAMPED AND VERIFIED', fontSize: 2.5, color: 'rgba(201,168,76,0.15)', rows: 4, angle: 0, spacing: 5 } as MicroprintConfig),
+      makeLayer('text', 'Label', { text: 'STAMPED', fontFamily: 'Space Grotesk', fontSize: 28, fontWeight: 700, color: '#c9a84c', letterSpacing: 8, align: 'center', x: 0.5, y: 0.9 } as TextLayerConfig),
+    ])
+  },
+  {
+    id: 'security-stamp',
+    name: 'Security Stamp',
+    description: 'Hash visualization with security features (500x500)',
+    factory: () => docBase('Security Stamp', 500, 500, '#0a1a0a', [
+      makeLayer('gradient', 'Background', { type: 'radial', colors: ['#1b5e20', '#0a1a0a'], angle: 0, opacity: 1 } as GradientConfig),
+      makeLayer('crosshatch', 'Hash Grid', { angle: 30, spacing: 6, strokeWidth: 0.25, color: 'rgba(76,175,80,0.12)', sets: 3 } as CrosshatchConfig),
+      makeLayer('security-thread', 'Thread', { x: 0.5, width: 3, color: 'rgba(76,175,80,0.2)', text: 'VERIFIED', textColor: 'rgba(76,175,80,0.35)', dashed: true, dashLength: 25, gapLength: 12 } as SecurityThreadConfig),
+      makeLayer('hologram', 'Hologram', { colors: ['#4caf50', '#66bb6a', '#81c784', '#a5d6a7', '#c8e6c9', '#4caf50'], angle: 45, stripWidth: 6, shimmer: 0.6, x: 0.65, y: 0.05, width: 0.3, height: 0.2 } as HologramConfig),
+      makeLayer('moire', 'Moire Pattern', { angle1: 0, angle2: 3, spacing: 5, strokeWidth: 0.2, color: 'rgba(76,175,80,0.08)' } as MoireConfig),
+      makeLayer('rosette', 'Center Mark', { petals: 8, rings: 4, radius: 0.2, strokeWidth: 0.6, color: '#4caf50', rotation: 0, innerRadius: 0.3 } as RosetteConfig),
+      makeLayer('text', 'SHA-256', { text: 'SHA-256', fontFamily: 'IBM Plex Mono', fontSize: 24, fontWeight: 700, color: '#a5d6a7', letterSpacing: 6, align: 'center', x: 0.5, y: 0.82 } as TextLayerConfig),
+      makeLayer('serial-number', 'Hash ID', { prefix: 'SEC', startNumber: 1, digits: 6, fontFamily: 'IBM Plex Mono', fontSize: 14, color: '#81c784', letterSpacing: 3, x: 0.5, y: 0.92 } as SerialNumberConfig),
+    ])
+  },
+  {
+    id: 'custom-stamp',
+    name: 'Custom Stamp',
+    description: 'Blank stamp canvas (800x800)',
+    factory: () => docBase('Custom Stamp', 800, 800, '#0a0a1a', [
+      makeLayer('gradient', 'Background', { type: 'radial', colors: ['#1a1a2e', '#0a0a1a'], angle: 0, opacity: 1 } as GradientConfig),
+      makeLayer('border', 'Border', { style: 'classic', thickness: 30, color: '#c9a84c', cornerStyle: 'square', innerBorder: true, innerGap: 8 } as BorderConfig),
+    ])
+  },
 ];

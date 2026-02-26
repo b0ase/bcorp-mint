@@ -1,8 +1,7 @@
-'use client';
-
 import React from 'react';
 import { FONT_OPTIONS } from '@shared/lib/logos';
 import type { MintLayer } from '@shared/lib/types';
+import { usePlatform } from '@shared/lib/platform-context';
 
 type Props = {
   layer: MintLayer;
@@ -184,22 +183,14 @@ function TextControls({ layer, onConfigChange }: Props) {
 }
 
 function ImageControls({ layer, onConfigChange }: Props) {
+  const platform = usePlatform();
   const c = layer.config as { src: string; fit: string; x: number; y: number; scale: number };
 
-  const handlePickImage = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        onConfigChange({ src: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
+  const handlePickImage = async () => {
+    const handle = await platform.pickLogo();
+    if (!handle) return;
+    const src = await platform.getFileUrl(handle);
+    onConfigChange({ src });
   };
 
   return (
