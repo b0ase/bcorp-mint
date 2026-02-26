@@ -1,7 +1,8 @@
 import { PrivateKey } from '@bsv/sdk';
 import { deployBsv21Token, oneSatBroadcaster, fetchPayUtxos } from 'js-1sat-ord';
 import { BrowserWindow } from 'electron';
-import { loadPrivateKey } from './keystore';
+import { loadPrivateKey, loadMasterKey, hasMasterKey } from './keystore';
+import { deriveChildKey } from './wallet-derivation';
 
 const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
 
@@ -31,8 +32,21 @@ async function broadcastToken(tx: any): Promise<{ tokenId: string; txid: string 
 }
 
 /**
+ * Resolve the signing private key for token minting.
+ * If master key exists and derivation provided, derives child key for $TOKEN/{slug}.
+ */
+async function resolveTokenKey(derivation?: { protocol: string; slug: string }): Promise<PrivateKey> {
+  if (derivation && await hasMasterKey()) {
+    const masterHex = await loadMasterKey();
+    return deriveChildKey(masterHex, derivation.protocol, derivation.slug);
+  }
+  const wif = await loadPrivateKey();
+  return PrivateKey.fromWif(wif);
+}
+
+/**
  * Mint a BSV-21 token for a stamped image.
- * Private key is loaded from keystore internally — never crosses IPC.
+ * Private key is resolved internally — never crosses IPC.
  */
 export async function mintStampToken(payload: {
   path: string;
@@ -40,9 +54,9 @@ export async function mintStampToken(payload: {
   name: string;
   iconDataB64?: string;
   iconContentType?: string;
+  derivation?: { protocol: string; slug: string };
 }): Promise<{ tokenId: string; txid: string }> {
-  const wif = await loadPrivateKey();
-  const privateKey = PrivateKey.fromWif(wif);
+  const privateKey = await resolveTokenKey(payload.derivation);
   const address = privateKey.toPublicKey().toAddress();
 
   const payUtxos = await fetchPayUtxos(address);
@@ -81,11 +95,8 @@ export async function batchMintTokens(pieces: Array<{
   name: string;
   iconDataB64?: string;
   iconContentType?: string;
+  derivation?: { protocol: string; slug: string };
 }>): Promise<Array<{ tokenId: string; txid: string; index: number }>> {
-  const wif = await loadPrivateKey();
-  const privateKey = PrivateKey.fromWif(wif);
-  const address = privateKey.toPublicKey().toAddress();
-
   const results: Array<{ tokenId: string; txid: string; index: number }> = [];
 
   for (let i = 0; i < pieces.length; i++) {
@@ -93,6 +104,9 @@ export async function batchMintTokens(pieces: Array<{
     sendMintProgress({ completed: i, total: pieces.length, stage: `Minting ${i + 1}/${pieces.length}...` });
 
     try {
+      const privateKey = await resolveTokenKey(piece.derivation);
+      const address = privateKey.toPublicKey().toAddress();
+
       const payUtxos = await fetchPayUtxos(address);
       if (!payUtxos.length) {
         throw new Error('No payment UTXOs — need satoshis');

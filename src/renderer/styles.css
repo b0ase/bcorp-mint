@@ -2095,3 +2095,485 @@ select:focus {
   opacity: 0.2;
   color: var(--accent);
 }
+
+/* --- Wallet Selector Dropdown --- */
+
+.wallet-selector {
+  position: relative;
+}
+
+.wallet-provider-icon {
+  font-size: 12px;
+}
+
+.wallet-info {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.wallet-balance {
+  color: var(--accent-dim);
+}
+
+.wallet-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: var(--panel-2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.wallet-dropdown-header {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 6px 10px 4px;
+}
+
+.wallet-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.wallet-dropdown-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wallet-dropdown-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wallet-dropdown-item.active {
+  background: var(--accent-glow);
+}
+
+.wallet-dropdown-item.danger {
+  color: var(--danger);
+}
+
+.wallet-unavailable,
+.wallet-detected,
+.wallet-active-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wallet-unavailable {
+  color: var(--danger);
+}
+
+.wallet-detected {
+  color: #4a9;
+}
+
+.wallet-active-badge {
+  color: var(--accent);
+}
+
+.wallet-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+/* --- MetaNet Tree View --- */
+
+.metanet-tree {
+  overflow-y: auto;
+  max-height: calc(100vh - 220px);
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: background 0.1s ease;
+  user-select: none;
+}
+
+.tree-node:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tree-node.selected {
+  background: var(--accent-glow);
+}
+
+.tree-arrow {
+  font-size: 8px;
+  width: 14px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tree-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-arrow-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.tree-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-pending { background: var(--muted); }
+.status-inscribing { background: var(--accent); animation: pulse-dot 1.2s infinite; }
+.status-inscribed { background: var(--accent); }
+.status-failed { background: var(--danger); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.tree-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-condition-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border: 1px solid;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.tree-address {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.tree-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* --- File Preview Canvas --- */
+
+.file-preview-empty,
+.file-preview-folder,
+.file-preview-binary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.file-preview-folder-icon,
+.file-preview-binary-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.3;
+}
+
+.file-preview-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.file-preview-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.file-preview-image {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.file-preview-video {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: var(--radius-sm);
+}
+
+.file-preview-audio {
+  width: 100%;
+}
+
+.file-preview-text {
+  width: 100%;
+  max-height: 400px;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.file-preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.meta-label {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.meta-value {
+  font-size: 11px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-value.mono {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+}
+
+/* --- Protocol Condition Panel --- */
+
+.protocol-condition-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.condition-segmented {
+  display: flex;
+  gap: 2px;
+  background: var(--panel);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.condition-segment {
+  flex: 1;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 4px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.condition-segment:hover {
+  color: var(--text);
+}
+
+.condition-segment.active {
+  background: var(--panel-3);
+}
+
+.condition-sub-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.small-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.range-value {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.input-sm {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+
+.input-sm:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.btn-secondary {
+  background: var(--panel-3);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: var(--panel-2);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* --- Batch Inscription Panel --- */
+
+.batch-inscription-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inscription-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.stat-value {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.stat-value.accent {
+  color: var(--accent);
+}
+
+.stat-value.danger {
+  color: var(--danger);
+}
+
+.inscription-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: var(--panel);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-stage {
+  font-size: 11px;
+  color: var(--text);
+  margin: 0;
+}
+
+.progress-path {
+  margin: 0;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.inscription-complete {
+  padding: 8px 12px;
+  background: rgba(201, 168, 76, 0.08);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--accent);
+}

@@ -2,6 +2,20 @@ import type { StampReceipt, WalletState } from './lib/types';
 
 export {};
 
+type MetaNetNodeResult = {
+  txid: string;
+  path: string;
+  segment: string;
+  isDirectory: boolean;
+  publicKey: string;
+  address: string;
+  parentTxid: string;
+  contentHash: string | null;
+  contentType: string | null;
+  condition: string;
+  conditionData: string;
+};
+
 declare global {
   interface Window {
     mint: {
@@ -78,10 +92,25 @@ declare global {
       listStampReceipts: () => Promise<StampReceipt[]>;
       updateStampReceipt: (id: string, patch: Record<string, unknown>) => Promise<StampReceipt>;
 
-      // Wallet
+      // Wallet (legacy HandCash)
       walletConnect: () => Promise<WalletState>;
       walletStatus: () => Promise<WalletState>;
       walletDisconnect: () => Promise<void>;
+
+      // Wallet manager
+      walletListProviders: () => Promise<Array<{ type: string; available: boolean; label: string }>>;
+      walletSwitchProvider: (type: string) => Promise<{
+        type: string; connected: boolean; address: string | null;
+        publicKey: string | null; balance: number | null; handle: string | null;
+      }>;
+      walletGetStatus: () => Promise<{
+        active: string;
+        status: {
+          type: string; connected: boolean; address: string | null;
+          publicKey: string | null; balance: number | null; handle: string | null;
+        };
+        available: Array<{ type: string; available: boolean; label: string }>;
+      }>;
 
       // Blockchain
       inscribeStamp: (payload: {
@@ -108,10 +137,62 @@ declare global {
       }>) => Promise<Array<{ tokenId: string; txid: string; index: number }>>;
       onMintProgress: (callback: (data: { completed: number; total: number; stage: string }) => void) => () => void;
 
-      // Keystore
+      // Keystore (legacy single key)
       keystoreHasKey: () => Promise<boolean>;
       keystoreSaveKey: (wif: string) => Promise<void>;
       keystoreDeleteKey: () => Promise<void>;
+
+      // HD master key
+      keystoreHasMaster: () => Promise<boolean>;
+      keystoreSetupMaster: (importHex?: string) => Promise<{ address: string; publicKey: string }>;
+      keystoreGetMasterInfo: () => Promise<{ address: string; publicKey: string } | null>;
+      keystoreDeriveAddress: (protocol: string, slug: string) => Promise<{
+        protocol: string; slug: string; address: string; publicKey: string;
+      }>;
+      keystoreExportBackup: (password: string) => Promise<string>;
+      keystoreImportBackup: (data: string, password: string) => Promise<{ address: string; publicKey: string }>;
+
+      // File tokenisation
+      scanFolderTokenise: (folderPath: string) => Promise<{
+        name: string; path: string; relativePath: string; isDirectory: boolean;
+        size: number; hash: string | null; mimeType: string | null;
+        children: any[]; metanetTxid: string | null; tokenId: string | null;
+      }>;
+      tokeniseEstimate: (folderPath: string) => Promise<{ nodes: number; estimatedSats: number }>;
+      tokeniseFolder: (payload: {
+        folderPath: string;
+        stampPath: string;
+        conditions?: Record<string, { condition: string; conditionData: string }>;
+      }) => Promise<{
+        root: MetaNetNodeResult;
+        nodes: MetaNetNodeResult[];
+        totalNodes: number;
+        totalCost: number;
+      }>;
+
+      // MetaNet
+      metanetEstimate: (folderPath: string) => Promise<{ nodes: number; estimatedSats: number }>;
+      metanetCreateTree: (payload: {
+        folderPath: string;
+        stampPath: string;
+        conditions?: Record<string, { condition: string; conditionData: string }>;
+      }) => Promise<{
+        root: MetaNetNodeResult;
+        nodes: MetaNetNodeResult[];
+        totalNodes: number;
+        totalCost: number;
+      }>;
+      metanetCreateNode: (payload: {
+        parentTxid: string;
+        parentPath: string;
+        segment: string;
+        filePath?: string;
+        condition?: string;
+        conditionData?: string;
+      }) => Promise<MetaNetNodeResult>;
+      onMetanetProgress: (callback: (data: {
+        stage: string; completed: number; total: number; currentPath?: string;
+      }) => void) => () => void;
 
       // Mint documents
       listMintDocuments: () => Promise<{ id: string; name: string; filePath: string; updatedAt: string }[]>;

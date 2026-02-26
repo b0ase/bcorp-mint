@@ -20,11 +20,16 @@ export type StampReceipt = {
   metadata: Record<string, string>;
 };
 
+export type WalletProviderType = 'local' | 'handcash' | 'metanet';
+
 export type WalletState = {
   connected: boolean;
   handle: string | null;
   authToken: string | null;
   balance: number | null;
+  provider: WalletProviderType;
+  availableProviders: Array<{ type: WalletProviderType; available: boolean; label: string }>;
+  masterAddress: string | null;
 };
 
 export type ImageSettings = {
@@ -92,7 +97,30 @@ export type TokenisationPiece = {
   status: 'pending' | 'hashing' | 'hashed' | 'stamping' | 'stamped' | 'minting' | 'minted' | 'error';
 };
 
-export type AppMode = 'stamp' | 'mint' | 'tokenise';
+export type AppMode = 'stamp' | 'currency' | 'tokenise' | 'music';
+
+// --- MetaNet Tree types ---
+
+export type InscriptionStatus = 'pending' | 'inscribing' | 'inscribed' | 'failed';
+
+export type MetaNetNodeUI = {
+  id: string;
+  name: string;
+  type: 'folder' | 'file';
+  localPath: string;
+  metanetPath: string;
+  derivedAddress: string | null;
+  hash: string | null;
+  size: number;
+  mimeType: string | null;
+  protocolCondition: import('./protocol-conditions').ProtocolCondition;
+  inscriptionStatus: InscriptionStatus;
+  txid: string | null;
+  tokenId: string | null;
+  children: string[];
+  parentId: string | null;
+  expanded: boolean;
+};
 
 // --- Mint (Currency Designer) types ---
 
