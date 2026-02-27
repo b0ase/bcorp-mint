@@ -61,6 +61,14 @@ function extOf(name: string): string {
   return '.' + (name.split('.').pop()?.toLowerCase() ?? '');
 }
 
+const BUNDLED_NOTES = [
+  'image', 'image-1', 'image-2', 'image-3', 'image-4', 'image-5',
+  'image-6', 'image-7', 'image-8', 'image-9', 'image-10', 'image-11',
+].map((name) => ({
+  name: name.replace('image', 'Note'),
+  src: `/bcorp notes landscape/${name}.jpg`,
+}));
+
 // ---------------------------------------------------------------------------
 // Spread helpers
 // ---------------------------------------------------------------------------
@@ -1425,6 +1433,26 @@ export default function MintApp({
       <div className="main">
         <aside className="panel left-panel">
           <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : tokenisation.mode === 'magazine' ? 'Pages' : tokenisation.mode === 'qr' ? 'QR Codes' : 'Images'}</h2>
+
+          {/* Note Gallery — bundled artwork for currency mode */}
+          {tokenisation.mode === 'currency' && (
+            <div className="note-gallery">
+              <div className="small" style={{ color: 'var(--accent-dim)', marginBottom: 6 }}>Note Gallery</div>
+              <div className="note-gallery-grid">
+                {BUNDLED_NOTES.map((note) => (
+                  <div
+                    key={note.name}
+                    className="note-gallery-thumb"
+                    onClick={() => mint.addImageLayer(note.src, note.name)}
+                    title={note.name}
+                  >
+                    <img src={note.src} alt={note.name} loading="lazy" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="image-list">
             {images.length === 0 ? (
               <div className="empty-sidebar">

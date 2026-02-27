@@ -3392,3 +3392,39 @@ select:focus {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }
 }
+
+/* ---------------------------------------------------------------------------
+   Note Gallery — bundled artwork for currency mode
+   --------------------------------------------------------------------------- */
+
+.note-gallery {
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.08);
+}
+
+.note-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.note-gallery-thumb {
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.note-gallery-thumb:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.25);
+}
+
+.note-gallery-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
