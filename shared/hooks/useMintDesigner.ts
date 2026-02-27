@@ -204,8 +204,22 @@ export function useMintDesigner() {
       type: 'image',
       config: { src, fit: 'cover' as const, x: 0.5, y: 0.5, scale: 1 },
     };
-    // Insert at index 0 so image sits behind all existing layers
-    setDoc((prev) => ({ ...prev, layers: [layer, ...prev.layers] }));
+    setDoc((prev) => {
+      const layers = [...prev.layers];
+      // Find insertion point: above the first gradient layer so the image
+      // isn't buried under opaque fills. Gradient switches to multiply
+      // so it tints the image rather than replacing it.
+      let insertIdx = 0;
+      for (let i = 0; i < layers.length; i++) {
+        if (layers[i].type === 'gradient') {
+          layers[i] = { ...layers[i], blendMode: 'multiply' };
+          insertIdx = i + 1;
+          break;
+        }
+      }
+      layers.splice(insertIdx, 0, layer);
+      return { ...prev, layers };
+    });
     setSelectedLayerId(layer.id);
     regenerateLayer(layer, doc.width, doc.height);
   }, [doc, pushUndo, regenerateLayer]);
