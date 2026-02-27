@@ -26,11 +26,17 @@ import type { FileHandle } from '@shared/lib/platform';
 const SUPPORTED_EXT = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp',
   '.mp4', '.mov', '.webm', '.avi',
-  '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'
+  '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a',
+  '.pdf', '.doc', '.docx', '.txt', '.rtf', '.md', '.csv', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.zip', '.tar', '.gz', '.7z', '.rar',
+  '.json', '.xml', '.html', '.css', '.js', '.ts', '.py', '.go', '.rs', '.c', '.cpp',
+  '.exe', '.dmg', '.app', '.apk', '.ipa', '.wasm', '.bin', '.iso',
 ]);
 
 const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.bmp']);
 const VIDEO_EXT = new Set(['.mp4', '.mov', '.webm', '.avi']);
+const DOCUMENT_EXT = new Set(['.pdf', '.doc', '.docx', '.txt', '.rtf', '.md', '.csv', '.xls', '.xlsx', '.ppt', '.pptx']);
+const MEDIA_EXT = new Set([...IMAGE_EXT, ...VIDEO_EXT, '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a']);
 const AUDIO_EXT = new Set(['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a']);
 
 function extOf(name: string): string {
@@ -436,15 +442,39 @@ export default function MintApp({
           }
 
           // --- Image ---
-          const url = await platform.getFileUrl(handle);
-          const img = await loadImage(url);
+          if (IMAGE_EXT.has(ext)) {
+            const url = await platform.getFileUrl(handle);
+            const img = await loadImage(url);
+            return {
+              id: crypto.randomUUID(),
+              path: handle.type === 'path' ? handle.path : '',
+              name,
+              url,
+              width: img.naturalWidth || img.width,
+              height: img.naturalHeight || img.height,
+              mediaType: 'image' as const,
+              settings: createDefaultSettings(defaultLogoId)
+            };
+          }
+
+          // --- Document / Generic file ---
+          const fileExt = ext.replace('.', '').toUpperCase() || 'FILE';
+          const isDoc = DOCUMENT_EXT.has(ext);
+          const icon = isDoc ? '\uD83D\uDCC4' : '\uD83D\uDCE6'; // 📄 or 📦
+          const label = isDoc ? `Document: ${name}` : name;
+          const svgPlaceholder = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300">
+            <rect fill="#111" width="400" height="300" rx="8"/>
+            <text x="200" y="120" fill="#555" text-anchor="middle" font-size="48">${icon}</text>
+            <text x="200" y="170" fill="#888" text-anchor="middle" font-size="14" font-family="monospace">${fileExt}</text>
+            <text x="200" y="200" fill="#555" text-anchor="middle" font-size="11" font-family="sans-serif">${name.length > 40 ? name.slice(0, 37) + '...' : name}</text>
+          </svg>`;
           return {
             id: crypto.randomUUID(),
             path: handle.type === 'path' ? handle.path : '',
             name,
-            url,
-            width: img.naturalWidth || img.width,
-            height: img.naturalHeight || img.height,
+            url: 'data:image/svg+xml,' + encodeURIComponent(svgPlaceholder),
+            width: 400,
+            height: 300,
             mediaType: 'image' as const,
             settings: createDefaultSettings(defaultLogoId)
           };
@@ -473,17 +503,28 @@ export default function MintApp({
   };
 
   const handleSelectFiles = async () => {
-    const handles = await platform.pickFiles();
+    const handles = await platform.pickFiles({ accept: 'image/*,video/*,audio/*' });
     if (!handles || handles.length === 0) return;
-    // Filter to supported extensions
     const filtered = handles.filter((h) => SUPPORTED_EXT.has(extOf(h.name)));
     await loadFileHandles(filtered);
+  };
+
+  const handleSelectDocuments = async () => {
+    const handles = await platform.pickFiles({ accept: '.pdf,.doc,.docx,.txt,.rtf,.md,.csv,.xls,.xlsx,.ppt,.pptx', multiple: true });
+    if (!handles || handles.length === 0) return;
+    await loadFileHandles(handles);
+  };
+
+  const handleSelectAnyFiles = async () => {
+    const handles = await platform.pickFiles({ accept: '*/*', multiple: true });
+    if (!handles || handles.length === 0) return;
+    await loadFileHandles(handles);
   };
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
-    const supported = files.filter((f) => SUPPORTED_EXT.has(extOf(f.name)));
+    const supported = files; // Accept any file — documents, archives, binaries, media
 
     // Check if files have a .path property (Electron)
     const firstFile = supported[0] as File & { path?: string };
@@ -1175,7 +1216,13 @@ export default function MintApp({
             </button>
           )}
           <button className="secondary" onClick={handleSelectFiles}>
-            Add Files
+            Add Media
+          </button>
+          <button className="secondary" onClick={handleSelectDocuments}>
+            Documents
+          </button>
+          <button className="secondary" onClick={handleSelectAnyFiles}>
+            Files
           </button>
           {showDownloadButton && (
             <a
