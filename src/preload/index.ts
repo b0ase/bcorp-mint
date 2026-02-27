@@ -74,6 +74,11 @@ contextBridge.exposeInMainWorld('mint', {
   walletStatus: () => ipcRenderer.invoke('wallet-status'),
   walletDisconnect: () => ipcRenderer.invoke('wallet-disconnect'),
 
+  // BitSign auth (desktop → bitcoin-mint.com API)
+  bitsignGetAuth: () => ipcRenderer.invoke('bitsign-get-auth'),
+  bitsignLogin: () => ipcRenderer.invoke('bitsign-login'),
+  bitsignLogout: () => ipcRenderer.invoke('bitsign-logout'),
+
   // Wallet manager
   walletListProviders: () => ipcRenderer.invoke('wallet-list-providers'),
   walletSwitchProvider: (type: string) => ipcRenderer.invoke('wallet-switch-provider', type),

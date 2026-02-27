@@ -1,29 +1,28 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { PenTool, Hash, Lock, FileSignature, Fingerprint } from 'lucide-react';
+import { useNavigation, type NavSection } from '@shared/lib/navigation-context';
 
-const tabs = [
-  { href: '/mint', label: 'Mint', icon: PenTool },
-  { href: '/hash', label: 'Hash', icon: Hash },
-  { href: '/vault', label: 'Vault', icon: Lock },
-  { href: '/sign', label: 'Sign', icon: FileSignature },
-  { href: '/identity', label: 'Identity', icon: Fingerprint },
+const tabs: { section: NavSection; label: string; icon: typeof PenTool }[] = [
+  { section: 'mint', label: 'Mint', icon: PenTool },
+  { section: 'hash', label: 'Hash', icon: Hash },
+  { section: 'vault', label: 'Vault', icon: Lock },
+  { section: 'sign', label: 'Sign', icon: FileSignature },
+  { section: 'identity', label: 'Identity', icon: Fingerprint },
 ];
 
 export default function BottomNav() {
-  const pathname = usePathname();
+  const { currentSection, navigate } = useNavigation();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black/90 backdrop-blur-xl safe-bottom">
       <div className="flex items-center justify-around max-w-lg mx-auto h-16">
-        {tabs.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname?.startsWith(href + '/');
+        {tabs.map(({ section, label, icon: Icon }) => {
+          const active = currentSection === section;
           return (
-            <Link
-              key={href}
-              href={href}
+            <button
+              key={section}
+              onClick={() => navigate(section)}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 active
                   ? 'text-amber-400'
@@ -34,7 +33,7 @@ export default function BottomNav() {
               <span className="text-[10px] font-bold tracking-wider uppercase">
                 {label}
               </span>
-            </Link>
+            </button>
           );
         })}
       </div>

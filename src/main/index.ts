@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey, hasMasterKey, saveMasterKey, loadMasterKey, deleteMasterKey, migrateLegacyKey, exportMasterKeyBackup, importMasterKeyBackup } from './keystore';
 import { inscribeStamp, inscribeDocumentHash } from './bsv';
-import { getRedirectUrl, getWalletState, disconnect as walletDisconnect } from './handcash';
+import { getRedirectUrl, getOAuthUrl, startOAuthFlow, getWalletState, getBitsignAuthState, loadPersistedAuth, disconnect as walletDisconnect } from './handcash';
 import { mintStampToken, batchMintTokens } from './token-mint';
 import { generateMasterKey, deriveChildInfo, getMasterKeyInfo, buildManifest } from './wallet-derivation';
 import { WalletManager } from './wallet-manager';
@@ -97,7 +97,10 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Load any persisted HandCash auth (BitSign sessions survive restart)
+  await loadPersistedAuth();
+
   // Register custom protocol for streaming local media files (used for video playback)
   protocol.handle('mint-media', async (request) => {
     try {
@@ -371,10 +374,12 @@ ipcMain.handle('update-stamp-receipt', async (_e, payload: { id: string; patch: 
 
 ipcMain.handle('wallet-connect', async () => {
   try {
-    const url = await getRedirectUrl();
-    await shell.openExternal(url);
-    // Wait for callback (profile will be populated)
-    return getWalletState();
+    // Start OAuth flow (sets up callback server) and open browser
+    const flowPromise = startOAuthFlow();
+    await shell.openExternal(getOAuthUrl());
+    // Wait until the callback arrives with the token
+    const result = await flowPromise;
+    return { connected: true, handle: result.handle, authToken: result.authToken, balance: null };
   } catch (err) {
     console.error('[wallet-connect]', err);
     return getWalletState();
@@ -384,7 +389,29 @@ ipcMain.handle('wallet-connect', async () => {
 ipcMain.handle('wallet-status', async () => getWalletState());
 
 ipcMain.handle('wallet-disconnect', async () => {
-  walletDisconnect();
+  await walletDisconnect();
+});
+
+// --------------- BitSign auth handlers (desktop → bitcoin-mint.com API) ---------------
+
+ipcMain.handle('bitsign-get-auth', async () => {
+  return getBitsignAuthState();
+});
+
+ipcMain.handle('bitsign-login', async () => {
+  try {
+    const flowPromise = startOAuthFlow();
+    await shell.openExternal(getOAuthUrl());
+    const result = await flowPromise;
+    return { handle: result.handle, authToken: result.authToken };
+  } catch (err) {
+    console.error('[bitsign-login]', err);
+    return null;
+  }
+});
+
+ipcMain.handle('bitsign-logout', async () => {
+  await walletDisconnect();
 });
 
 // --------------- Blockchain handlers ---------------

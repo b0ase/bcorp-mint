@@ -7,6 +7,21 @@ import { getUserAccount } from './handcash';
  * looking up the profile via handcash_auth_token.
  */
 export async function resolveUserHandle(request: NextRequest): Promise<string | null> {
+    // 0. Check Authorization: Bearer header (desktop app sends this)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+        const bearerToken = authHeader.slice(7);
+        try {
+            const account = getUserAccount(bearerToken);
+            if (account) {
+                const { publicProfile } = await account.profile.getCurrentProfile();
+                if (publicProfile?.handle) return publicProfile.handle;
+            }
+        } catch (e) {
+            console.error('[resolveUserHandle] Bearer token lookup failed:', e);
+        }
+    }
+
     // 1. Try the handle cookie (fast path)
     const handleCookie = request.cookies.get('handcash_handle')?.value;
     if (handleCookie) return handleCookie;

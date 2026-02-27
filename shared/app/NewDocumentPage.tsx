@@ -1,0 +1,530 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+  FiArrowLeft, FiArrowRight, FiPlus, FiTrash2,
+  FiFileText, FiCopy, FiCheck, FiZap, FiUpload
+} from 'react-icons/fi';
+import { useAuth } from '@shared/lib/auth-context';
+import { useApiClient } from '@shared/lib/api-client';
+
+interface TemplateInfo {
+  id: string;
+  name: string;
+  description: string;
+  fields: { key: string; label: string; required: boolean; default?: string }[];
+  signers: { role: string; label: string; required: boolean }[];
+}
+
+interface SignerEntry {
+  name: string;
+  email: string;
+  handle: string;
+  role: string;
+}
+
+type Step = 'template' | 'fields' | 'signers' | 'review';
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+interface NewDocumentPageProps {
+  /** Called when user clicks back from the wizard (desktop: return to sign list, web: navigate) */
+  onBack?: () => void;
+}
+
+export default function NewDocumentPage({ onBack }: NewDocumentPageProps) {
+  const { handle, login } = useAuth();
+  const api = useApiClient();
+  const [step, setStep] = useState<Step>('template');
+  const [templates, setTemplates] = useState<TemplateInfo[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateInfo | null>(null);
+  const [variables, setVariables] = useState<Record<string, string>>({});
+  const [signers, setSigners] = useState<SignerEntry[]>([]);
+  const [title, setTitle] = useState('');
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; dataUrl: string } | null>(null);
+  const [fundSigners, setFundSigners] = useState(false);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await api.get('/api/templates');
+      const data = await res.json();
+      setTemplates(data.templates || []);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    setUploadedFile({ name: file.name, dataUrl });
+    setTitle(file.name.replace(/\.[^.]+$/, ''));
+    setSigners([{ name: '', email: '', handle: '', role: 'Signer' }]);
+    setSelectedTemplate(null);
+    setStep('signers');
+  };
+
+  const handleSelectTemplate = (template: TemplateInfo) => {
+    setSelectedTemplate(template);
+
+    const defaults: Record<string, string> = {};
+    template.fields.forEach(f => {
+      if (f.default) defaults[f.key] = f.default;
+    });
+    setVariables(defaults);
+
+    setSigners(template.signers.map(s => ({
+      name: '',
+      email: '',
+      handle: '',
+      role: s.role,
+    })));
+
+    setTitle(`${template.name} - ${new Date().toLocaleDateString('en-GB')}`);
+    setStep('fields');
+  };
+
+  const handlePreview = async () => {
+    if (!selectedTemplate) return;
+    try {
+      const res = await api.post('/api/templates', {
+        template_id: selectedTemplate.id, variables,
+      });
+      const data = await res.json();
+      setPreviewHtml(data.html || '');
+    } catch (error) {
+      console.error('Preview failed:', error);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if ((!selectedTemplate && !uploadedFile) || !handle) return;
+    setSubmitting(true);
+
+    try {
+      const payload: any = {
+        title,
+        signers: signers.map((s, i) => ({
+          name: s.name,
+          email: s.email || undefined,
+          handle: s.handle || undefined,
+          role: s.role,
+          order: i + 1,
+        })),
+        expires_in_days: 30,
+        fund_signers: fundSigners,
+      };
+
+      if (uploadedFile) {
+        payload.uploaded_file = uploadedFile.dataUrl;
+        payload.uploaded_file_name = uploadedFile.name;
+      } else if (selectedTemplate) {
+        payload.template_id = selectedTemplate.id;
+        payload.variables = variables;
+      }
+
+      const res = await api.post('/api/envelopes', payload);
+      const data = await res.json();
+      if (data.success) {
+        setResult(data);
+        setStep('review');
+      } else {
+        alert(data.error || 'Failed to create envelope');
+      }
+    } catch (error) {
+      console.error('Submit failed:', error);
+      alert('Failed to create envelope');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const copyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(url);
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
+
+  if (!handle) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <h1 className="text-3xl font-bold mb-4 tracking-tight">Sign in required</h1>
+        <button onClick={login} className="px-8 py-3 bg-white text-black font-medium text-sm rounded-md hover:bg-zinc-200">Sign in with HandCash</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen text-white overflow-x-hidden">
+      <div className="relative z-10 p-6 pt-8 max-w-4xl mx-auto space-y-8 pb-40">
+        {/* Header */}
+        <header className="flex items-center gap-4 border-b border-zinc-900 pb-6">
+          <button
+            onClick={onBack}
+            className="p-2 border border-zinc-800 rounded-md hover:border-zinc-600 transition-colors"
+          >
+            <FiArrowLeft size={16} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">New Document</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">
+              {step === 'template' && 'Select a template'}
+              {step === 'fields' && 'Fill in details'}
+              {step === 'signers' && 'Add signers'}
+              {step === 'review' && 'Complete'}
+            </p>
+          </div>
+        </header>
+
+        {/* Step indicator */}
+        <div className="flex gap-1">
+          {['template', 'fields', 'signers', 'review'].map((s, i) => (
+            <div
+              key={s}
+              className={`h-1 flex-1 rounded-full ${
+                s === step ? 'bg-white' :
+                ['template', 'fields', 'signers', 'review'].indexOf(step) > i ? 'bg-zinc-600' : 'bg-zinc-900'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Step 1: Template Selection */}
+        {step === 'template' && (
+          <div className="space-y-3">
+            <label className="w-full text-left p-5 border border-dashed border-zinc-700 bg-zinc-950 rounded-md hover:bg-zinc-900 hover:border-zinc-500 transition-all group cursor-pointer block">
+              <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" onChange={handleFileUpload} />
+              <div className="flex items-start gap-4">
+                <FiUpload className="text-zinc-500 group-hover:text-white transition-colors mt-0.5" size={22} />
+                <div>
+                  <h3 className="font-semibold text-base">Upload a document</h3>
+                  <p className="text-sm text-zinc-500 mt-0.5">Upload a PDF or image you already have and send it for signing</p>
+                </div>
+              </div>
+            </label>
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-zinc-900"></div></div>
+              <div className="relative flex justify-center"><span className="bg-black px-3 text-xs text-zinc-600">or use a template</span></div>
+            </div>
+
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => handleSelectTemplate(t)}
+                className="w-full text-left p-5 border border-zinc-900 bg-zinc-950 rounded-md hover:bg-zinc-900 hover:border-zinc-700 transition-all group"
+              >
+                <div className="flex items-start gap-4">
+                  <FiFileText className="text-zinc-600 group-hover:text-white transition-colors mt-0.5" size={22} />
+                  <div>
+                    <h3 className="font-semibold text-base">{t.name}</h3>
+                    <p className="text-sm text-zinc-500 mt-0.5">{t.description}</p>
+                    <div className="flex gap-3 mt-2">
+                      <span className="text-xs text-zinc-600">{t.fields.length} fields</span>
+                      <span className="text-xs text-zinc-600">{t.signers.length} signers</span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Step 2: Fill Fields */}
+        {step === 'fields' && selectedTemplate && (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5">Document Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-md text-sm text-white focus:border-white outline-none transition-colors"
+              />
+            </div>
+
+            <div className="border-t border-zinc-900 pt-6 space-y-4">
+              {selectedTemplate.fields.map((field) => (
+                <div key={field.key}>
+                  <label className="block text-xs text-zinc-500 mb-1.5">
+                    {field.label} {field.required && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    value={variables[field.key] || ''}
+                    onChange={(e) => setVariables(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    placeholder={field.default || ''}
+                    className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-md text-sm text-white placeholder:text-zinc-700 focus:border-white outline-none transition-colors"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => setStep('template')}
+                className="px-5 py-3 border border-zinc-800 text-zinc-400 text-sm rounded-md hover:border-zinc-600 hover:text-white transition-all flex items-center gap-2"
+              >
+                <FiArrowLeft size={14} /> Back
+              </button>
+              <button
+                onClick={async () => { await handlePreview(); setStep('signers'); }}
+                className="flex-1 py-3 bg-white text-black font-medium text-sm rounded-md hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+              >
+                Continue <FiArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Add Signers */}
+        {step === 'signers' && (selectedTemplate || uploadedFile) && (
+          <div className="space-y-6">
+            {uploadedFile && (
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1.5">Document Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-md text-sm text-white focus:border-white outline-none transition-colors"
+                />
+              </div>
+            )}
+
+            {uploadedFile ? (
+              <div className="border border-zinc-800 rounded-md overflow-hidden">
+                {uploadedFile.dataUrl.startsWith('data:application/pdf') ? (
+                  <iframe src={uploadedFile.dataUrl} className="w-full h-[300px]" />
+                ) : uploadedFile.dataUrl.startsWith('data:image/') ? (
+                  <img src={uploadedFile.dataUrl} alt="Document" className="w-full max-h-[300px] object-contain bg-white" />
+                ) : (
+                  <div className="p-6 text-center text-sm text-zinc-400">
+                    <FiFileText className="mx-auto mb-2" size={24} />
+                    {uploadedFile.name}
+                  </div>
+                )}
+              </div>
+            ) : previewHtml ? (
+              <div className="border border-zinc-800 rounded-md overflow-hidden">
+                <div className="bg-white text-black p-4 max-h-[300px] overflow-y-auto">
+                  <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-zinc-400">Signers</h3>
+
+              {signers.map((signer, i) => (
+                <div key={i} className="p-4 border border-zinc-900 bg-zinc-950 rounded-md space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-zinc-300">
+                      {selectedTemplate?.signers[i]?.label || `Signer ${i + 1}`}
+                    </span>
+                    {(!selectedTemplate || i >= selectedTemplate.signers.length) && (
+                      <button
+                        onClick={() => setSigners(prev => prev.filter((_, idx) => idx !== i))}
+                        className="text-zinc-600 hover:text-red-500 transition-colors"
+                      >
+                        <FiTrash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      value={signer.name}
+                      onChange={(e) => {
+                        const updated = [...signers];
+                        updated[i] = { ...updated[i], name: e.target.value };
+                        setSigners(updated);
+                      }}
+                      placeholder="Full Name *"
+                      className="px-3 py-2.5 bg-black border border-zinc-800 rounded-md text-sm text-white placeholder:text-zinc-700 focus:border-white outline-none"
+                    />
+                    <input
+                      type="email"
+                      value={signer.email}
+                      onChange={(e) => {
+                        const updated = [...signers];
+                        updated[i] = { ...updated[i], email: e.target.value };
+                        setSigners(updated);
+                      }}
+                      placeholder="Email (optional)"
+                      className="px-3 py-2.5 bg-black border border-zinc-800 rounded-md text-sm text-white placeholder:text-zinc-700 focus:border-white outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={signer.handle}
+                      onChange={(e) => {
+                        const updated = [...signers];
+                        updated[i] = { ...updated[i], handle: e.target.value };
+                        setSigners(updated);
+                      }}
+                      placeholder="$handle (HandCash)"
+                      className="px-3 py-2.5 bg-black border border-zinc-800 rounded-md text-sm text-white placeholder:text-zinc-700 focus:border-white outline-none"
+                    />
+                  </div>
+                  {signer.handle && (
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                      <FiZap size={10} className="text-amber-500" /> Will receive a HandCash notification
+                    </p>
+                  )}
+                  {signer.email && !signer.handle && (
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                      <FiZap size={10} className="text-blue-400" /> Will receive a signing link via email (HandCash required to verify)
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              <button
+                onClick={() => setSigners(prev => [...prev, { name: '', email: '', handle: '', role: 'additional' }])}
+                className="w-full py-3 border border-dashed border-zinc-800 rounded-md text-zinc-500 hover:text-white hover:border-zinc-600 text-sm transition-all flex items-center justify-center gap-2"
+              >
+                <FiPlus size={14} /> Add Signer
+              </button>
+            </div>
+
+            {signers.some(s => s.handle) && (
+              <div className="p-4 border border-zinc-800 bg-zinc-950 rounded-md">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={fundSigners}
+                    onChange={(e) => setFundSigners(e.target.checked)}
+                    className="w-4 h-4 rounded border-zinc-600 bg-zinc-900 text-green-500 focus:ring-0"
+                  />
+                  <div>
+                    <span className="text-sm text-white">Fund signers ($0.01 each)</span>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Send each signer a penny to cover their blockchain attestation fee
+                    </p>
+                  </div>
+                </label>
+                {fundSigners && (
+                  <p className="text-xs text-amber-400 mt-2 ml-7">
+                    Total: ${(signers.filter(s => s.handle).length * 0.01).toFixed(2)} from your HandCash wallet
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => { setStep(uploadedFile ? 'template' : 'fields'); if (uploadedFile) setUploadedFile(null); }}
+                className="px-5 py-3 border border-zinc-800 text-zinc-400 text-sm rounded-md hover:border-zinc-600 hover:text-white transition-all flex items-center gap-2"
+              >
+                <FiArrowLeft size={14} /> Back
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || signers.some(s => !s.name)}
+                className="flex-1 py-3 bg-white text-black font-medium text-sm rounded-md hover:bg-zinc-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitting ? 'Creating...' : 'Create & Send'} <FiArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Result */}
+        {step === 'review' && result && (
+          <div className="space-y-8">
+            <div className="p-8 border border-green-900 bg-green-950/20 rounded-md text-center space-y-3">
+              <FiCheck className="mx-auto text-green-400" size={40} />
+              <h2 className="font-semibold text-xl">Envelope Created</h2>
+              <p className="font-mono text-xs text-zinc-500">
+                Hash: {result.envelope.document_hash.slice(0, 16)}...
+              </p>
+            </div>
+
+            {(result.notified_handles?.length > 0 || result.emailed_addresses?.length > 0 || result.funded_signers?.length > 0) && (
+              <div className="space-y-2">
+                {result.notified_handles?.length > 0 && (
+                  <div className="p-3 border border-amber-900/50 bg-amber-950/10 rounded-md">
+                    <p className="text-sm text-amber-400 flex items-center gap-2">
+                      <FiZap size={14} />
+                      HandCash notification sent to: {result.notified_handles.map((h: string) => `$${h.replace(/^\$/, '')}`).join(', ')}
+                    </p>
+                  </div>
+                )}
+                {result.emailed_addresses?.length > 0 && (
+                  <div className="p-3 border border-blue-900/50 bg-blue-950/10 rounded-md">
+                    <p className="text-sm text-blue-400 flex items-center gap-2">
+                      <FiZap size={14} />
+                      Email sent to: {result.emailed_addresses.join(', ')}
+                    </p>
+                  </div>
+                )}
+                {result.funded_signers?.length > 0 && (
+                  <div className="p-3 border border-green-900/50 bg-green-950/10 rounded-md">
+                    <p className="text-sm text-green-400 flex items-center gap-2">
+                      <FiCheck size={14} />
+                      Funded: {result.funded_signers.map((h: string) => `$${h}`).join(', ')} ($0.01 each)
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-zinc-400">Signing Links</h3>
+              <p className="text-sm text-zinc-500">Share these with each signer:</p>
+
+              {result.signing_urls.map((s: any, i: number) => (
+                <div key={i} className="flex items-center gap-3 p-4 bg-zinc-950 border border-zinc-900 rounded-md">
+                  <div className="flex-1 space-y-0.5">
+                    <span className="block text-sm font-medium text-white">{s.name}</span>
+                    <span className="block text-xs text-zinc-500">{s.role}</span>
+                    <span className="block font-mono text-xs text-zinc-600 break-all">{s.url}</span>
+                  </div>
+                  <button
+                    onClick={() => copyUrl(s.url)}
+                    className="p-2 border border-zinc-800 rounded-md hover:border-zinc-600 transition-colors"
+                  >
+                    {copiedUrl === s.url ? <FiCheck size={14} className="text-green-400" /> : <FiCopy size={14} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onBack}
+                className="flex-1 py-3 border border-zinc-800 text-zinc-400 text-sm rounded-md hover:border-zinc-600 hover:text-white transition-all text-center"
+              >
+                View All Documents
+              </button>
+              {result.envelope?.id && (
+                <a
+                  href={`/verify/${result.envelope.id}`}
+                  className="flex-1 py-3 bg-white text-black font-medium text-sm rounded-md hover:bg-zinc-200 transition-all text-center"
+                >
+                  View Envelope
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
