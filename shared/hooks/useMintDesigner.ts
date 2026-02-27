@@ -191,24 +191,15 @@ export function useMintDesigner() {
 
   const addImageLayer = useCallback((src: string, name: string) => {
     pushUndo(doc);
-    const layer: MintLayer = {
-      id: crypto.randomUUID(),
-      name,
-      visible: true,
-      locked: false,
-      opacity: 1,
-      blendMode: 'source-over',
-      uvOnly: false,
-      transform: defaultTransform(),
-      filters: defaultFilters(),
-      type: 'image',
-      config: { src, fit: 'cover' as const, x: 0.5, y: 0.5, scale: 1 },
-    };
+
+    // Sentinel name for the background image layer we manage
+    const BG_IMAGE_NAME = '\u00b7 Background';
+    const VEIL_NAME = '\u00b7 Veil';
+
     setDoc((prev) => {
       const layers = [...prev.layers];
-      // Find insertion point: above the first gradient layer so the image
-      // isn't buried under opaque fills. Gradient switches to multiply
-      // so it tints the image rather than replacing it.
+
+      // Find insertion point above the first gradient layer
       let insertIdx = 0;
       for (let i = 0; i < layers.length; i++) {
         if (layers[i].type === 'gradient') {
@@ -217,11 +208,62 @@ export function useMintDesigner() {
           break;
         }
       }
-      layers.splice(insertIdx, 0, layer);
+
+      // Check if we already have a managed background image — replace it
+      const existingIdx = layers.findIndex((l) => l.name === BG_IMAGE_NAME);
+      if (existingIdx !== -1) {
+        const existing = layers[existingIdx];
+        layers[existingIdx] = {
+          ...existing,
+          config: { ...existing.config, src },
+          name: BG_IMAGE_NAME,
+        } as typeof existing;
+        // Reload the image
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          imageCache.current.set(existing.id, img);
+          setRenderTick((t) => t + 1);
+        };
+        return { ...prev, layers };
+      }
+
+      // New background image layer
+      const imageLayer: MintLayer = {
+        id: crypto.randomUUID(),
+        name: BG_IMAGE_NAME,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        blendMode: 'source-over',
+        uvOnly: false,
+        transform: defaultTransform(),
+        filters: defaultFilters(),
+        type: 'image',
+        config: { src, fit: 'cover' as const, x: 0.5, y: 0.5, scale: 1 },
+      };
+
+      // Dark veil layer above image so gold filigree stays visible
+      const veilLayer: MintLayer = {
+        id: crypto.randomUUID(),
+        name: VEIL_NAME,
+        visible: true,
+        locked: false,
+        opacity: 0.45,
+        blendMode: 'source-over',
+        uvOnly: false,
+        transform: defaultTransform(),
+        filters: defaultFilters(),
+        type: 'gradient',
+        config: { type: 'radial' as const, colors: ['transparent', 'rgba(0,0,0,0.9)'], angle: 0, opacity: 1 },
+      };
+
+      layers.splice(insertIdx, 0, imageLayer, veilLayer);
+      regenerateLayer(imageLayer, prev.width, prev.height);
+      regenerateLayer(veilLayer, prev.width, prev.height);
+      setSelectedLayerId(imageLayer.id);
       return { ...prev, layers };
     });
-    setSelectedLayerId(layer.id);
-    regenerateLayer(layer, doc.width, doc.height);
   }, [doc, pushUndo, regenerateLayer]);
 
   const removeLayer = useCallback((id: string) => {
