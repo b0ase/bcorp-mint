@@ -1541,28 +1541,234 @@ export default function MintApp({
               tokenisation.mode === 'music' ? 'music-empty' :
               'stamp-empty'
             }`}>
-              <div className="canvas-empty-content">
-                <div className="canvas-empty-icon">
-                  {tokenisation.mode === 'currency' ? '\u2756' :
-                   tokenisation.mode === 'tokenise' ? '\u2699' :
-                   tokenisation.mode === 'music' ? '\u266B' : '\u2756'}
+              {/* --- Currency Demo: Gold Banknote Blueprint --- */}
+              {tokenisation.mode === 'currency' && (
+                <div className="demo-container banknote-demo">
+                  <svg viewBox="0 0 400 200" width="400" height="200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Outer border */}
+                    <rect x="4" y="4" width="392" height="192" rx="6" stroke="#d4af37" strokeWidth="1.5" strokeDasharray="2 3" />
+                    <rect x="10" y="10" width="380" height="180" rx="4" stroke="#d4af37" strokeWidth="0.8" />
+                    {/* Guilloche corner arcs */}
+                    {[[16,16],[384,16],[16,184],[384,184]].map(([cx,cy], i) => (
+                      <g key={i}>
+                        <path d={`M ${cx} ${cy + (cy < 100 ? 20 : -20)} A 20 20 0 0 ${cy < 100 ? (cx < 200 ? 1 : 0) : (cx < 200 ? 0 : 1)} ${cx + (cx < 200 ? 20 : -20)} ${cy}`} stroke="#d4af37" strokeWidth="0.6" opacity="0.5" />
+                        <path d={`M ${cx} ${cy + (cy < 100 ? 30 : -30)} A 30 30 0 0 ${cy < 100 ? (cx < 200 ? 1 : 0) : (cx < 200 ? 0 : 1)} ${cx + (cx < 200 ? 30 : -30)} ${cy}`} stroke="#d4af37" strokeWidth="0.4" opacity="0.3" />
+                      </g>
+                    ))}
+                    {/* Central portrait oval */}
+                    <ellipse cx="200" cy="95" rx="42" ry="52" stroke="#d4af37" strokeWidth="0.8" opacity="0.5" />
+                    <ellipse cx="200" cy="95" rx="38" ry="48" stroke="#d4af37" strokeWidth="0.4" opacity="0.3" strokeDasharray="3 2" />
+                    {/* Denomination */}
+                    <text x="50" y="60" fontFamily="'IBM Plex Mono', monospace" fontSize="28" fontWeight="700" fill="#d4af37" opacity="0.6">100</text>
+                    <text x="340" y="60" fontFamily="'IBM Plex Mono', monospace" fontSize="28" fontWeight="700" fill="#d4af37" opacity="0.6" textAnchor="end">100</text>
+                    {/* Serial number area */}
+                    <rect x="130" y="160" width="140" height="16" rx="2" stroke="#d4af37" strokeWidth="0.5" opacity="0.4" strokeDasharray="4 2" />
+                    <text x="200" y="172" fontFamily="'IBM Plex Mono', monospace" fontSize="8" fill="#d4af37" opacity="0.35" textAnchor="middle" letterSpacing="2">AA 000000 000</text>
+                    {/* QR code grid (bottom-right) */}
+                    <g opacity="0.35">
+                      {Array.from({ length: 5 }, (_, r) =>
+                        Array.from({ length: 5 }, (_, c) => (
+                          <rect key={`${r}-${c}`} x={340 + c * 6} y={148 + r * 6} width="5" height="5" rx="0.5" fill={(r + c) % 3 === 0 ? '#d4af37' : 'none'} stroke="#d4af37" strokeWidth="0.3" />
+                        ))
+                      )}
+                    </g>
+                    {/* Horizontal guilloche lines */}
+                    {[30, 170].map(y => (
+                      <line key={y} x1="80" y1={y} x2="320" y2={y} stroke="#d4af37" strokeWidth="0.3" opacity="0.25" />
+                    ))}
+                    {/* "THE MINT" header */}
+                    <text x="200" y="34" fontFamily="'IBM Plex Mono', monospace" fontSize="9" fill="#d4af37" opacity="0.45" textAnchor="middle" letterSpacing="6">THE MINT</text>
+                  </svg>
+                  <div className="demo-hint">Design banknotes, certificates, and currency with the 18-layer visual editor.</div>
                 </div>
-                <div className="canvas-empty-title">
-                  {tokenisation.mode === 'currency' ? 'Currency Designer' :
-                   tokenisation.mode === 'tokenise' ? 'Tokenise Media' :
-                   tokenisation.mode === 'music' ? 'Music Notation' :
-                   'Load Media to Begin'}
+              )}
+
+              {/* --- Stamp Demo: Circular Seals & Rosettes --- */}
+              {tokenisation.mode === 'stamp' && (
+                <div className="demo-container">
+                  <svg viewBox="0 0 360 240" width="360" height="240" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Crosshatch background */}
+                    <defs>
+                      <pattern id="crosshatch" width="8" height="8" patternUnits="userSpaceOnUse">
+                        <path d="M 0 8 L 8 0 M -1 1 L 1 -1 M 7 9 L 9 7" stroke="#d4af37" strokeWidth="0.2" opacity="0.1" />
+                      </pattern>
+                    </defs>
+                    <rect width="360" height="240" fill="url(#crosshatch)" />
+                    {/* Seal 1 — large, tilted left */}
+                    <g className="seal-group" style={{ '--r': '-12deg', '--delay': '0s' } as React.CSSProperties} transform="translate(100,120)">
+                      <circle r="65" stroke="#b8960c" strokeWidth="1.2" opacity="0.5" />
+                      <circle r="58" stroke="#b8960c" strokeWidth="0.6" opacity="0.35" />
+                      <circle r="52" stroke="#b8960c" strokeWidth="0.4" opacity="0.25" strokeDasharray="2 2" />
+                      {/* Rosette — concentric rings */}
+                      {[18, 26, 34].map((r, i) => (
+                        <circle key={i} r={r} stroke="#b8960c" strokeWidth="0.4" opacity={0.2 - i * 0.04} strokeDasharray={`${2 + i} ${1 + i}`} />
+                      ))}
+                      {/* Star emblem */}
+                      <path d="M 0 -10 L 3 -3 L 10 -3 L 5 2 L 7 10 L 0 6 L -7 10 L -5 2 L -10 -3 L -3 -3 Z" fill="#b8960c" opacity="0.3" />
+                      {/* Radial text */}
+                      <path id="seal1-arc" d="M -45 0 A 45 45 0 1 1 45 0" fill="none" />
+                      <text fontSize="6" fill="#b8960c" opacity="0.4" letterSpacing="3">
+                        <textPath href="#seal1-arc" startOffset="10%">CERTIFIED AUTHENTIC</textPath>
+                      </text>
+                    </g>
+                    {/* Seal 2 — medium, tilted right */}
+                    <g className="seal-group" style={{ '--r': '8deg', '--delay': '0.4s' } as React.CSSProperties} transform="translate(220,100)">
+                      <circle r="50" stroke="#8a8a8a" strokeWidth="1" opacity="0.4" />
+                      <circle r="44" stroke="#8a8a8a" strokeWidth="0.5" opacity="0.3" />
+                      <circle r="38" stroke="#8a8a8a" strokeWidth="0.3" opacity="0.2" strokeDasharray="1.5 2" />
+                      {[14, 20, 27].map((r, i) => (
+                        <circle key={i} r={r} stroke="#8a8a8a" strokeWidth="0.3" opacity={0.15 - i * 0.03} strokeDasharray={`${1.5 + i} ${1 + i}`} />
+                      ))}
+                      <circle r="5" fill="#8a8a8a" opacity="0.2" />
+                      <path id="seal2-arc" d="M -35 0 A 35 35 0 1 1 35 0" fill="none" />
+                      <text fontSize="5" fill="#8a8a8a" opacity="0.35" letterSpacing="2.5">
+                        <textPath href="#seal2-arc" startOffset="15%">OFFICIAL SEAL</textPath>
+                      </text>
+                    </g>
+                    {/* Seal 3 — small accent */}
+                    <g className="seal-group" style={{ '--r': '20deg', '--delay': '0.8s' } as React.CSSProperties} transform="translate(290,160)">
+                      <circle r="32" stroke="#b8960c" strokeWidth="0.8" opacity="0.35" />
+                      <circle r="27" stroke="#b8960c" strokeWidth="0.4" opacity="0.25" />
+                      {[10, 16].map((r, i) => (
+                        <circle key={i} r={r} stroke="#b8960c" strokeWidth="0.3" opacity={0.15 - i * 0.04} strokeDasharray={`${1 + i} ${1 + i}`} />
+                      ))}
+                      <path d="M 0 -5 L 2 -1.5 L 5 -1.5 L 3 1 L 4 5 L 0 3 L -4 5 L -3 1 L -5 -1.5 L -2 -1.5 Z" fill="#b8960c" opacity="0.25" />
+                    </g>
+                  </svg>
+                  <div className="demo-hint">Load media to frame, watermark, and inscribe to chain.</div>
                 </div>
-                <div className="canvas-empty-hint">
-                  {tokenisation.mode === 'currency'
-                    ? 'Design banknotes, certificates, and currency with the 18-layer visual editor.'
-                    : tokenisation.mode === 'tokenise'
-                    ? 'Load video or audio files to extract frames and segments for tokenisation.'
-                    : tokenisation.mode === 'music'
-                    ? 'Create sheet music notation and export scores.'
-                    : 'Drop files here, or use Load Folder / Add Media above to start framing and stamping.'}
+              )}
+
+              {/* --- Tokenise Demo: Cover Flow --- */}
+              {tokenisation.mode === 'tokenise' && (
+                <div className="demo-container">
+                  <div className="coverflow-container">
+                    <div className="coverflow-track">
+                      {[-3, -2, -1, 0, 1, 2, 3].map(i => {
+                        const absI = Math.abs(i);
+                        const rotateY = i * -25;
+                        const translateX = i * 60;
+                        const translateZ = -absI * 50;
+                        const opacity = 1 - absI * 0.2;
+                        return (
+                          <div
+                            key={i}
+                            className="coverflow-card"
+                            style={{
+                              transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg)`,
+                              opacity,
+                              zIndex: 10 - absI,
+                            }}
+                          >
+                            <div className="card-perf" />
+                            <div className="card-num">#{String(i + 4).padStart(3, '0')}</div>
+                            <span style={{ fontSize: 9, opacity: 0.5, marginTop: 4 }}>FRAME</span>
+                            <div className="card-perf-bottom" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="demo-hint">Extract frames and segments for batch tokenisation.</div>
                 </div>
-              </div>
+              )}
+
+              {/* --- Music Demo: Für Elise Sheet Music --- */}
+              {tokenisation.mode === 'music' && (
+                <div className="demo-container music-demo">
+                  <div className="score-title">F&#252;r Elise</div>
+                  <div className="score-composer">L. van Beethoven</div>
+                  <svg viewBox="0 0 420 160" width="420" height="160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Treble staff */}
+                    {[0,1,2,3,4].map(i => (
+                      <line key={`t${i}`} x1="20" y1={30 + i * 8} x2="400" y2={30 + i * 8} stroke="rgba(212,175,55,0.2)" strokeWidth="0.8" />
+                    ))}
+                    {/* Bass staff */}
+                    {[0,1,2,3,4].map(i => (
+                      <line key={`b${i}`} x1="20" y1={95 + i * 8} x2="400" y2={95 + i * 8} stroke="rgba(212,175,55,0.2)" strokeWidth="0.8" />
+                    ))}
+                    {/* Brace */}
+                    <path d="M 22 30 C 14 55 14 70 22 95 C 14 95 14 95 22 127" stroke="rgba(212,175,55,0.4)" strokeWidth="1.2" fill="none" />
+                    {/* Treble clef */}
+                    <g transform="translate(30,33) scale(0.6)" opacity="0.6">
+                      <path d="M 8 40 C 8 28 16 20 16 10 C 16 4 12 0 8 0 C 4 0 0 4 0 10 C 0 16 4 18 8 18 C 12 18 16 16 16 10 C 16 20 8 28 8 40 C 8 48 12 54 16 54 C 18 54 20 52 20 48 C 20 44 16 42 14 42" fill="none" stroke="#d4af37" strokeWidth="1.8" strokeLinecap="round" />
+                    </g>
+                    {/* Bass clef */}
+                    <g transform="translate(30,95) scale(0.55)" opacity="0.6">
+                      <path d="M 0 10 C 0 4 4 0 10 0 C 14 0 18 4 18 8 C 18 14 12 18 8 18 L 0 28" fill="none" stroke="#d4af37" strokeWidth="1.8" strokeLinecap="round" />
+                      <circle cx="22" cy="6" r="2" fill="#d4af37" />
+                      <circle cx="22" cy="14" r="2" fill="#d4af37" />
+                    </g>
+                    {/* Time signature 3/8 */}
+                    <text x="56" y="48" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">3</text>
+                    <text x="56" y="62" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">8</text>
+                    <text x="56" y="112" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">3</text>
+                    <text x="56" y="126" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">8</text>
+                    {/* Bar lines */}
+                    {[150, 235, 320].map(x => (
+                      <g key={x}>
+                        <line x1={x} y1={30} x2={x} y2={62} stroke="rgba(212,175,55,0.25)" strokeWidth="0.8" />
+                        <line x1={x} y1={95} x2={x} y2={127} stroke="rgba(212,175,55,0.25)" strokeWidth="0.8" />
+                      </g>
+                    ))}
+                    {/* Final double bar */}
+                    <line x1="398" y1={30} x2="398" y2={62} stroke="rgba(212,175,55,0.3)" strokeWidth="0.8" />
+                    <line x1="400" y1={30} x2="400" y2={62} stroke="rgba(212,175,55,0.4)" strokeWidth="2" />
+                    <line x1="398" y1={95} x2="398" y2={127} stroke="rgba(212,175,55,0.3)" strokeWidth="0.8" />
+                    <line x1="400" y1={95} x2="400" y2={127} stroke="rgba(212,175,55,0.4)" strokeWidth="2" />
+                    {/* Für Elise opening notes — E5 D#5 E5 D#5 E5 B4 D5 C5 (bar 1) A4 (bar 2 start) */}
+                    {/* Treble noteheads — ellipses at staff positions */}
+                    {[
+                      // bar 1: E5 D#5 E5 D#5 E5 B4 D5 C5
+                      { x: 80, y: 30, stem: 'up' },   // E5 (top line)
+                      { x: 95, y: 34, stem: 'up', accidental: true },  // D#5
+                      { x: 110, y: 30, stem: 'up' },  // E5
+                      { x: 125, y: 34, stem: 'up', accidental: true },  // D#5
+                      { x: 140, y: 30, stem: 'up' },  // E5
+                      // bar 2: B4 D5 C5
+                      { x: 165, y: 46, stem: 'up' },  // B4
+                      { x: 183, y: 38, stem: 'up' },  // D5
+                      { x: 200, y: 42, stem: 'up' },  // C5
+                      // bar 3: A4
+                      { x: 220, y: 50, stem: 'down' },  // A4
+                      // bar 3 continuation
+                      { x: 250, y: 58, stem: 'down' },  // E4
+                      { x: 268, y: 50, stem: 'down' },  // A4
+                      { x: 285, y: 46, stem: 'up' },    // B4
+                      // bar 4
+                      { x: 335, y: 42, stem: 'up' },    // C5
+                      { x: 355, y: 30, stem: 'up' },    // E5
+                      { x: 375, y: 34, stem: 'up' },    // D#5
+                    ].map((n, i) => (
+                      <g key={i} opacity="0.55">
+                        {(n as any).accidental && (
+                          <text x={n.x - 8} y={n.y + 4} fontSize="10" fill="#d4af37" fontFamily="serif">#</text>
+                        )}
+                        <ellipse cx={n.x} cy={n.y} rx="4.5" ry="3.2" fill="#d4af37" transform={`rotate(-15 ${n.x} ${n.y})`} />
+                        {n.stem === 'up' ? (
+                          <line x1={n.x + 4} y1={n.y} x2={n.x + 4} y2={n.y - 24} stroke="#d4af37" strokeWidth="0.8" />
+                        ) : (
+                          <line x1={n.x - 4} y1={n.y} x2={n.x - 4} y2={n.y + 24} stroke="#d4af37" strokeWidth="0.8" />
+                        )}
+                      </g>
+                    ))}
+                    {/* Bass clef notes — sparse accompaniment */}
+                    {[
+                      { x: 220, y: 111 },  // A2
+                      { x: 250, y: 103 },  // E3
+                      { x: 268, y: 107 },  // C3
+                    ].map((n, i) => (
+                      <g key={`bass-${i}`} opacity="0.4">
+                        <ellipse cx={n.x} cy={n.y} rx="4.5" ry="3.2" fill="#d4af37" transform={`rotate(-15 ${n.x} ${n.y})`} />
+                        <line x1={n.x - 4} y1={n.y} x2={n.x - 4} y2={n.y + 24} stroke="#d4af37" strokeWidth="0.8" />
+                      </g>
+                    ))}
+                    {/* Beam groups (simplified) */}
+                    <line x1="84" y1="6" x2="144" y2="6" stroke="#d4af37" strokeWidth="1.5" opacity="0.45" />
+                  </svg>
+                  <div className="demo-hint">Create, edit, and inscribe sheet music scores.</div>
+                </div>
+              )}
             </div>
           ) : (
             <>

@@ -313,6 +313,7 @@ select {
   flex-direction: column;
   gap: 4px;
   min-height: 0;
+  overflow: hidden;
   box-shadow: var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.02);
 }
@@ -1997,18 +1998,25 @@ select:focus {
 
 .canvas-empty-state.stamp-empty::before {
   background-image: url('/bg-banknote-wide.jpg');
+  opacity: 0.2;
+  filter: saturate(0.5) brightness(0.7);
 }
 
 .canvas-empty-state.mint-empty::before {
   background-image: url('/bg-rosette.jpg');
+  opacity: 0.25;
+  filter: saturate(0.6) brightness(0.7);
 }
 
 .canvas-empty-state.tokenise-empty::before {
   background-image: url('/bg-coin.jpg');
+  opacity: 0.15;
 }
 
 .canvas-empty-state.music-empty::before {
   background-image: url('/bg-seal.jpg');
+  opacity: 0.15;
+  filter: saturate(0.5) brightness(0.8);
 }
 
 .canvas-empty-state::after {
@@ -3003,4 +3011,151 @@ select:focus {
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--accent);
+}
+
+/* === Rich Empty State Demos === */
+
+.demo-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 520px;
+}
+
+.demo-hint {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 320px;
+  line-height: 1.5;
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* Currency banknote shimmer */
+@keyframes banknote-shimmer {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.banknote-demo svg {
+  animation: banknote-shimmer 4s ease-in-out infinite;
+}
+
+/* Stamp seal gentle bob */
+@keyframes seal-bob {
+  0%, 100% { transform: rotate(var(--r, 0deg)) translateY(0); }
+  50% { transform: rotate(var(--r, 0deg)) translateY(-3px); }
+}
+
+.seal-group {
+  animation: seal-bob 3s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* Tokenise cover flow */
+.coverflow-container {
+  perspective: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 200px;
+  position: relative;
+}
+
+.coverflow-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: coverflow-sway 6s ease-in-out infinite;
+}
+
+.coverflow-card {
+  position: absolute;
+  width: 100px;
+  height: 140px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 4px;
+  background: rgba(10, 10, 10, 0.9);
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  color: rgba(212, 175, 55, 0.5);
+  font-size: 11px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.3s;
+}
+
+.coverflow-card .card-num {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(212, 175, 55, 0.6);
+  letter-spacing: 0.05em;
+}
+
+.coverflow-card .card-perf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 4px,
+    rgba(212, 175, 55, 0.15) 4px,
+    rgba(212, 175, 55, 0.15) 6px
+  );
+  border-radius: 4px 4px 0 0;
+}
+
+.coverflow-card .card-perf-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 4px,
+    rgba(212, 175, 55, 0.15) 4px,
+    rgba(212, 175, 55, 0.15) 6px
+  );
+  border-radius: 0 0 4px 4px;
+}
+
+@keyframes coverflow-sway {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-8px); }
+}
+
+/* Music score */
+.music-demo svg {
+  opacity: 0.8;
+}
+
+.music-demo .score-title {
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(212, 175, 55, 0.6);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.music-demo .score-composer {
+  font-size: 10px;
+  color: rgba(212, 175, 55, 0.35);
+  letter-spacing: 0.15em;
+  text-align: center;
+  margin-top: -14px;
 }
