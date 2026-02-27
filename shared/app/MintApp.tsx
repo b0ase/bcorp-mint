@@ -1415,12 +1415,46 @@ export default function MintApp({
 
       <div className="main">
         <aside className="panel left-panel">
-          <h2>Images</h2>
+          <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : 'Images'}</h2>
           <div className="image-list">
             {images.length === 0 ? (
               <div className="empty-sidebar">
-                <div className="empty-sidebar-icon">{'\u25C8'}</div>
-                <div className="small">Drop files here or use the buttons above to load media.</div>
+                {tokenisation.mode === 'currency' ? (
+                  <>
+                    <div className="empty-sidebar-icon">{'\u2756'}</div>
+                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Currency Designer</div>
+                    <div className="small">Import background images, portraits, or textures for your banknote layers.</div>
+                    <div className="small" style={{ opacity: 0.4, marginTop: 4 }}>Supports JPG, PNG, WebP, TIFF</div>
+                  </>
+                ) : tokenisation.mode === 'tokenise' ? (
+                  <>
+                    <div className="empty-sidebar-icon">{'\u2699'}</div>
+                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Tokenise Media</div>
+                    <div className="small">Load video, audio, or image files to decompose into tokenisable pieces.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                      <div className="small" style={{ opacity: 0.4 }}>Video: MP4, MOV, WebM</div>
+                      <div className="small" style={{ opacity: 0.4 }}>Audio: MP3, WAV, FLAC, AAC</div>
+                      <div className="small" style={{ opacity: 0.4 }}>Image: JPG, PNG, WebP</div>
+                    </div>
+                  </>
+                ) : tokenisation.mode === 'music' ? (
+                  <>
+                    <div className="empty-sidebar-icon">{'\u266B'}</div>
+                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Sheet Music</div>
+                    <div className="small">Create notation from scratch using the editor, or import reference images.</div>
+                    <div className="small" style={{ opacity: 0.4, marginTop: 4 }}>Desktop app: full notation editor</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="empty-sidebar-icon">{'\u25C8'}</div>
+                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Stamp &amp; Frame</div>
+                    <div className="small">Drop files here or use Add Media above. Each image gets framed, watermarked, and stamped to chain.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                      <div className="small" style={{ opacity: 0.4 }}>Vignette &middot; Frame &middot; Logo</div>
+                      <div className="small" style={{ opacity: 0.4 }}>Watermark &middot; SHA-256 &middot; Inscribe</div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               images.map((image) => {
@@ -2017,6 +2051,43 @@ export default function MintApp({
             mintingProgress={tokenisation.mintingProgress}
             lastReceipt={lastReceipt}
           />
+        ) : tokenisation.mode === 'music' && !MusicPanel ? (
+          <aside className="panel right-panel">
+            <h2>Music</h2>
+            <div className="section">
+              <h3>Notation Tools</h3>
+              <div className="control-group">
+                <div className="small" style={{ color: 'var(--accent-dim)', marginBottom: 4 }}>Desktop Features</div>
+                <div className="small" style={{ opacity: 0.6 }}>Note entry &middot; Rest &middot; Accidentals</div>
+                <div className="small" style={{ opacity: 0.6 }}>Clef selection &middot; Key signature</div>
+                <div className="small" style={{ opacity: 0.6 }}>Time signature &middot; Tempo</div>
+                <div className="small" style={{ opacity: 0.6 }}>Multi-staff &middot; Measures</div>
+              </div>
+            </div>
+            <div className="section">
+              <h3>Export</h3>
+              <div className="control-group">
+                <div className="small" style={{ opacity: 0.6 }}>PNG &middot; SVG &middot; On-chain inscription</div>
+              </div>
+            </div>
+            <div className="section">
+              <h3>Get Started</h3>
+              <div className="control-group">
+                <div className="small">Download the desktop app for the full notation editor with playback, multi-staff scoring, and direct export.</div>
+              </div>
+              {showDownloadButton && (
+                <a
+                  href="https://github.com/b0ase/bcorp-mint/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="secondary"
+                  style={{ textDecoration: 'none', display: 'inline-block', marginTop: 8 }}
+                >
+                  Download Desktop
+                </a>
+              )}
+            </div>
+          </aside>
         ) : (
         <aside className="panel right-panel">
           <h2>Settings</h2>
@@ -2307,7 +2378,27 @@ export default function MintApp({
 
             </>
           ) : (
-            <div className="small">Pick an image to edit its settings.</div>
+            <>
+              <div className="section">
+                <h3>How It Works</h3>
+                <div className="control-group">
+                  <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>1.</strong> Load images using Add Media or drag &amp; drop</div>
+                  <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>2.</strong> Adjust vignette, frame, logo, and watermark</div>
+                  <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>3.</strong> Set your stamp path (e.g. $TOKEN/SERIES/ISSUE)</div>
+                  <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>4.</strong> Hash &amp; Inscribe to write SHA-256 proof to BSV</div>
+                </div>
+              </div>
+              <div className="section">
+                <h3>Available Controls</h3>
+                <div className="control-group">
+                  <div className="small" style={{ opacity: 0.6 }}>Vignette &middot; strength &amp; edge darkening</div>
+                  <div className="small" style={{ opacity: 0.6 }}>Frame &middot; border thickness &amp; color</div>
+                  <div className="small" style={{ opacity: 0.6 }}>Logo &middot; position, scale, gallery</div>
+                  <div className="small" style={{ opacity: 0.6 }}>Watermark &middot; text, opacity, position</div>
+                  <div className="small" style={{ opacity: 0.6 }}>Stamp &middot; hash, inscribe, mint token</div>
+                </div>
+              </div>
+            </>
           )}
         </aside>
         )}

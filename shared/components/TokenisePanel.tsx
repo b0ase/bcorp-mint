@@ -54,7 +54,28 @@ export default function TokenisePanel({
     return (
       <aside className="panel right-panel">
         <h2>Tokenise</h2>
-        <div className="small">Select media to tokenise.</div>
+        <div className="section">
+          <h3>Pipelines</h3>
+          <div className="control-group">
+            <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>Video</strong> &mdash; Extract frame sequences at custom intervals. Each frame becomes a selectable, stampable piece.</div>
+            <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>Audio</strong> &mdash; Visualise waveform and create segments. Each segment is individually tokenisable.</div>
+            <div className="small"><strong style={{ color: 'var(--accent-dim)' }}>Image</strong> &mdash; Single-item tokenisation with SHA-256 proof and BSV-21 minting.</div>
+          </div>
+        </div>
+        <div className="section">
+          <h3>Token Path</h3>
+          <div className="control-group">
+            <div className="small" style={{ opacity: 0.6 }}>Video: $TOKEN/VIDEO-01/FRAME-042</div>
+            <div className="small" style={{ opacity: 0.6 }}>Audio: $TOKEN/AUDIO-01/SEGMENT-003</div>
+            <div className="small" style={{ opacity: 0.6 }}>Each piece gets parent + index metadata on-chain.</div>
+          </div>
+        </div>
+        <div className="section">
+          <h3>Get Started</h3>
+          <div className="control-group">
+            <div className="small">Load a video, audio, or image file using Add Media above.</div>
+          </div>
+        </div>
       </aside>
     );
   }
