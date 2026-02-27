@@ -184,7 +184,11 @@ export default function MintApp({
   const [allReceipts, setAllReceipts] = useState<StampReceipt[]>([]);
 
   // Tokenisation state (conditional hook or default stub)
-  const tokenisation = useTokenisationHook ? useTokenisationHook() : defaultTokenisation;
+  const [fallbackMode, setFallbackMode] = useState<AppMode>('stamp');
+  const rawTokenisation = useTokenisationHook ? useTokenisationHook() : defaultTokenisation;
+  const tokenisation = useTokenisationHook
+    ? rawTokenisation
+    : { ...rawTokenisation, mode: fallbackMode, setMode: setFallbackMode };
   const [audioPeaks, setAudioPeaks] = useState<Map<string, number[]>>(new Map());
 
   // Mint (Currency Designer) state
