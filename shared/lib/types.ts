@@ -330,6 +330,12 @@ export type MintLayerConfig =
   | { type: 'watermark-pattern'; config: WatermarkPatternConfig }
   | { type: 'hologram'; config: HologramConfig };
 
+export type MintLayerFilters = {
+  hue: number;        // -180 to +180 degrees
+  saturation: number; // -100 to +100 (% adjustment)
+  brightness: number; // -100 to +100 (% adjustment)
+};
+
 export type MintLayer = {
   id: string;
   name: string;
@@ -339,6 +345,7 @@ export type MintLayer = {
   blendMode: MintBlendMode;
   uvOnly: boolean;
   transform: MintLayerTransform;
+  filters: MintLayerFilters;
 } & MintLayerConfig;
 
 export type MintDocument = {

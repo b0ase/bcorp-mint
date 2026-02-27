@@ -18,6 +18,18 @@ import type { ActiveIssue, AppMode, AudioSegment, ExtractedFrame, ImageItem, Ima
 import { useMintDesigner } from '@shared/hooks/useMintDesigner';
 import { usePlatform } from '@shared/lib/platform-context';
 import type { FileHandle } from '@shared/lib/platform';
+import {
+  type VaultEntry,
+  saveToVault,
+  listVaultEntries,
+  deleteVaultEntry,
+  updateVaultEntry,
+  encryptForVault,
+  decryptFromVault,
+  hexFromBytes,
+  bytesFromHex,
+} from '@shared/lib/mint-vault';
+import { estimateUploadCost, uploadToUHRP, downloadFromUHRP } from '@shared/lib/uhrp-storage';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -80,7 +92,7 @@ function spreadImages(spread: Spread): ImageItem[] {
 // ---------------------------------------------------------------------------
 
 const defaultTokenisation = {
-  mode: 'stamp' as AppMode,
+  mode: 'currency' as AppMode,
   setMode: (() => {}) as (mode: AppMode) => void,
   extractedFrames: new Map<string, ExtractedFrame[]>(),
   audioSegments: new Map<string, AudioSegment[]>(),
@@ -190,7 +202,7 @@ export default function MintApp({
   const [allReceipts, setAllReceipts] = useState<StampReceipt[]>([]);
 
   // Tokenisation state (conditional hook or default stub)
-  const [fallbackMode, setFallbackMode] = useState<AppMode>('stamp');
+  const [fallbackMode, setFallbackMode] = useState<AppMode>('currency');
   const rawTokenisation = useTokenisationHook ? useTokenisationHook() : defaultTokenisation;
   const tokenisation = useTokenisationHook
     ? rawTokenisation
@@ -201,7 +213,16 @@ export default function MintApp({
   const mint = useMintDesigner();
   const [showMintGrid, setShowMintGrid] = useState(false);
   const [mintAnimate, setMintAnimate] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showVault, setShowVault] = useState(false);
+  const [vaultEntries, setVaultEntries] = useState<VaultEntry[]>([]);
+  const [vaultLoading, setVaultLoading] = useState(false);
+  const [vaultStatus, setVaultStatus] = useState('');
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('mint-splash-seen');
+    }
+    return true;
+  });
 
   // Music Editor state (conditional hook or undefined)
   const music = useMusicEditorHook ? useMusicEditorHook() : null;
@@ -1160,6 +1181,145 @@ export default function MintApp({
   }
 
   // -----------------------------------------------------------------------
+  // Vault handlers
+  // -----------------------------------------------------------------------
+
+  const refreshVault = useCallback(async () => {
+    try {
+      const entries = await listVaultEntries();
+      setVaultEntries(entries);
+    } catch (err) {
+      console.error('Failed to load vault:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showVault) refreshVault();
+  }, [showVault, refreshVault]);
+
+  const handleSaveToVault = async () => {
+    setVaultLoading(true);
+    setVaultStatus('Encrypting...');
+    try {
+      // Export current design as PNG thumbnail
+      const thumbnail = mint.exportPng() || '';
+      const docJson = JSON.stringify(mint.doc);
+      // Encrypt the document JSON
+      const { ciphertext, iv, envelopeKey } = await encryptForVault(docJson);
+
+      const entry: VaultEntry = {
+        id: crypto.randomUUID(),
+        name: mint.doc.name || 'Untitled Design',
+        thumbnail,
+        createdAt: new Date().toISOString(),
+        status: 'local',
+        iv: hexFromBytes(iv),
+        wrappedKey: hexFromBytes(envelopeKey),
+        docJson,
+        fileSize: ciphertext.byteLength,
+      };
+
+      await saveToVault(entry);
+      await refreshVault();
+      setVaultStatus('Saved to vault');
+      setTimeout(() => setVaultStatus(''), 2000);
+    } catch (err) {
+      setVaultStatus(`Failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setVaultLoading(false);
+    }
+  };
+
+  const handleUploadToChain = async (entryId: string) => {
+    setVaultLoading(true);
+    setVaultStatus('Preparing upload...');
+    try {
+      const entry = vaultEntries.find((e) => e.id === entryId);
+      if (!entry || !entry.docJson) throw new Error('Entry not found or missing data');
+
+      // Re-encrypt for upload
+      const { ciphertext, iv, envelopeKey } = await encryptForVault(entry.docJson);
+
+      // Estimate cost
+      setVaultStatus('Estimating cost...');
+      const cost = await estimateUploadCost(ciphertext.byteLength);
+      setVaultStatus(`Uploading (est. ${cost.satoshis} sats / $${cost.usd})...`);
+
+      // Update status to uploading
+      await updateVaultEntry(entryId, { status: 'uploading' });
+      await refreshVault();
+
+      // Upload to UHRP
+      const result = await uploadToUHRP(
+        ciphertext,
+        `${entry.name.replace(/[^a-zA-Z0-9]/g, '_')}.enc`,
+        'application/octet-stream'
+      );
+
+      // Update entry with on-chain info
+      await updateVaultEntry(entryId, {
+        status: 'on-chain',
+        uhrpUrl: result.uhrpUrl,
+        publicUrl: result.publicUrl,
+        iv: hexFromBytes(iv),
+        wrappedKey: hexFromBytes(envelopeKey),
+        fileSize: ciphertext.byteLength,
+      });
+      await refreshVault();
+      setVaultStatus(`On-chain: ${result.uhrpUrl.slice(0, 24)}...`);
+      setTimeout(() => setVaultStatus(''), 3000);
+    } catch (err) {
+      // Revert status if upload failed
+      await updateVaultEntry(entryId, { status: 'local' }).catch(() => {});
+      await refreshVault();
+      setVaultStatus(`Upload failed: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setVaultLoading(false);
+    }
+  };
+
+  const handleRestoreFromVault = async (entryId: string) => {
+    try {
+      const entry = vaultEntries.find((e) => e.id === entryId);
+      if (!entry) throw new Error('Entry not found');
+
+      let docJson = entry.docJson;
+
+      // If on-chain and no local docJson, download and decrypt
+      if (!docJson && entry.uhrpUrl) {
+        setVaultLoading(true);
+        setVaultStatus('Downloading from chain...');
+        const encrypted = await downloadFromUHRP(entry.uhrpUrl);
+        const iv = bytesFromHex(entry.iv);
+        const key = bytesFromHex(entry.wrappedKey);
+        docJson = await decryptFromVault(encrypted, iv, key);
+        setVaultLoading(false);
+        setVaultStatus('');
+      }
+
+      if (!docJson) throw new Error('No design data available');
+
+      const doc = JSON.parse(docJson);
+      mint.loadDocument(doc);
+      setShowVault(false);
+      setVaultStatus('Design restored');
+      setTimeout(() => setVaultStatus(''), 2000);
+    } catch (err) {
+      setVaultStatus(`Restore failed: ${err instanceof Error ? err.message : err}`);
+      setVaultLoading(false);
+    }
+  };
+
+  const handleDeleteVaultEntry = async (entryId: string) => {
+    try {
+      await deleteVaultEntry(entryId);
+      await refreshVault();
+    } catch (err) {
+      console.error('Delete failed:', err);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
 
@@ -1234,6 +1394,11 @@ export default function MintApp({
             >
               Download Desktop
             </a>
+          )}
+          {tokenisation.mode === 'currency' && (
+            <button className="secondary" onClick={() => setShowVault(true)}>
+              Vault
+            </button>
           )}
           <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
             {isExporting ? 'Printing\u2026' : 'Print'}
@@ -1902,7 +2067,97 @@ export default function MintApp({
         />
       )}
 
-      {showSplash && <SplashScreen onEnter={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onEnter={() => { localStorage.setItem('mint-splash-seen', '1'); setShowSplash(false); }} />}
+
+      {/* Mint Vault Modal */}
+      {showVault && (
+        <div className="logo-designer-overlay" onClick={() => setShowVault(false)}>
+          <div className="logo-designer" style={{ maxWidth: 900, maxHeight: '80vh' }} onClick={(e) => e.stopPropagation()}>
+            <div className="logo-designer-header">
+              <h2>Mint Vault</h2>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {vaultStatus && <span className="small" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{vaultStatus}</span>}
+                <button className="secondary" onClick={handleSaveToVault} disabled={vaultLoading}>
+                  {vaultLoading ? 'Working...' : 'Save Current'}
+                </button>
+                <button className="ghost" onClick={() => setShowVault(false)}>Close</button>
+              </div>
+            </div>
+            <div style={{ padding: 20, overflowY: 'auto', maxHeight: 'calc(80vh - 60px)' }}>
+              {vaultEntries.length === 0 ? (
+                <div className="small" style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
+                  No designs saved yet. Click &quot;Save Current&quot; to store your first design.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                  {vaultEntries.map((entry) => (
+                    <div key={entry.id} style={{
+                      background: 'var(--panel-2)',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      border: '1px solid var(--border)',
+                    }}>
+                      {/* Thumbnail */}
+                      {entry.thumbnail && (
+                        <div style={{ width: '100%', aspectRatio: '2/1', overflow: 'hidden', background: '#000' }}>
+                          <img
+                            src={entry.thumbnail}
+                            alt={entry.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+                      )}
+                      <div style={{ padding: 10 }}>
+                        {/* Name + Date */}
+                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{entry.name}</div>
+                        <div className="small" style={{ color: 'var(--muted)', marginBottom: 6 }}>
+                          {new Date(entry.createdAt).toLocaleDateString()} &middot; {(entry.fileSize / 1024).toFixed(1)} KB
+                        </div>
+                        {/* Status Badge */}
+                        <div style={{ marginBottom: 8 }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: 1,
+                            background: entry.status === 'on-chain' ? 'rgba(76,175,80,0.2)' : entry.status === 'uploading' ? 'rgba(255,193,7,0.2)' : 'rgba(158,158,158,0.2)',
+                            color: entry.status === 'on-chain' ? '#4caf50' : entry.status === 'uploading' ? '#ffc107' : '#9e9e9e',
+                          }}>
+                            {entry.status === 'on-chain' ? 'On-Chain' : entry.status === 'uploading' ? 'Uploading...' : 'Local'}
+                          </span>
+                        </div>
+                        {/* UHRP URL */}
+                        {entry.uhrpUrl && (
+                          <div className="small" style={{ fontFamily: "'IBM Plex Mono', monospace", marginBottom: 6, wordBreak: 'break-all', color: 'var(--accent)' }}>
+                            {entry.uhrpUrl.slice(0, 32)}...
+                          </div>
+                        )}
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="secondary" onClick={() => handleRestoreFromVault(entry.id)} style={{ flex: 1, fontSize: 11, padding: '4px 6px' }}>
+                            Restore
+                          </button>
+                          {entry.status === 'local' && (
+                            <button className="secondary" onClick={() => handleUploadToChain(entry.id)} disabled={vaultLoading} style={{ flex: 1, fontSize: 11, padding: '4px 6px' }}>
+                              Upload
+                            </button>
+                          )}
+                          <button className="ghost" onClick={() => handleDeleteVaultEntry(entry.id)} style={{ fontSize: 11, padding: '4px 6px', color: 'var(--danger)' }}>
+                            Del
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDocumentHash && DocumentHashPanel && (
         <DocumentHashPanel

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '@shared/lib/mint-defaults';
-import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '@shared/lib/types';
+import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerFilters, MintLayerTransform } from '@shared/lib/types';
 import LayerList from '@shared/components/LayerList';
 import PatternControls from './PatternControls';
 import { usePlatform } from '@shared/lib/platform-context';
@@ -18,7 +18,7 @@ type Props = {
   onRemoveLayer: (id: string) => void;
   onReorderLayer: (id: string, newIndex: number) => void;
   onUpdateConfig: (id: string, patch: Record<string, unknown>) => void;
-  onUpdateMeta: (id: string, patch: { name?: string; visible?: boolean; locked?: boolean; opacity?: number; blendMode?: MintBlendMode; uvOnly?: boolean }) => void;
+  onUpdateMeta: (id: string, patch: { name?: string; visible?: boolean; locked?: boolean; opacity?: number; blendMode?: MintBlendMode; uvOnly?: boolean; filters?: Partial<MintLayerFilters> }) => void;
   onUpdateTransform: (id: string, patch: Partial<MintLayerTransform>) => void;
   onDuplicateLayer: (id: string) => void;
   onSelectLayer: (id: string | null) => void;
@@ -486,6 +486,31 @@ export default function MintPanel({
             <label className="control-row">
               <span>UV Only</span>
               <input type="checkbox" checked={selectedLayer.uvOnly ?? false} onChange={(e) => onUpdateMeta(selectedLayer.id, { uvOnly: e.target.checked })} />
+            </label>
+          </div>
+
+          {/* Adjustments (HSL) */}
+          <div className="control-group">
+            <div className="small" style={{ fontWeight: 600, marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Adjustments</span>
+              {((selectedLayer.filters?.hue ?? 0) !== 0 || (selectedLayer.filters?.saturation ?? 0) !== 0 || (selectedLayer.filters?.brightness ?? 0) !== 0) && (
+                <button className="ghost" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => onUpdateMeta(selectedLayer.id, { filters: { hue: 0, saturation: 0, brightness: 0 } })}>Reset</button>
+              )}
+            </div>
+            <label className="control-row">
+              <span>Hue</span>
+              <input type="range" min={-180} max={180} step={1} value={selectedLayer.filters?.hue ?? 0} onChange={(e) => onUpdateMeta(selectedLayer.id, { filters: { hue: Number(e.target.value) } })} />
+              <span className="small" style={{ minWidth: 30, textAlign: 'right' }}>{selectedLayer.filters?.hue ?? 0}&deg;</span>
+            </label>
+            <label className="control-row">
+              <span>Saturation</span>
+              <input type="range" min={-100} max={100} step={1} value={selectedLayer.filters?.saturation ?? 0} onChange={(e) => onUpdateMeta(selectedLayer.id, { filters: { saturation: Number(e.target.value) } })} />
+              <span className="small" style={{ minWidth: 30, textAlign: 'right' }}>{selectedLayer.filters?.saturation ?? 0}</span>
+            </label>
+            <label className="control-row">
+              <span>Brightness</span>
+              <input type="range" min={-100} max={100} step={1} value={selectedLayer.filters?.brightness ?? 0} onChange={(e) => onUpdateMeta(selectedLayer.id, { filters: { brightness: Number(e.target.value) } })} />
+              <span className="small" style={{ minWidth: 30, textAlign: 'right' }}>{selectedLayer.filters?.brightness ?? 0}</span>
             </label>
           </div>
 

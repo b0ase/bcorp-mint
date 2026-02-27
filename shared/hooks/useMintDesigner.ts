@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   defaultBorderConfig,
   defaultCrosshatchConfig,
+  defaultFilters,
   defaultFineLineConfig,
   defaultGradientConfig,
   defaultGuillocheConfig,
@@ -22,7 +23,7 @@ import {
   defaultWatermarkPatternConfig
 } from '../lib/mint-defaults';
 import { encodeSvg, generators } from '../lib/mint-patterns';
-import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '../lib/types';
+import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerFilters, MintLayerTransform } from '../lib/types';
 
 const MAX_UNDO = 50;
 
@@ -34,6 +35,7 @@ type LayerMetaPatch = {
   blendMode?: MintBlendMode;
   uvOnly?: boolean;
   transform?: MintLayerTransform;
+  filters?: Partial<MintLayerFilters>;
 };
 
 function defaultConfigForType(type: MintLayerConfig['type']): MintLayerConfig['config'] {
@@ -177,6 +179,7 @@ export function useMintDesigner() {
       blendMode: 'source-over',
       uvOnly: false,
       transform: defaultTransform(),
+      filters: defaultFilters(),
       type,
       config
     } as MintLayer;
@@ -219,11 +222,17 @@ export function useMintDesigner() {
 
   const updateLayerMeta = useCallback((id: string, patch: LayerMetaPatch) => {
     pushUndo(doc);
+    const { filters: filtersPatch, ...rest } = patch;
     setDoc((prev) => ({
       ...prev,
-      layers: prev.layers.map((l) =>
-        l.id === id ? { ...l, ...patch } : l
-      )
+      layers: prev.layers.map((l) => {
+        if (l.id !== id) return l;
+        const updated = { ...l, ...rest };
+        if (filtersPatch) {
+          updated.filters = { ...(l.filters || defaultFilters()), ...filtersPatch };
+        }
+        return updated;
+      })
     }));
     setRenderTick((t) => t + 1);
   }, [doc, pushUndo]);
@@ -321,6 +330,12 @@ export function useMintDesigner() {
         ctx.translate(t.x, t.y);
       }
 
+      // Apply per-layer HSL filters
+      const f = layer.filters || { hue: 0, saturation: 0, brightness: 0 };
+      if (f.hue !== 0 || f.saturation !== 0 || f.brightness !== 0) {
+        ctx.filter = `hue-rotate(${f.hue}deg) saturate(${100 + f.saturation}%) brightness(${100 + f.brightness}%)`;
+      }
+
       if (layer.type === 'image' && layer.config.src) {
         const img = imageCache.current.get(layer.id);
         if (img && img.complete) {
@@ -344,6 +359,8 @@ export function useMintDesigner() {
           ctx.drawImage(cached, 0, 0, doc.width, doc.height);
         }
       }
+
+      ctx.filter = 'none';
 
       ctx.restore();
     }
@@ -392,6 +409,7 @@ export function useMintDesigner() {
         ...l,
         uvOnly: l.uvOnly ?? false,
         transform: l.transform ?? defaultTransform(),
+        filters: l.filters ?? defaultFilters(),
       })) as MintLayer[],
     };
     setDoc(normalized);

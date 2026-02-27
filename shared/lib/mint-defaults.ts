@@ -96,6 +96,8 @@ export function defaultHologramConfig(): HologramConfig {
   return { colors: ['#c9a84c', '#e6c665', '#daa520', '#b8860b', '#ffd700', '#c9a84c'], angle: 45, stripWidth: 8, shimmer: 0.5, x: 0.05, y: 0.05, width: 0.2, height: 0.15 };
 }
 
+export const defaultFilters = () => ({ hue: 0, saturation: 0, brightness: 0 });
+
 export function makeLayer(type: MintLayer['type'], name: string, config: MintLayer['config']): MintLayer {
   return {
     id: crypto.randomUUID(),
@@ -106,6 +108,7 @@ export function makeLayer(type: MintLayer['type'], name: string, config: MintLay
     blendMode: 'source-over',
     uvOnly: false,
     transform: defaultTransform(),
+    filters: defaultFilters(),
     type,
     config
   } as MintLayer;
@@ -119,11 +122,48 @@ export function defaultMintDocument(): MintDocument {
     description: '',
     width: 1200,
     height: 600,
-    backgroundColor: '#0a0800',
+    backgroundColor: '#060012',
     layers: [
-      makeLayer('fine-line', 'Background Lines', { angle: 30, spacing: 8, strokeWidth: 0.3, color: 'rgba(201,168,76,0.06)', wave: false, waveAmplitude: 3, waveFrequency: 4 } as FineLineConfig),
-      makeLayer('guilloche', 'Guilloche', defaultGuillocheConfig()),
-      makeLayer('border', 'Border', defaultBorderConfig())
+      // 1. Base Gradient — Deep indigo→midnight radial
+      makeLayer('gradient', 'Base Gradient', { type: 'radial', colors: ['#0a0020', '#060012', '#0a0028'], angle: 0, opacity: 1 } as GradientConfig),
+      // 2. Crosshatch Substrate — Fine paper texture
+      makeLayer('crosshatch', 'Crosshatch Substrate', { angle: 30, spacing: 4, strokeWidth: 0.15, color: 'rgba(201,168,76,0.04)', sets: 3 } as CrosshatchConfig),
+      // 3. Moiré Anti-Copy — Subtle security interference
+      makeLayer('moire', 'Moiré Anti-Copy', { angle1: 0, angle2: 4, spacing: 3, strokeWidth: 0.2, color: 'rgba(201,168,76,0.05)' } as MoireConfig),
+      // 4. Wavy Fine Lines — Angled engraving lines with wave
+      makeLayer('fine-line', 'Wavy Fine Lines', { angle: 25, spacing: 5, strokeWidth: 0.3, color: 'rgba(201,168,76,0.08)', wave: true, waveAmplitude: 4, waveFrequency: 6 } as FineLineConfig),
+      // 5. Lathe Engine Turn — Radial engine-turning pattern (left side)
+      makeLayer('lathe', 'Lathe Engine Turn', { lineCount: 80, strokeWidth: 0.2, color: 'rgba(218,165,32,0.1)', centerX: 0.25, centerY: 0.5, scale: 1, rotation: 0 } as LatheConfig),
+      // 6. Guilloche Left — Left-side oval wave medallion
+      makeLayer('guilloche', 'Guilloche Left', { waves: 4, frequency: 12, amplitude: 55, lines: 35, strokeWidth: 0.5, color: '#c9a84c', phase: 0, damping: 0.35 } as GuillocheConfig),
+      // 7. Guilloche Right — Right-side complementary (phase offset, translated)
+      (() => {
+        const l = makeLayer('guilloche', 'Guilloche Right', { waves: 3, frequency: 10, amplitude: 45, lines: 25, strokeWidth: 0.5, color: '#daa520', phase: 45, damping: 0.4 } as GuillocheConfig);
+        l.transform = { x: 200, y: 0, rotation: 0, scale: 1 };
+        return l;
+      })(),
+      // 8. Centre Rosette — Central medallion/seal
+      makeLayer('rosette', 'Centre Rosette', { petals: 20, rings: 12, radius: 0.18, strokeWidth: 0.4, color: '#e6c665', rotation: 0, innerRadius: 0.25 } as RosetteConfig),
+      // 9. Ornate Border — Art-deco frame + inner border
+      makeLayer('border', 'Ornate Border', { style: 'ornate', thickness: 48, color: '#c9a84c', cornerStyle: 'ornament', innerBorder: true, innerGap: 10 } as BorderConfig),
+      // 10. Security Thread — Vertical dashed thread
+      makeLayer('security-thread', 'Security Thread', { x: 0.35, width: 4, color: 'rgba(230,198,101,0.15)', text: 'THE MINT', textColor: 'rgba(255,248,220,0.25)', dashed: true, dashLength: 30, gapLength: 15 } as SecurityThreadConfig),
+      // 11. Watermark Pattern — Tiled diagonal watermark
+      makeLayer('watermark-pattern', 'Watermark Pattern', { text: 'THE MINT', fontFamily: 'Space Grotesk', fontSize: 14, color: 'rgba(255,255,255,0.025)', angle: -30, spacingX: 180, spacingY: 65 } as WatermarkPatternConfig),
+      // 12. Microprint Band — Tiny repeating security text
+      makeLayer('microprint', 'Microprint Band', { text: 'THE BITCOIN CORPORATION MINT', fontSize: 2.5, color: 'rgba(255,248,220,0.12)', rows: 10, angle: 0, spacing: 5 } as MicroprintConfig),
+      // 13. Hologram Strip — Iridescent foil badge top-left
+      makeLayer('hologram', 'Hologram Strip', { colors: ['#c9a84c', '#e6c665', '#daa520', '#b8860b', '#ffd700', '#c9a84c'], angle: 45, stripWidth: 6, shimmer: 0.6, x: 0.04, y: 0.06, width: 0.18, height: 0.14 } as HologramConfig),
+      // 14. Stipple Texture — Dot-cloud for depth
+      makeLayer('stipple', 'Stipple Texture', { density: 300, dotSize: 0.8, color: 'rgba(201,168,76,0.04)', pattern: 'halftone', seed: 1729 } as StippleConfig),
+      // 15. Title Text — "THE BITCOIN CORPORATION" header
+      makeLayer('text', 'Title Text', { text: 'THE BITCOIN CORPORATION', fontFamily: 'Space Grotesk', fontSize: 26, fontWeight: 700, color: '#fff8dc', letterSpacing: 8, align: 'center', x: 0.5, y: 0.13 } as TextLayerConfig),
+      // 16. Denomination — Large "100" numeral
+      makeLayer('text', 'Denomination', { text: '100', fontFamily: 'Bebas Neue', fontSize: 140, fontWeight: 700, color: 'rgba(255,248,220,0.9)', letterSpacing: 0, align: 'center', x: 0.82, y: 0.45 } as TextLayerConfig),
+      // 17. Sub-denomination — "ONE HUNDRED" small text
+      makeLayer('text', 'Sub-denomination', { text: 'ONE HUNDRED', fontFamily: 'Space Grotesk', fontSize: 14, fontWeight: 400, color: 'rgba(255,248,220,0.5)', letterSpacing: 6, align: 'center', x: 0.82, y: 0.62 } as TextLayerConfig),
+      // 18. Serial Number — "AA000001" bottom-right
+      makeLayer('serial-number', 'Serial Number', { prefix: 'AA', startNumber: 1, digits: 6, fontFamily: 'IBM Plex Mono', fontSize: 20, color: '#c9a84c', letterSpacing: 4, x: 0.88, y: 0.9 } as SerialNumberConfig),
     ],
     circleMask: false,
     rimPattern: defaultRimPattern()
