@@ -313,7 +313,6 @@ select {
   flex-direction: column;
   gap: 4px;
   min-height: 0;
-  overflow: hidden;
   box-shadow: var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.02);
 }
@@ -322,6 +321,7 @@ select {
   position: relative;
   flex: 1;
   min-height: 0;
+  max-height: 100%;
   border-radius: 8px;
   background: #020202;
   overflow: hidden;

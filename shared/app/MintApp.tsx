@@ -1507,12 +1507,81 @@ export default function MintApp({
             />
           ) : tokenisation.mode === 'music' && !MusicCanvas ? (
             <div className="canvas-empty-state music-empty">
-              <div className="canvas-empty-content">
-                <div className="canvas-empty-icon">{'\u266B'}</div>
-                <div className="canvas-empty-title">Music Editor</div>
-                <div className="canvas-empty-hint">
-                  The Music Editor is available in the desktop version of The Mint.
-                </div>
+              <div className="demo-container music-demo">
+                <div className="score-title">F&#252;r Elise</div>
+                <div className="score-composer">L. van Beethoven</div>
+                <svg viewBox="0 0 420 160" width="420" height="160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {[0,1,2,3,4].map(i => (
+                    <line key={`t${i}`} x1="20" y1={30 + i * 8} x2="400" y2={30 + i * 8} stroke="rgba(212,175,55,0.2)" strokeWidth="0.8" />
+                  ))}
+                  {[0,1,2,3,4].map(i => (
+                    <line key={`b${i}`} x1="20" y1={95 + i * 8} x2="400" y2={95 + i * 8} stroke="rgba(212,175,55,0.2)" strokeWidth="0.8" />
+                  ))}
+                  <path d="M 22 30 C 14 55 14 70 22 95 C 14 95 14 95 22 127" stroke="rgba(212,175,55,0.4)" strokeWidth="1.2" fill="none" />
+                  <g transform="translate(30,33) scale(0.6)" opacity="0.6">
+                    <path d="M 8 40 C 8 28 16 20 16 10 C 16 4 12 0 8 0 C 4 0 0 4 0 10 C 0 16 4 18 8 18 C 12 18 16 16 16 10 C 16 20 8 28 8 40 C 8 48 12 54 16 54 C 18 54 20 52 20 48 C 20 44 16 42 14 42" fill="none" stroke="#d4af37" strokeWidth="1.8" strokeLinecap="round" />
+                  </g>
+                  <g transform="translate(30,95) scale(0.55)" opacity="0.6">
+                    <path d="M 0 10 C 0 4 4 0 10 0 C 14 0 18 4 18 8 C 18 14 12 18 8 18 L 0 28" fill="none" stroke="#d4af37" strokeWidth="1.8" strokeLinecap="round" />
+                    <circle cx="22" cy="6" r="2" fill="#d4af37" />
+                    <circle cx="22" cy="14" r="2" fill="#d4af37" />
+                  </g>
+                  <text x="56" y="48" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">3</text>
+                  <text x="56" y="62" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">8</text>
+                  <text x="56" y="112" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">3</text>
+                  <text x="56" y="126" fontFamily="serif" fontSize="14" fill="#d4af37" opacity="0.5" fontWeight="bold">8</text>
+                  {[150, 235, 320].map(x => (
+                    <g key={x}>
+                      <line x1={x} y1={30} x2={x} y2={62} stroke="rgba(212,175,55,0.25)" strokeWidth="0.8" />
+                      <line x1={x} y1={95} x2={x} y2={127} stroke="rgba(212,175,55,0.25)" strokeWidth="0.8" />
+                    </g>
+                  ))}
+                  <line x1="398" y1={30} x2="398" y2={62} stroke="rgba(212,175,55,0.3)" strokeWidth="0.8" />
+                  <line x1="400" y1={30} x2="400" y2={62} stroke="rgba(212,175,55,0.4)" strokeWidth="2" />
+                  <line x1="398" y1={95} x2="398" y2={127} stroke="rgba(212,175,55,0.3)" strokeWidth="0.8" />
+                  <line x1="400" y1={95} x2="400" y2={127} stroke="rgba(212,175,55,0.4)" strokeWidth="2" />
+                  {[
+                    { x: 80, y: 30, stem: 'up' },
+                    { x: 95, y: 34, stem: 'up', accidental: true },
+                    { x: 110, y: 30, stem: 'up' },
+                    { x: 125, y: 34, stem: 'up', accidental: true },
+                    { x: 140, y: 30, stem: 'up' },
+                    { x: 165, y: 46, stem: 'up' },
+                    { x: 183, y: 38, stem: 'up' },
+                    { x: 200, y: 42, stem: 'up' },
+                    { x: 220, y: 50, stem: 'down' },
+                    { x: 250, y: 58, stem: 'down' },
+                    { x: 268, y: 50, stem: 'down' },
+                    { x: 285, y: 46, stem: 'up' },
+                    { x: 335, y: 42, stem: 'up' },
+                    { x: 355, y: 30, stem: 'up' },
+                    { x: 375, y: 34, stem: 'up' },
+                  ].map((n, i) => (
+                    <g key={i} opacity="0.55">
+                      {(n as any).accidental && (
+                        <text x={n.x - 8} y={n.y + 4} fontSize="10" fill="#d4af37" fontFamily="serif">#</text>
+                      )}
+                      <ellipse cx={n.x} cy={n.y} rx="4.5" ry="3.2" fill="#d4af37" transform={`rotate(-15 ${n.x} ${n.y})`} />
+                      {n.stem === 'up' ? (
+                        <line x1={n.x + 4} y1={n.y} x2={n.x + 4} y2={n.y - 24} stroke="#d4af37" strokeWidth="0.8" />
+                      ) : (
+                        <line x1={n.x - 4} y1={n.y} x2={n.x - 4} y2={n.y + 24} stroke="#d4af37" strokeWidth="0.8" />
+                      )}
+                    </g>
+                  ))}
+                  {[
+                    { x: 220, y: 111 },
+                    { x: 250, y: 103 },
+                    { x: 268, y: 107 },
+                  ].map((n, i) => (
+                    <g key={`bass-${i}`} opacity="0.4">
+                      <ellipse cx={n.x} cy={n.y} rx="4.5" ry="3.2" fill="#d4af37" transform={`rotate(-15 ${n.x} ${n.y})`} />
+                      <line x1={n.x - 4} y1={n.y} x2={n.x - 4} y2={n.y + 24} stroke="#d4af37" strokeWidth="0.8" />
+                    </g>
+                  ))}
+                  <line x1="84" y1="6" x2="144" y2="6" stroke="#d4af37" strokeWidth="1.5" opacity="0.45" />
+                </svg>
+                <div className="demo-hint">Create, edit, and inscribe sheet music scores. Full editor available in the desktop app.</div>
               </div>
             </div>
           ) : /* Tokenise mode: show FrameBrowser or WaveformEditor (desktop components) */
