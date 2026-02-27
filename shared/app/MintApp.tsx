@@ -217,6 +217,7 @@ export default function MintApp({
   const [vaultEntries, setVaultEntries] = useState<VaultEntry[]>([]);
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultStatus, setVaultStatus] = useState('');
+  const [coverFlowIdx, setCoverFlowIdx] = useState(0);
   const [showSplash, setShowSplash] = useState(() => {
     if (typeof window !== 'undefined') {
       return !localStorage.getItem('mint-splash-seen');
@@ -1742,37 +1743,62 @@ export default function MintApp({
                 </div>
               )}
 
-              {/* --- Tokenise Demo: Cover Flow --- */}
+              {/* --- Tokenise Demo: Interactive Cover Flow --- */}
               {tokenisation.mode === 'tokenise' && (
                 <div className="demo-container">
-                  <div className="coverflow-container">
+                  <div
+                    className="coverflow-container"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowLeft') { e.preventDefault(); setCoverFlowIdx(p => Math.max(p - 1, -3)); }
+                      if (e.key === 'ArrowRight') { e.preventDefault(); setCoverFlowIdx(p => Math.min(p + 1, 3)); }
+                    }}
+                    onWheel={(e) => {
+                      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                        setCoverFlowIdx(p => Math.max(-3, Math.min(3, p + (e.deltaX > 0 ? 1 : -1))));
+                      } else {
+                        setCoverFlowIdx(p => Math.max(-3, Math.min(3, p + (e.deltaY > 0 ? 1 : -1))));
+                      }
+                    }}
+                  >
                     <div className="coverflow-track">
-                      {[-3, -2, -1, 0, 1, 2, 3].map(i => {
-                        const absI = Math.abs(i);
-                        const rotateY = i * -25;
-                        const translateX = i * 60;
-                        const translateZ = -absI * 50;
-                        const opacity = 1 - absI * 0.2;
+                      {Array.from({ length: 11 }, (_, idx) => idx - 5).map(cardIdx => {
+                        const rel = cardIdx - coverFlowIdx;
+                        if (Math.abs(rel) > 4) return null;
+                        const absRel = Math.abs(rel);
+                        const rotateY = rel * -25;
+                        const translateX = rel * 60;
+                        const translateZ = -absRel * 50;
+                        const cardOpacity = Math.max(0, 1 - absRel * 0.22);
+                        const frameNum = cardIdx + 6;
                         return (
                           <div
-                            key={i}
-                            className="coverflow-card"
+                            key={cardIdx}
+                            className={`coverflow-card${rel === 0 ? ' coverflow-active' : ''}`}
                             style={{
                               transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg)`,
-                              opacity,
-                              zIndex: 10 - absI,
+                              opacity: cardOpacity,
+                              zIndex: 10 - absRel,
+                              cursor: 'pointer',
+                              transition: 'transform 0.4s ease, opacity 0.4s ease',
                             }}
+                            onClick={() => setCoverFlowIdx(cardIdx)}
                           >
                             <div className="card-perf" />
-                            <div className="card-num">#{String(i + 4).padStart(3, '0')}</div>
+                            <div className="card-num">#{String(frameNum).padStart(3, '0')}</div>
                             <span style={{ fontSize: 9, opacity: 0.5, marginTop: 4 }}>FRAME</span>
                             <div className="card-perf-bottom" />
                           </div>
                         );
                       })}
                     </div>
+                    <div className="coverflow-nav">
+                      <button className="coverflow-arrow" onClick={() => setCoverFlowIdx(p => Math.max(p - 1, -5))} disabled={coverFlowIdx <= -5}>{'\u2039'}</button>
+                      <span className="coverflow-label">Frame {coverFlowIdx + 6} of 11</span>
+                      <button className="coverflow-arrow" onClick={() => setCoverFlowIdx(p => Math.min(p + 1, 5))} disabled={coverFlowIdx >= 5}>{'\u203A'}</button>
+                    </div>
                   </div>
-                  <div className="demo-hint">Extract frames and segments for batch tokenisation.</div>
+                  <div className="demo-hint">Scroll, arrow keys, or click to browse. Load media to extract real frames.</div>
                 </div>
               )}
 
