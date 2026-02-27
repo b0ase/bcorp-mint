@@ -59,6 +59,8 @@ export type ImageItem = {
   sampleRate?: number;
   channels?: number;
   settings: ImageSettings;
+  originMode?: AppMode;
+  tags?: AppMode[];
 };
 
 export type ExtractedFrame = {
@@ -97,7 +99,20 @@ export type TokenisationPiece = {
   status: 'pending' | 'hashing' | 'hashed' | 'stamping' | 'stamped' | 'minting' | 'minted' | 'error';
 };
 
-export type AppMode = 'stamp' | 'currency' | 'tokenise' | 'music' | 'magazine' | 'qr';
+export type AppMode = 'stamp' | 'currency' | 'stocks' | 'bonds' | 'tokenise' | 'music' | 'magazine' | 'qr';
+
+export type WIPItem = {
+  id: string;
+  name: string;
+  mode: AppMode;
+  createdAt: string;
+  thumbnail?: string;
+  mintDoc?: MintDocument;
+  imageIds?: string[];
+  musicScoreJson?: string;
+  qrProjectJson?: string;
+  metadata?: Record<string, unknown>;
+};
 
 // --- MetaNet Tree types ---
 
@@ -348,6 +363,41 @@ export type MintLayer = {
   filters: MintLayerFilters;
 } & MintLayerConfig;
 
+export type StockShareClass = 'common' | 'preferred' | 'class-a' | 'class-b' | 'convertible' | 'restricted' | 'treasury' | 'founders' | 'employee-options';
+
+export type StockCertificateMetadata = {
+  companyName: string;
+  stateOfIncorporation: string;
+  shareClass: StockShareClass;
+  sharesAuthorized: number;
+  parValue: number;
+  certificateNumber: string;
+  holderName: string;
+  issueDate: string;
+  cusip: string;
+  transferAgent: string;
+};
+
+export type BondType = 'government' | 'corporate' | 'municipal' | 'zero-coupon' | 'convertible' | 'bearer' | 'savings' | 'green';
+export type PaymentFrequency = 'annual' | 'semi-annual' | 'quarterly' | 'monthly' | 'at-maturity';
+
+export type BondCertificateMetadata = {
+  issuerName: string;
+  bondType: BondType;
+  faceValue: number;
+  couponRate: number;
+  maturityDate: string;
+  paymentFrequency: PaymentFrequency;
+  certificateNumber: string;
+  holderName: string;
+  issueDate: string;
+  isin: string;
+};
+
+export type CertificateMetadata =
+  | { kind: 'stock'; data: StockCertificateMetadata }
+  | { kind: 'bond'; data: BondCertificateMetadata };
+
 export type MintDocument = {
   name: string;
   description: string;
@@ -362,6 +412,83 @@ export type MintDocument = {
     depth: number;
     color: string;
   };
+  certificateMetadata?: CertificateMetadata;
+};
+
+// --- Ownership Chain (digital title transfer) ---
+
+export type TransferEndorsement = {
+  id: string;
+  fromAddress: string;
+  fromName: string;
+  toAddress: string;
+  toName: string;
+  signature: string;
+  signedMessage: string;
+  timestamp: string;
+  txid?: string;
+  walletType: string;
+};
+
+export type OwnershipChain = {
+  assetId: string;
+  assetHash: string;
+  assetType: 'stock' | 'bond' | 'currency' | 'stamp' | 'token';
+  issuance: {
+    issuerAddress: string;
+    issuerName: string;
+    signature: string;
+    signedMessage: string;
+    timestamp: string;
+    txid?: string;
+  };
+  transfers: TransferEndorsement[];
+  currentHolder: {
+    address: string;
+    name: string;
+  };
+};
+
+// --- Portfolio / Wallet types ---
+
+export type OwnedAsset = {
+  vaultId: string;
+  name: string;
+  assetType: 'stock' | 'bond' | 'currency' | 'stamp' | 'token';
+  thumbnail: string;
+  acquiredAt: string;
+  ownershipChain: OwnershipChain;
+  chainLength: number;
+  docJson?: string;
+};
+
+export type PortfolioSummary = {
+  total: number;
+  stocks: number;
+  bonds: number;
+  currency: number;
+  stamps: number;
+  tokens: number;
+};
+
+// --- Cloud Save / Attestation types ---
+
+export type CloudSaveStatus = 'none' | 'attested' | 'uploading' | 'saved' | 'error';
+
+export type AttestationProof = {
+  hash: string;
+  signature: string;
+  address: string;
+  timestamp: string;
+  walletType: string;
+};
+
+export type EncryptedBundle = {
+  ciphertext: string;   // base64
+  iv: string;           // hex
+  attestation: AttestationProof;
+  assetType: string;
+  name: string;
 };
 
 export type Spread =

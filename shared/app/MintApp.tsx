@@ -17,7 +17,7 @@ import WalletView from '@shared/components/WalletView';
 import { createDefaultSettings } from '@shared/lib/defaults';
 import { loadImage } from '@shared/lib/image-utils';
 import { createTextLogo, initialLogos, type GeneratedLogoStyle } from '@shared/lib/logos';
-import type { ActiveIssue, AppMode, AudioSegment, ExtractedFrame, ImageItem, ImageSettings, LogoAsset, Spread, StampReceipt, WalletState, WalletProviderType } from '@shared/lib/types';
+import type { ActiveIssue, AppMode, AudioSegment, ExtractedFrame, ImageItem, ImageSettings, LogoAsset, OwnershipChain, Spread, StampReceipt, WalletState, WalletProviderType, WIPItem } from '@shared/lib/types';
 import { useMintDesigner } from '@shared/hooks/useMintDesigner';
 import { usePlatform } from '@shared/lib/platform-context';
 import type { FileHandle } from '@shared/lib/platform';
@@ -35,6 +35,21 @@ import {
 import { estimateUploadCost, uploadToUHRP, downloadFromUHRP } from '@shared/lib/uhrp-storage';
 import QRCanvas from '@shared/components/QRCanvas';
 import QRPanel from '@shared/components/QRPanel';
+import LeftPanel from '@shared/components/LeftPanel';
+import type { StampPreset } from '@shared/components/LeftPanel';
+import UploadButton from '@shared/components/UploadButton';
+import WIPCarousel from '@shared/components/WIPCarousel';
+import CertificateBack from '@shared/components/CertificateBack';
+import TransferModal from '@shared/components/TransferModal';
+import ChainVerifier from '@shared/components/ChainVerifier';
+import { createIssuance, createTransfer, sha256Hash } from '@shared/lib/ownership-chain';
+import PortfolioView from '@shared/components/PortfolioView';
+import AssetDetailView from '@shared/components/AssetDetailView';
+import ReceiveAssetModal from '@shared/components/ReceiveAssetModal';
+import CloudSaveModal from '@shared/components/CloudSaveModal';
+import CloudVaultBrowser from '@shared/components/CloudVaultBrowser';
+import { usePortfolio } from '@shared/hooks/usePortfolio';
+import type { OwnedAsset, AttestationProof } from '@shared/lib/types';
 import { useQREditor } from '@shared/hooks/useQREditor';
 
 // ---------------------------------------------------------------------------
@@ -61,30 +76,7 @@ function extOf(name: string): string {
   return '.' + (name.split('.').pop()?.toLowerCase() ?? '');
 }
 
-const BUNDLED_NOTES = [
-  'image', 'image-1', 'image-2', 'image-3', 'image-4', 'image-5',
-  'image-6', 'image-7', 'image-8', 'image-9', 'image-10', 'image-11',
-].map((name) => ({
-  name: name.replace('image', 'Note'),
-  src: `/bcorp notes landscape/${name}.jpg`,
-}));
-
-type QRExample = { label: string; icon: string; type: import('@shared/lib/qr-types').QRContentType; content: Record<string, string> };
-
-const QR_EXAMPLES: QRExample[] = [
-  { label: 'Website', icon: '\u{1F310}', type: 'url', content: { url: 'https://bcorpmint.com' } },
-  { label: 'Bitcoin Address', icon: '\u20BF', type: 'wallet', content: { address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' } },
-  { label: 'BSV-20 Token', icon: '\u{1FA99}', type: 'token', content: { symbol: 'BCORP', supply: '100000000000', protocol: 'BSV-20', address: '' } },
-  { label: 'Contact Card', icon: '\u{1F4C7}', type: 'vcard', content: { name: 'Satoshi Nakamoto', email: 'satoshi@bitcoin.org', phone: '+1-555-0100', org: 'Bitcoin Corporation' } },
-  { label: 'WiFi Network', icon: '\u{1F4F6}', type: 'wifi', content: { ssid: 'bCorp-Guest', password: 'goldstandard', encryption: 'WPA' } },
-  { label: 'Email', icon: '\u2709', type: 'email', content: { address: 'mint@bcorp.com', subject: 'PoW Note Enquiry', body: 'I am interested in acquiring a PoW Note.' } },
-  { label: 'Plain Text', icon: '\u{1F4DD}', type: 'text', content: { text: 'This note is backed by Proof of Work. SHA-256 verified.' } },
-  { label: '$401 Identity', icon: '\u{1F512}', type: 'url', content: { url: 'https://path401.com/verify/satoshi' } },
-  { label: 'Mint Receipt', icon: '\u{1F4DC}', type: 'text', content: { text: 'STAMP|$BCORP/SERIES-01/NOTE-001|sha256:e3b0c44298fc1c149afbf4c8996fb924|2026-02-27T00:00:00Z' } },
-  { label: 'GitHub Repo', icon: '\u{1F4E6}', type: 'url', content: { url: 'https://github.com/b0ase/bcorp-mint' } },
-  { label: '$402 Payment', icon: '\u{1F4B0}', type: 'url', content: { url: 'https://path402.com/pay/0.01' } },
-  { label: 'PoW Note #001', icon: '\u26A1', type: 'text', content: { text: 'POW-NOTE|001|DIFFICULTY:2^32|REWARD:0.001BSV|HASH:0000000000000003fa2e6...' } },
-];
+// BUNDLED_NOTES and QR_EXAMPLES moved to LeftPanel.tsx
 
 // ---------------------------------------------------------------------------
 // Spread helpers
@@ -249,6 +241,27 @@ export default function MintApp({
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultStatus, setVaultStatus] = useState('');
   const [coverFlowIdx, setCoverFlowIdx] = useState(0);
+
+  // WIP (Work In Progress) carousel state
+  const [wipItems, setWipItems] = useState<WIPItem[]>([]);
+  const [activeWipId, setActiveWipId] = useState<string | null>(null);
+
+  // Ownership chain state
+  const [activeChain, setActiveChain] = useState<OwnershipChain | null>(null);
+  const [showCertificateBack, setShowCertificateBack] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showChainVerifier, setShowChainVerifier] = useState(false);
+
+  // Portfolio state
+  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [showAssetDetail, setShowAssetDetail] = useState(false);
+  const [showReceiveAsset, setShowReceiveAsset] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<OwnedAsset | null>(null);
+
+  // Cloud vault state
+  const [showCloudSave, setShowCloudSave] = useState(false);
+  const [showCloudBrowser, setShowCloudBrowser] = useState(false);
+
   const [showSplash, setShowSplash] = useState(() => {
     if (typeof window !== 'undefined') {
       return !localStorage.getItem('mint-splash-seen');
@@ -265,6 +278,9 @@ export default function MintApp({
 
   // Wallet manager (conditional hook or default stub)
   const walletMgr = useWalletManagerHook ? useWalletManagerHook() : defaultWalletManager;
+
+  // Portfolio
+  const portfolio = usePortfolio(walletMgr.walletState.masterAddress ?? null);
 
   const canvasPanelRef = useRef<HTMLElement>(null);
   const swipeRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -365,6 +381,152 @@ export default function MintApp({
       })
     );
   };
+
+  // Cross-tab bridge: send an image to another mode
+  const sendToMode = useCallback((targetMode: AppMode, item: ImageItem) => {
+    setImages((prev) => prev.map((img) =>
+      img.id === item.id
+        ? { ...img, tags: [...new Set([...(img.tags ?? []), targetMode])] }
+        : img
+    ));
+    tokenisation.setMode(targetMode);
+    setSelectedId(item.id);
+  }, [tokenisation]);
+
+  // WIP carousel handlers
+  const handleNewWip = useCallback(() => {
+    const mode = tokenisation.mode;
+    const count = wipItems.filter((w) => w.mode === mode).length;
+    const item: WIPItem = {
+      id: crypto.randomUUID(),
+      name: `${mode.charAt(0).toUpperCase() + mode.slice(1)} ${count + 1}`,
+      mode,
+      createdAt: new Date().toISOString(),
+    };
+    setWipItems((prev) => [...prev, item]);
+    setActiveWipId(item.id);
+  }, [tokenisation.mode, wipItems]);
+
+  const handleSelectWip = useCallback((id: string) => {
+    setActiveWipId(id);
+    const item = wipItems.find((w) => w.id === id);
+    if (item?.mintDoc) {
+      mint.loadDocument(item.mintDoc);
+    }
+  }, [wipItems, mint]);
+
+  // Ownership chain handlers
+  const handleSealAndIssue = useCallback(async () => {
+    const exportPng = mint.exportPng();
+    if (!exportPng) return;
+
+    const assetHash = await sha256Hash(exportPng);
+    const mode = tokenisation.mode;
+    const assetType: OwnershipChain['assetType'] =
+      mode === 'stocks' ? 'stock' :
+      mode === 'bonds' ? 'bond' :
+      mode === 'currency' ? 'currency' : 'stamp';
+
+    let signature = 'local-unsigned';
+    let issuerAddress = walletMgr.walletState.masterAddress || 'local';
+    const issuerName = walletMgr.walletState.handle || 'Local Wallet';
+
+    if (platform.signMessage) {
+      try {
+        const result = await platform.signMessage(
+          `ISSUE|${assetHash}|BY:${issuerAddress}|AT:${new Date().toISOString()}`
+        );
+        signature = result.signature;
+        issuerAddress = result.address;
+      } catch {
+        // Fallback to local unsigned
+      }
+    }
+
+    const chain = createIssuance({
+      assetId: crypto.randomUUID(),
+      assetHash,
+      assetType,
+      issuerAddress,
+      issuerName,
+      signature,
+    });
+
+    setActiveChain(chain);
+
+    // Save to vault with chain
+    const docJson = JSON.stringify(mint.doc);
+    const { ciphertext, iv, envelopeKey } = await encryptForVault(docJson);
+    const entry = {
+      id: chain.assetId,
+      name: mint.doc.name || `${assetType} Certificate`,
+      thumbnail: exportPng.slice(0, 200),
+      createdAt: new Date().toISOString(),
+      status: 'local' as const,
+      iv: hexFromBytes(iv),
+      wrappedKey: hexFromBytes(envelopeKey),
+      docJson,
+      fileSize: ciphertext.byteLength,
+      ownershipChain: JSON.stringify(chain),
+    };
+    await saveToVault(entry);
+
+    setShowCertificateBack(true);
+  }, [mint, tokenisation.mode, walletMgr, platform]);
+
+  const handleTransfer = useCallback(async (toAddress: string, toName: string) => {
+    if (!activeChain) return;
+
+    let signature = 'local-unsigned';
+    const walletType = walletMgr.walletState.provider || 'local';
+
+    if (platform.signMessage) {
+      try {
+        const msg = `TRANSFER|${activeChain.assetHash}|FROM:${activeChain.currentHolder.address}|TO:${toAddress}|AT:${new Date().toISOString()}`;
+        const result = await platform.signMessage(msg);
+        signature = result.signature;
+      } catch {
+        // Fallback
+      }
+    }
+
+    const updatedChain = createTransfer(activeChain, {
+      toAddress,
+      toName,
+      signature,
+      walletType,
+    });
+
+    setActiveChain(updatedChain);
+    await updateVaultEntry(updatedChain.assetId, {
+      ownershipChain: JSON.stringify(updatedChain),
+    });
+  }, [activeChain, walletMgr, platform]);
+
+  // Load a stamp visual preset
+  const loadStampPreset = useCallback((preset: StampPreset) => {
+    if (!selectedImage) return;
+    setImages((prev) =>
+      prev.map((img) =>
+        img.id === selectedImage.id
+          ? {
+              ...img,
+              settings: {
+                ...img.settings,
+                stampVisual: {
+                  watermarkEnabled: true,
+                  watermarkText: preset.watermarkText,
+                  watermarkOpacity: preset.watermarkOpacity,
+                  watermarkPosition: preset.watermarkPosition,
+                  borderStampEnabled: true,
+                  borderStampText: preset.borderStampText,
+                },
+              },
+            }
+          : img
+      )
+    );
+  }, [selectedImage]);
 
   // Stop video playback when selection changes
   useEffect(() => {
@@ -543,9 +705,10 @@ export default function MintApp({
     );
     const items = results.filter((item): item is ImageItem => item !== null);
 
-    setImages((prev) => [...prev, ...items]);
-    setSelectedId((prev) => prev ?? items[0]?.id ?? null);
-  }, [logos, platform]);
+    const taggedItems = items.map((item) => ({ ...item, originMode: tokenisation.mode }));
+    setImages((prev) => [...prev, ...taggedItems]);
+    setSelectedId((prev) => prev ?? taggedItems[0]?.id ?? null);
+  }, [logos, platform, tokenisation.mode]);
 
   const handleSelectFolder = async () => {
     const result = await platform.selectFolder?.();
@@ -652,7 +815,7 @@ export default function MintApp({
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
 
-      const isCurrency = tokenisation.mode === 'currency';
+      const isCurrency = tokenisation.mode === 'currency' || tokenisation.mode === 'stocks' || tokenisation.mode === 'bonds';
       const ctrl = e.ctrlKey || e.metaKey;
 
       // Currency mode shortcuts
@@ -1375,243 +1538,86 @@ export default function MintApp({
 
   return (
     <div className="app" onDrop={handleDrop} onDragOver={handleDragOver}>
-      <header className="topbar">
-        <div className="topbar-left">
-          <h1 className="brand-title">The Bitcoin Corporation <span className="brand-accent">Mint</span></h1>
-          <WalletSelector
-            walletState={walletMgr.walletState}
-            onSwitchProvider={walletMgr.switchProvider}
-            onConnect={walletMgr.connect}
-            onDisconnect={walletMgr.disconnect}
-            onOpenWalletView={() => setShowWalletView(true)}
+      <header className="topbar topbar-two-row">
+        <div className="topbar-row-1">
+          <div className="topbar-left">
+            <h1 className="brand-title">The Bitcoin Corporation <span className="brand-accent">Mint</span></h1>
+            <WalletSelector
+              walletState={walletMgr.walletState}
+              onSwitchProvider={walletMgr.switchProvider}
+              onConnect={walletMgr.connect}
+              onDisconnect={walletMgr.disconnect}
+              onOpenWalletView={() => setShowWalletView(true)}
+            />
+          </div>
+          <WIPCarousel
+            items={wipItems}
+            currentMode={tokenisation.mode}
+            activeItemId={activeWipId}
+            onSelect={handleSelectWip}
+            onNew={handleNewWip}
           />
-          <div className="issue-carousel">
-            {issues.map((iss) => (
-              <button
-                key={iss.id}
-                className={`issue-chip ${iss.id === currentIssueId ? 'active' : ''}`}
-                onClick={() => switchIssue(iss.id)}
-                title={`${iss.parentDir}/${iss.name}`}
+        </div>
+        <div className="topbar-row-2">
+          <ModeToggle mode={tokenisation.mode} onChange={tokenisation.setMode} />
+          <div className="topbar-actions">
+            <UploadButton
+              onSelectFiles={handleSelectFiles}
+              onSelectDocuments={handleSelectDocuments}
+              onSelectAnyFiles={handleSelectAnyFiles}
+              onSelectFolder={handleSelectFolder}
+              showFolderOption={platform.supportedFeatures.has('folder-access')}
+            />
+            {showDownloadButton && (
+              <a
+                href="https://github.com/b0ase/bcorp-mint/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="secondary"
+                style={{ textDecoration: 'none' }}
               >
-                {iss.name}
-                {iss.id === currentIssueId && (
-                  <span className="issue-chip-count">{iss.enabledIds.size}</span>
-                )}
-              </button>
-            ))}
-            <button className="issue-chip new-issue" onClick={handleNewIssue}>
-              + New
+                Download Desktop
+              </a>
+            )}
+            <button className="secondary" onClick={() => setShowPortfolio(true)}>
+              Portfolio{portfolio.summary.total > 0 ? ` (${portfolio.summary.total})` : ''}
+            </button>
+            <button className="secondary" onClick={() => setShowVault(true)}>
+              Vault
+            </button>
+            <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
+              {isExporting ? 'Printing\u2026' : 'Print'}
+            </button>
+            <button
+              className="fullscreen-btn"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? '\u2716' : '\u26F6'}
             </button>
           </div>
-        </div>
-        <div className="topbar-actions">
-          <ModeToggle mode={tokenisation.mode} onChange={tokenisation.setMode} />
-          {platform.supportedFeatures.has('folder-access') && (
-            <button className="secondary" onClick={handleSelectFolder}>
-              Load Folder
-            </button>
-          )}
-          <button className="secondary" onClick={handleSelectFiles}>
-            Add Media
-          </button>
-          <button className="secondary" onClick={handleSelectDocuments}>
-            Documents
-          </button>
-          <button className="secondary" onClick={handleSelectAnyFiles}>
-            Files
-          </button>
-          {showDownloadButton && (
-            <a
-              href="https://github.com/b0ase/bcorp-mint/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="secondary"
-              style={{ textDecoration: 'none' }}
-            >
-              Download Desktop
-            </a>
-          )}
-          <button className="secondary" onClick={() => setShowVault(true)}>
-            Vault
-          </button>
-          <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
-            {isExporting ? 'Printing\u2026' : 'Print'}
-          </button>
-          <button
-            className="fullscreen-btn"
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            {isFullscreen ? '\u2716' : '\u26F6'}
-          </button>
         </div>
       </header>
 
       <div className="main">
-        <aside className="panel left-panel">
-          <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : tokenisation.mode === 'magazine' ? 'Pages' : tokenisation.mode === 'qr' ? 'QR Codes' : 'Images'}</h2>
-
-          {/* QR Examples — preset examples for QR mode */}
-          {tokenisation.mode === 'qr' && (
-            <div className="qr-examples">
-              <div className="small" style={{ color: 'var(--accent-dim)', marginBottom: 6 }}>Examples</div>
-              <div className="qr-examples-list">
-                {QR_EXAMPLES.map((ex) => (
-                  <button
-                    key={ex.label}
-                    className="qr-example-btn"
-                    onClick={() => qr.loadPreset(ex.type, ex.content)}
-                  >
-                    <span className="qr-example-icon">{ex.icon}</span>
-                    <span className="qr-example-label">{ex.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Note Gallery — bundled artwork for currency mode */}
-          {tokenisation.mode === 'currency' && (
-            <div className="note-gallery">
-              <div className="small" style={{ color: 'var(--accent-dim)', marginBottom: 6 }}>Note Gallery</div>
-              <div className="note-gallery-grid">
-                {BUNDLED_NOTES.map((note) => (
-                  <div
-                    key={note.name}
-                    className="note-gallery-thumb"
-                    onClick={() => mint.addImageLayer(note.src, note.name)}
-                    title={note.name}
-                  >
-                    <img src={note.src} alt={note.name} loading="lazy" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="image-list">
-            {images.length === 0 ? (
-              <div className="empty-sidebar">
-                {tokenisation.mode === 'currency' ? (
-                  <>
-                    <div className="empty-sidebar-icon">{'\u2756'}</div>
-                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Currency Designer</div>
-                    <div className="small">Import background images, portraits, or textures for your banknote layers.</div>
-                    <div className="small" style={{ opacity: 0.4, marginTop: 4 }}>Supports JPG, PNG, WebP, TIFF</div>
-                  </>
-                ) : tokenisation.mode === 'tokenise' ? (
-                  <>
-                    <div className="empty-sidebar-icon">{'\u2699'}</div>
-                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Tokenise Media</div>
-                    <div className="small">Load video, audio, or image files to decompose into tokenisable pieces.</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                      <div className="small" style={{ opacity: 0.4 }}>Video: MP4, MOV, WebM</div>
-                      <div className="small" style={{ opacity: 0.4 }}>Audio: MP3, WAV, FLAC, AAC</div>
-                      <div className="small" style={{ opacity: 0.4 }}>Image: JPG, PNG, WebP</div>
-                    </div>
-                  </>
-                ) : tokenisation.mode === 'music' ? (
-                  <>
-                    <div className="empty-sidebar-icon">{'\u266B'}</div>
-                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Sheet Music</div>
-                    <div className="small">Create notation from scratch using the editor, or import reference images.</div>
-                    <div className="small" style={{ opacity: 0.4, marginTop: 4 }}>Desktop app: full notation editor</div>
-                  </>
-                ) : tokenisation.mode === 'magazine' ? (
-                  <>
-                    <div className="empty-sidebar-icon">{'\u{1F4D6}'}</div>
-                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Magazine Creator</div>
-                    <div className="small">Add pages for your magazine, zine, or publication. Each page gets framed, branded, and stamped to chain.</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                      <div className="small" style={{ opacity: 0.4 }}>Covers &middot; Spreads &middot; Articles</div>
-                      <div className="small" style={{ opacity: 0.4 }}>Logo &middot; Watermark &middot; Print &middot; Inscribe</div>
-                    </div>
-                  </>
-                ) : tokenisation.mode === 'qr' ? (
-                  <>
-                    <div className="empty-sidebar-icon">{'\u25A3'}</div>
-                    <div className="small" style={{ color: 'var(--accent-dim)' }}>QR Code Generator</div>
-                    <div className="small">Create scannable QR codes for URLs, wallets, tokens, contacts, and more.</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                      <div className="small" style={{ opacity: 0.4 }}>URL &middot; vCard &middot; WiFi &middot; Token</div>
-                      <div className="small" style={{ opacity: 0.4 }}>Customise &middot; Batch &middot; Export &middot; Inscribe</div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="empty-sidebar-icon">{'\u25C8'}</div>
-                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Stamp &amp; Frame</div>
-                    <div className="small">Drop files here or use Add Media above. Each image gets framed, watermarked, and stamped to chain.</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                      <div className="small" style={{ opacity: 0.4 }}>Vignette &middot; Frame &middot; Logo</div>
-                      <div className="small" style={{ opacity: 0.4 }}>Watermark &middot; SHA-256 &middot; Inscribe</div>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              images.map((image) => {
-                const inIssue = isImageInIssue(image.id);
-                const partnerId = pairMap.get(image.id);
-                const isPaired = !!partnerId;
-                const isPartnerSelected = partnerId === selectedId;
-                return (
-                  <div
-                    key={image.id}
-                    className={[
-                      'image-card',
-                      image.id === selectedId && 'active',
-                      isPartnerSelected && 'paired',
-                      currentIssue && !inIssue && 'is-disabled',
-                      isPaired && 'is-paired'
-                    ].filter(Boolean).join(' ')}
-                    onClick={() => {
-                      if (currentIssue && !inIssue) {
-                        toggleImage(image.id);
-                      }
-                      setSelectedId(image.id);
-                      if (tokenisation.mode === 'currency' && image.mediaType === 'image') {
-                        mint.addImageLayer(image.url, image.name);
-                      }
-                    }}
-                  >
-                    <div style={{ position: 'relative' }}>
-                      <img src={image.url} alt={image.name} />
-                      {image.mediaType === 'video' && (
-                        <span className="video-badge">VID</span>
-                      )}
-                      {image.mediaType === 'audio' && (
-                        <span className="video-badge" style={{ background: 'rgba(100, 149, 237, 0.85)' }}>AUD</span>
-                      )}
-                    </div>
-                    <div className="image-meta">
-                      <strong>{image.name}</strong>
-                      <span>
-                        {image.mediaType === 'video' ? 'Video' : image.mediaType === 'audio' ? 'Audio' : (image.width > image.height ? 'L' : 'P')}
-                        {image.duration ? ` \u00b7 ${Math.floor(image.duration)}s` : ''}
-                        {isPaired ? ' \u00b7 Paired' : ''}
-                        {currentIssue ? (inIssue ? ' \u00b7 In' : '') : ''}
-                      </span>
-                    </div>
-                    {currentIssue && (
-                      <button
-                        className="image-toggle"
-                        onClick={(e) => { e.stopPropagation(); toggleImage(image.id); }}
-                        title={inIssue ? 'Remove from issue' : 'Add to issue'}
-                      >
-                        {inIssue ? '\u25C9' : '\u25CB'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </aside>
+        <LeftPanel
+          mode={tokenisation.mode}
+          images={images}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onToggleImage={toggleImage}
+          currentIssue={currentIssue}
+          isImageInIssue={isImageInIssue}
+          pairMap={pairMap}
+          qr={qr}
+          mint={mint}
+          onLoadStampPreset={loadStampPreset}
+          sendToMode={sendToMode}
+        />
 
         <section className="canvas-panel" ref={canvasPanelRef}>
           {/* Currency mode: Currency Designer canvas */}
-          {tokenisation.mode === 'currency' ? (
+          {(tokenisation.mode === 'currency' || tokenisation.mode === 'stocks' || tokenisation.mode === 'bonds') ? (
             <MintCanvas
               doc={mint.doc}
               selectedLayerId={mint.selectedLayerId}
@@ -1666,6 +1672,8 @@ export default function MintApp({
           ) : images.length === 0 ? (
             <div className={`canvas-empty-state ${
               tokenisation.mode === 'currency' ? 'mint-empty' :
+              tokenisation.mode === 'stocks' ? 'mint-empty' :
+              tokenisation.mode === 'bonds' ? 'mint-empty' :
               tokenisation.mode === 'tokenise' ? 'tokenise-empty' :
               tokenisation.mode === 'music' ? 'music-empty' :
               tokenisation.mode === 'magazine' ? 'magazine-empty' :
@@ -1711,6 +1719,65 @@ export default function MintApp({
                     <text x="200" y="34" fontFamily="'IBM Plex Mono', monospace" fontSize="9" fill="#d4af37" opacity="0.45" textAnchor="middle" letterSpacing="6">THE MINT</text>
                   </svg>
                   <div className="demo-hint">Design banknotes, certificates, and currency with the 18-layer visual editor.</div>
+                </div>
+              )}
+
+              {/* --- Stocks Demo: Share Certificate Blueprint --- */}
+              {tokenisation.mode === 'stocks' && (
+                <div className="demo-container banknote-demo">
+                  <svg viewBox="0 0 320 400" width="320" height="400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="4" width="312" height="392" rx="6" stroke="#d4af37" strokeWidth="1.5" strokeDasharray="2 3" />
+                    <rect x="10" y="10" width="300" height="380" rx="4" stroke="#d4af37" strokeWidth="0.8" />
+                    <text x="160" y="40" fontFamily="'IBM Plex Mono', monospace" fontSize="8" fill="#d4af37" opacity="0.45" textAnchor="middle" letterSpacing="4">SHARE CERTIFICATE</text>
+                    <line x1="40" y1="50" x2="280" y2="50" stroke="#d4af37" strokeWidth="0.4" opacity="0.3" />
+                    <text x="160" y="75" fontFamily="'IBM Plex Mono', monospace" fontSize="14" fontWeight="700" fill="#d4af37" opacity="0.6" textAnchor="middle">COMPANY NAME</text>
+                    <text x="160" y="95" fontFamily="'IBM Plex Mono', monospace" fontSize="7" fill="#d4af37" opacity="0.35" textAnchor="middle">State of Incorporation</text>
+                    <rect x="60" y="115" width="200" height="100" rx="4" stroke="#d4af37" strokeWidth="0.5" opacity="0.3" strokeDasharray="4 2" />
+                    <text x="160" y="155" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">This certifies that</text>
+                    <line x1="80" y1="175" x2="240" y2="175" stroke="#d4af37" strokeWidth="0.4" opacity="0.25" />
+                    <text x="160" y="195" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">is the owner of</text>
+                    <text x="160" y="250" fontFamily="'IBM Plex Mono', monospace" fontSize="22" fontWeight="700" fill="#d4af37" opacity="0.5" textAnchor="middle">1,000</text>
+                    <text x="160" y="270" fontFamily="'IBM Plex Mono', monospace" fontSize="8" fill="#d4af37" opacity="0.35" textAnchor="middle">COMMON SHARES</text>
+                    <ellipse cx="160" cy="320" rx="30" ry="30" stroke="#d4af37" strokeWidth="0.6" opacity="0.3" />
+                    <ellipse cx="160" cy="320" rx="25" ry="25" stroke="#d4af37" strokeWidth="0.3" opacity="0.2" strokeDasharray="2 2" />
+                    <text x="160" y="323" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">SEAL</text>
+                    <line x1="40" y1="370" x2="130" y2="370" stroke="#d4af37" strokeWidth="0.4" opacity="0.25" />
+                    <text x="85" y="380" fontFamily="'IBM Plex Mono', monospace" fontSize="5" fill="#d4af37" opacity="0.25" textAnchor="middle">Secretary</text>
+                    <line x1="190" y1="370" x2="280" y2="370" stroke="#d4af37" strokeWidth="0.4" opacity="0.25" />
+                    <text x="235" y="380" fontFamily="'IBM Plex Mono', monospace" fontSize="5" fill="#d4af37" opacity="0.25" textAnchor="middle">President</text>
+                  </svg>
+                  <div className="demo-hint">Design stock certificates with the visual layer editor.</div>
+                </div>
+              )}
+
+              {/* --- Bonds Demo: Bond Certificate Blueprint --- */}
+              {tokenisation.mode === 'bonds' && (
+                <div className="demo-container banknote-demo">
+                  <svg viewBox="0 0 320 400" width="320" height="400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="4" width="312" height="392" rx="6" stroke="#d4af37" strokeWidth="1.5" strokeDasharray="2 3" />
+                    <rect x="10" y="10" width="300" height="380" rx="4" stroke="#d4af37" strokeWidth="0.8" />
+                    <text x="160" y="40" fontFamily="'IBM Plex Mono', monospace" fontSize="8" fill="#d4af37" opacity="0.45" textAnchor="middle" letterSpacing="4">BOND CERTIFICATE</text>
+                    <line x1="40" y1="50" x2="280" y2="50" stroke="#d4af37" strokeWidth="0.4" opacity="0.3" />
+                    <text x="160" y="75" fontFamily="'IBM Plex Mono', monospace" fontSize="14" fontWeight="700" fill="#d4af37" opacity="0.6" textAnchor="middle">ISSUER NAME</text>
+                    <text x="160" y="95" fontFamily="'IBM Plex Mono', monospace" fontSize="7" fill="#d4af37" opacity="0.35" textAnchor="middle">Corporate Bond</text>
+                    <text x="160" y="140" fontFamily="'IBM Plex Mono', monospace" fontSize="28" fontWeight="700" fill="#d4af37" opacity="0.5" textAnchor="middle">$10,000</text>
+                    <text x="160" y="160" fontFamily="'IBM Plex Mono', monospace" fontSize="7" fill="#d4af37" opacity="0.35" textAnchor="middle">FACE VALUE</text>
+                    <rect x="50" y="180" width="100" height="50" rx="4" stroke="#d4af37" strokeWidth="0.5" opacity="0.3" strokeDasharray="3 2" />
+                    <text x="100" y="200" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">COUPON RATE</text>
+                    <text x="100" y="218" fontFamily="'IBM Plex Mono', monospace" fontSize="14" fontWeight="700" fill="#d4af37" opacity="0.45" textAnchor="middle">5.25%</text>
+                    <rect x="170" y="180" width="100" height="50" rx="4" stroke="#d4af37" strokeWidth="0.5" opacity="0.3" strokeDasharray="3 2" />
+                    <text x="220" y="200" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">MATURITY</text>
+                    <text x="220" y="218" fontFamily="'IBM Plex Mono', monospace" fontSize="10" fontWeight="700" fill="#d4af37" opacity="0.45" textAnchor="middle">2036-01-01</text>
+                    <text x="160" y="265" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">Payment Frequency: Semi-Annual</text>
+                    <rect x="50" y="285" width="220" height="40" rx="4" stroke="#d4af37" strokeWidth="0.4" opacity="0.25" strokeDasharray="4 2" />
+                    <text x="160" y="300" fontFamily="'IBM Plex Mono', monospace" fontSize="5" fill="#d4af37" opacity="0.25" textAnchor="middle">ISIN: XX0000000000</text>
+                    <text x="160" y="315" fontFamily="'IBM Plex Mono', monospace" fontSize="5" fill="#d4af37" opacity="0.25" textAnchor="middle">CERTIFICATE NO: BOND-000001</text>
+                    <ellipse cx="160" cy="350" rx="25" ry="25" stroke="#d4af37" strokeWidth="0.5" opacity="0.3" />
+                    <text x="160" y="353" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.3" textAnchor="middle">SEAL</text>
+                    <line x1="40" y1="385" x2="130" y2="385" stroke="#d4af37" strokeWidth="0.4" opacity="0.25" />
+                    <line x1="190" y1="385" x2="280" y2="385" stroke="#d4af37" strokeWidth="0.4" opacity="0.25" />
+                  </svg>
+                  <div className="demo-hint">Design bond certificates with coupon mechanics and maturity schedules.</div>
                 </div>
               )}
 
@@ -2100,8 +2167,9 @@ export default function MintApp({
           )}
         </section>
 
-        {tokenisation.mode === 'currency' ? (
+        {(tokenisation.mode === 'currency' || tokenisation.mode === 'stocks' || tokenisation.mode === 'bonds') ? (
           <MintPanel
+            mode={tokenisation.mode}
             doc={mint.doc}
             selectedLayer={mint.selectedLayer}
             selectedLayerId={mint.selectedLayerId}
@@ -2130,6 +2198,8 @@ export default function MintApp({
             animatePreview={mintAnimate}
             onToggleAnimate={() => setMintAnimate((prev) => !prev)}
             getThumbnailSrc={mint.getLayerThumbnailSrc}
+            onSealAndIssue={(tokenisation.mode === 'stocks' || tokenisation.mode === 'bonds') ? handleSealAndIssue : undefined}
+            onViewEndorsements={activeChain ? () => setShowCertificateBack(true) : undefined}
           />
         ) : tokenisation.mode === 'qr' ? (
           <QRPanel
@@ -2639,6 +2709,38 @@ export default function MintApp({
                   ))}
                 </div>
               )}
+
+              {/* Cloud Vault Section */}
+              <div className="cloud-vault-section">
+                <div className="cloud-vault-divider">
+                  <span>Cloud Vault</span>
+                </div>
+                <p className="small" style={{ color: 'var(--muted)', marginBottom: 12 }}>
+                  Encrypted cloud storage. Sign with your wallet, encrypt locally, upload securely. No plaintext leaves your device.
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="secondary"
+                    onClick={() => { setShowVault(false); setShowCloudSave(true); }}
+                    disabled={!platform.signMessage}
+                    style={{ flex: 1 }}
+                  >
+                    Save to Cloud
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => { setShowVault(false); setShowCloudBrowser(true); }}
+                    style={{ flex: 1 }}
+                  >
+                    Browse Cloud Vault
+                  </button>
+                </div>
+                {!platform.signMessage && (
+                  <div className="small" style={{ marginTop: 8, color: 'var(--danger)' }}>
+                    Set up your wallet to enable cloud save.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2656,6 +2758,8 @@ export default function MintApp({
         open={showWalletView}
         onClose={() => setShowWalletView(false)}
         onWalletChanged={walletMgr.refresh}
+        assetCount={portfolio.summary.total}
+        onOpenPortfolio={() => setShowPortfolio(true)}
       />
 
       {showReceiptViewer && (
@@ -2696,6 +2800,106 @@ export default function MintApp({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Cloud Vault Modals */}
+      {showCloudSave && platform.signMessage && (
+        <CloudSaveModal
+          docJson={JSON.stringify(mint.doc)}
+          name={mint.doc.name}
+          assetType={
+            tokenisation.mode === 'stocks' ? 'stock' :
+            tokenisation.mode === 'bonds' ? 'bond' :
+            tokenisation.mode === 'currency' ? 'currency' : 'design'
+          }
+          signMessage={platform.signMessage}
+          onSaved={async (cloudId, attestation) => {
+            setShowCloudSave(false);
+          }}
+          onClose={() => setShowCloudSave(false)}
+        />
+      )}
+
+      {showCloudBrowser && (
+        <CloudVaultBrowser
+          signMessage={platform.signMessage ?? null}
+          onRestore={(docJson) => {
+            try {
+              const doc = JSON.parse(docJson);
+              mint.loadDocument(doc);
+              setShowCloudBrowser(false);
+            } catch {
+              // Invalid doc
+            }
+          }}
+          onClose={() => setShowCloudBrowser(false)}
+        />
+      )}
+
+      {/* Portfolio Modals */}
+      {showPortfolio && (
+        <PortfolioView
+          assets={portfolio.assets}
+          summary={portfolio.summary}
+          loading={portfolio.loading}
+          onSelectAsset={(asset) => { setSelectedAsset(asset); setShowPortfolio(false); setShowAssetDetail(true); }}
+          onReceive={() => { setShowPortfolio(false); setShowReceiveAsset(true); }}
+          onClose={() => setShowPortfolio(false)}
+        />
+      )}
+
+      {showAssetDetail && selectedAsset && (
+        <AssetDetailView
+          asset={selectedAsset}
+          onTransfer={() => {
+            setActiveChain(selectedAsset.ownershipChain);
+            setShowAssetDetail(false);
+            setShowTransferModal(true);
+          }}
+          onVerify={() => {
+            setActiveChain(selectedAsset.ownershipChain);
+            setShowAssetDetail(false);
+            setShowChainVerifier(true);
+          }}
+          onViewEndorsements={() => {
+            setActiveChain(selectedAsset.ownershipChain);
+            setShowAssetDetail(false);
+            setShowCertificateBack(true);
+          }}
+          onClose={() => { setShowAssetDetail(false); setSelectedAsset(null); }}
+        />
+      )}
+
+      {showReceiveAsset && (
+        <ReceiveAssetModal
+          onImported={() => { portfolio.refresh(); setShowReceiveAsset(false); setShowPortfolio(true); }}
+          onClose={() => setShowReceiveAsset(false)}
+        />
+      )}
+
+      {/* Ownership Chain Modals */}
+      {showCertificateBack && activeChain && (
+        <CertificateBack
+          chain={activeChain}
+          onTransfer={() => { setShowCertificateBack(false); setShowTransferModal(true); }}
+          onVerify={() => { setShowCertificateBack(false); setShowChainVerifier(true); }}
+          onClose={() => setShowCertificateBack(false)}
+        />
+      )}
+
+      {showTransferModal && activeChain && (
+        <TransferModal
+          currentHolder={activeChain.currentHolder.name || activeChain.currentHolder.address}
+          onTransfer={handleTransfer}
+          onClose={() => setShowTransferModal(false)}
+        />
+      )}
+
+      {showChainVerifier && activeChain && (
+        <ChainVerifier
+          chain={activeChain}
+          onClose={() => setShowChainVerifier(false)}
+        />
       )}
     </div>
   );

@@ -2,12 +2,17 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '@shared/lib/mint-defaults';
-import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerFilters, MintLayerTransform } from '@shared/lib/types';
+import { STOCK_TEMPLATES } from '@shared/lib/stock-defaults';
+import { BOND_TEMPLATES } from '@shared/lib/bond-defaults';
+import type { AppMode, CertificateMetadata, MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerFilters, MintLayerTransform } from '@shared/lib/types';
 import LayerList from '@shared/components/LayerList';
+import StockMetadataPanel from '@shared/components/StockMetadataPanel';
+import BondMetadataPanel from '@shared/components/BondMetadataPanel';
 import PatternControls from './PatternControls';
 import { usePlatform } from '@shared/lib/platform-context';
 
 type Props = {
+  mode?: AppMode;
   doc: MintDocument;
   selectedLayer: MintLayer | null;
   selectedLayerId: string | null;
@@ -36,6 +41,8 @@ type Props = {
   animatePreview: boolean;
   onToggleAnimate: () => void;
   getThumbnailSrc: (id: string) => string | null;
+  onSealAndIssue?: () => void;
+  onViewEndorsements?: () => void;
 };
 
 const LAYER_TYPES: { type: MintLayerConfig['type']; label: string; group: string }[] = [
@@ -68,12 +75,13 @@ const BLEND_MODES: { value: MintBlendMode; label: string }[] = [
 ];
 
 export default function MintPanel({
-  doc, selectedLayer, selectedLayerId, canUndo, canRedo, uvMode,
+  mode = 'currency', doc, selectedLayer, selectedLayerId, canUndo, canRedo, uvMode,
   onAddLayer, onRemoveLayer, onReorderLayer, onUpdateConfig, onUpdateMeta,
   onUpdateTransform, onDuplicateLayer, onSelectLayer, onSetCanvasSize,
   onSetBackgroundColor, onSetDocMeta, onSetUvMode, onUndo, onRedo,
   onLoadDocument, onExportPng, onExportBatchPng, showGrid, onToggleGrid,
-  animatePreview, onToggleAnimate, getThumbnailSrc
+  animatePreview, onToggleAnimate, getThumbnailSrc,
+  onSealAndIssue, onViewEndorsements,
 }: Props) {
   const platform = usePlatform();
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -301,7 +309,7 @@ export default function MintPanel({
         <div className="section mint-dropdown-section">
           <h3>Templates</h3>
           <div className="mint-template-grid">
-            {MINT_TEMPLATES.map((tpl) => (
+            {(mode === 'stocks' ? STOCK_TEMPLATES : mode === 'bonds' ? BOND_TEMPLATES : MINT_TEMPLATES).map((tpl) => (
               <button key={tpl.id} className="mint-template-card" onClick={() => { onLoadDocument(tpl.factory()); setShowTemplates(false); }} title={tpl.description}>
                 <span className="mint-template-name">{tpl.name}</span>
                 <span className="mint-template-desc">{tpl.description}</span>
@@ -427,6 +435,48 @@ export default function MintPanel({
           )}
         </div>
       </div>
+
+      {/* Seal & Issue / View Endorsements (stocks/bonds only) */}
+      {(mode === 'stocks' || mode === 'bonds') && (
+        <div className="section" style={{ display: 'flex', gap: 8 }}>
+          {onSealAndIssue && (
+            <button onClick={onSealAndIssue} style={{ flex: 1 }}>Seal &amp; Issue</button>
+          )}
+          {onViewEndorsements && (
+            <button className="secondary" onClick={onViewEndorsements} style={{ flex: 1 }}>Endorsements</button>
+          )}
+        </div>
+      )}
+
+      {/* Certificate Metadata (stocks/bonds only) */}
+      {mode === 'stocks' && doc.certificateMetadata?.kind === 'stock' && (
+        <StockMetadataPanel
+          metadata={doc.certificateMetadata.data}
+          onChange={(patch) => {
+            if (doc.certificateMetadata?.kind === 'stock') {
+              onSetDocMeta({} as any);
+              onLoadDocument({
+                ...doc,
+                certificateMetadata: { kind: 'stock', data: { ...doc.certificateMetadata.data, ...patch } },
+              });
+            }
+          }}
+        />
+      )}
+      {mode === 'bonds' && doc.certificateMetadata?.kind === 'bond' && (
+        <BondMetadataPanel
+          metadata={doc.certificateMetadata.data}
+          onChange={(patch) => {
+            if (doc.certificateMetadata?.kind === 'bond') {
+              onSetDocMeta({} as any);
+              onLoadDocument({
+                ...doc,
+                certificateMetadata: { kind: 'bond', data: { ...doc.certificateMetadata.data, ...patch } },
+              });
+            }
+          }}
+        />
+      )}
 
       {/* Layer List */}
       <div className="section">

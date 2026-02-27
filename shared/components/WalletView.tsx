@@ -10,6 +10,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onWalletChanged: () => void;
+  assetCount?: number;
+  onOpenPortfolio?: () => void;
 };
 
 const DEFAULT_DERIVATIONS: Array<{ protocol: string; slug: string }> = [
@@ -19,7 +21,7 @@ const DEFAULT_DERIVATIONS: Array<{ protocol: string; slug: string }> = [
   { protocol: 'identity', slug: 'primary' },
 ];
 
-export default function WalletView({ open, onClose, onWalletChanged }: Props) {
+export default function WalletView({ open, onClose, onWalletChanged, assetCount, onOpenPortfolio }: Props) {
   const platform = usePlatform();
   const [view, setView] = useState<'loading' | 'setup' | 'dashboard' | 'import'>('loading');
   const [masterInfo, setMasterInfo] = useState<MasterInfo>(null);
@@ -319,6 +321,18 @@ export default function WalletView({ open, onClose, onWalletChanged }: Props) {
                   PubKey: {masterInfo.publicKey.slice(0, 16)}...{masterInfo.publicKey.slice(-8)}
                 </div>
               </div>
+
+              {onOpenPortfolio && (
+                <div className="wallet-view-section">
+                  <h4>My Assets</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span className="small">{assetCount ?? 0} owned asset{(assetCount ?? 0) !== 1 ? 's' : ''} in vault</span>
+                    <button className="secondary" onClick={() => { onClose(); onOpenPortfolio(); }} style={{ fontSize: 12, padding: '4px 12px' }}>
+                      View Portfolio
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {derivedAddresses.length > 0 && (
                 <div className="wallet-view-section">

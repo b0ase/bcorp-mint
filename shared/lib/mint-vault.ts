@@ -6,7 +6,7 @@
  */
 
 const DB_NAME = 'mint-vault';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const STORE_NAME = 'vault-entries';
 
 export type VaultEntryStatus = 'local' | 'uploading' | 'on-chain';
@@ -24,6 +24,10 @@ export interface VaultEntry {
   wrappedKey: string;        // hex-encoded envelope key
   docJson?: string;          // MintDocument JSON for re-editing
   fileSize: number;          // bytes of encrypted payload
+  ownershipChain?: string;   // JSON-serialized OwnershipChain
+  cloudSaveStatus?: 'none' | 'attested' | 'uploading' | 'saved' | 'error';
+  attestation?: string;      // JSON-serialized AttestationProof
+  cloudId?: string;          // server-side cloud vault UUID
 }
 
 function hexFromBytes(bytes: Uint8Array): string {

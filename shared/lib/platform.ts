@@ -121,6 +121,9 @@ export interface MintPlatform {
     iconContentType?: string;
   }>): Promise<void>;
 
+  // --- Message signing (optional — for ownership chain endorsements) ---
+  signMessage?(message: string): Promise<{ signature: string; address: string }>;
+
   // --- Desktop-only (optional — undefined in browser) ---
   selectFolder?(): Promise<{ folder: string; files: string[] } | null>;
   chooseExportFolder?(): Promise<string | null>;
