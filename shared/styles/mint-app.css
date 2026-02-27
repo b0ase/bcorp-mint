@@ -321,7 +321,6 @@ select {
   position: relative;
   flex: 1;
   min-height: 0;
-  max-height: 100%;
   border-radius: 8px;
   background: #020202;
   overflow: hidden;

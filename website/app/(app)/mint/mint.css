@@ -5,3 +5,10 @@
 body {
   overflow: auto;
 }
+
+/* On web the Electron #root { height:100vh } doesn't exist, so .app's
+   height:100% resolves to auto and everything collapses. Give it a
+   definite viewport height minus the bottom-nav spacing (pb-20 = 5rem). */
+.app {
+  height: calc(100dvh - 5rem);
+}
