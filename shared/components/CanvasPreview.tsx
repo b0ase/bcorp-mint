@@ -30,9 +30,18 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pagesRef = useRef<PageSlot[]>([]);
   const dragRef = useRef<{ pageId: string; offsetX: number; offsetY: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; origPanX: number; origPanY: number } | null>(null);
 
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [size, setSize] = useState({ width: 800, height: 600 });
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  // Reset zoom/pan when spread changes
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [spread]);
 
   // Collect all image URLs and logo URLs we need
   const spreadItems = spread
@@ -111,6 +120,14 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
     ctx.clearRect(0, 0, size.width, size.height);
     ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, size.width, size.height);
+
+    // Apply zoom + pan
+    ctx.save();
+    const cx = size.width / 2 + pan.x;
+    const cy = size.height / 2 + pan.y;
+    ctx.translate(cx, cy);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-size.width / 2, -size.height / 2);
 
     if (spreadItems.length === 0) {
       pagesRef.current = [];
@@ -229,7 +246,10 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
       }
     }
 
-    // Page number
+    // Restore zoom/pan transform
+    ctx.restore();
+
+    // Page number (drawn outside zoom so it stays fixed)
     if (pageNumber != null && pages.length > 0) {
       ctx.save();
       ctx.font = '11px "Space Grotesk", sans-serif';
@@ -238,7 +258,17 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
       ctx.fillText(String(pageNumber), size.width / 2, size.height - 6);
       ctx.restore();
     }
-  }, [loadedImages, size, spreadItems, selectedId, pageNumber]);
+
+    // Zoom indicator (show briefly when not 1x)
+    if (zoom !== 1) {
+      ctx.save();
+      ctx.font = '11px "Space Grotesk", sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${Math.round(zoom * 100)}%`, size.width - 10, 18);
+      ctx.restore();
+    }
+  }, [loadedImages, size, spreadItems, selectedId, pageNumber, zoom, pan]);
 
   // --- Pointer interaction ---
 
@@ -246,7 +276,14 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    // Convert screen coords to canvas coords accounting for zoom + pan
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+    const cx = size.width / 2 + pan.x;
+    const cy = size.height / 2 + pan.y;
+    const x = (screenX - cx) / zoom + size.width / 2;
+    const y = (screenY - cy) / zoom + size.height / 2;
+    return { x, y, screenX, screenY };
   };
 
   const findPage = (x: number, y: number): PageSlot | null => {
@@ -261,6 +298,12 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    // Middle-click or Alt+click → pan
+    if (event.button === 1 || (event.button === 0 && event.altKey)) {
+      handlePanDown(event);
+      return;
+    }
+
     const point = getCanvasPoint(event);
     if (!point) return;
 
@@ -301,6 +344,12 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    // Pan takes priority
+    if (panRef.current) {
+      handlePanMove(event);
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag || !onLogoPosChange) return;
 
@@ -330,10 +379,49 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (panRef.current) {
+      panRef.current = null;
+      (event.currentTarget as HTMLCanvasElement).releasePointerCapture(event.pointerId);
+      return;
+    }
     if (dragRef.current) {
       dragRef.current = null;
       (event.currentTarget as HTMLCanvasElement).releasePointerCapture(event.pointerId);
     }
+  };
+
+  // Scroll wheel zoom — zooms toward cursor position
+  const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const delta = event.deltaY > 0 ? 0.9 : 1.1;
+    setZoom((prev) => Math.min(10, Math.max(0.1, prev * delta)));
+  };
+
+  // Middle-click or Alt+click to pan
+  const handlePanDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.button === 1 || (event.button === 0 && event.altKey)) {
+      event.preventDefault();
+      panRef.current = {
+        startX: event.clientX,
+        startY: event.clientY,
+        origPanX: pan.x,
+        origPanY: pan.y,
+      };
+      (event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);
+    }
+  };
+
+  const handlePanMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!panRef.current) return;
+    const dx = event.clientX - panRef.current.startX;
+    const dy = event.clientY - panRef.current.startY;
+    setPan({ x: panRef.current.origPanX + dx, y: panRef.current.origPanY + dy });
+  };
+
+  // Double-click to reset zoom
+  const handleDoubleClick = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
   };
 
   return (
@@ -351,6 +439,9 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onWheel={handleWheel}
+          onDoubleClick={handleDoubleClick}
+          style={{ cursor: zoom !== 1 ? 'grab' : undefined }}
         />
       )}
     </div>
