@@ -1400,11 +1400,9 @@ export default function MintApp({
               Download Desktop
             </a>
           )}
-          {tokenisation.mode === 'currency' && (
-            <button className="secondary" onClick={() => setShowVault(true)}>
-              Vault
-            </button>
-          )}
+          <button className="secondary" onClick={() => setShowVault(true)}>
+            Vault
+          </button>
           <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
             {isExporting ? 'Printing\u2026' : 'Print'}
           </button>
@@ -1420,7 +1418,7 @@ export default function MintApp({
 
       <div className="main">
         <aside className="panel left-panel">
-          <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : 'Images'}</h2>
+          <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : tokenisation.mode === 'magazine' ? 'Pages' : 'Images'}</h2>
           <div className="image-list">
             {images.length === 0 ? (
               <div className="empty-sidebar">
@@ -1448,6 +1446,16 @@ export default function MintApp({
                     <div className="small" style={{ color: 'var(--accent-dim)' }}>Sheet Music</div>
                     <div className="small">Create notation from scratch using the editor, or import reference images.</div>
                     <div className="small" style={{ opacity: 0.4, marginTop: 4 }}>Desktop app: full notation editor</div>
+                  </>
+                ) : tokenisation.mode === 'magazine' ? (
+                  <>
+                    <div className="empty-sidebar-icon">{'\u{1F4D6}'}</div>
+                    <div className="small" style={{ color: 'var(--accent-dim)' }}>Magazine Creator</div>
+                    <div className="small">Add pages for your magazine, zine, or publication. Each page gets framed, branded, and stamped to chain.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                      <div className="small" style={{ opacity: 0.4 }}>Covers &middot; Spreads &middot; Articles</div>
+                      <div className="small" style={{ opacity: 0.4 }}>Logo &middot; Watermark &middot; Print &middot; Inscribe</div>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -1568,6 +1576,7 @@ export default function MintApp({
               tokenisation.mode === 'currency' ? 'mint-empty' :
               tokenisation.mode === 'tokenise' ? 'tokenise-empty' :
               tokenisation.mode === 'music' ? 'music-empty' :
+              tokenisation.mode === 'magazine' ? 'magazine-empty' :
               'stamp-empty'
             }`}>
               {/* --- Currency Demo: Gold Banknote Blueprint --- */}
@@ -1691,9 +1700,9 @@ export default function MintApp({
                         const rel = cardIdx - coverFlowIdx;
                         if (Math.abs(rel) > 4) return null;
                         const absRel = Math.abs(rel);
-                        const rotateY = rel * -25;
-                        const translateX = rel * 60;
-                        const translateZ = -absRel * 50;
+                        const rotateY = rel * -28;
+                        const translateX = rel * 85;
+                        const translateZ = -absRel * 70;
                         const cardOpacity = Math.max(0, 1 - absRel * 0.22);
                         const frameNum = cardIdx + 6;
                         return (
@@ -1711,7 +1720,7 @@ export default function MintApp({
                           >
                             <div className="card-perf" />
                             <div className="card-num">#{String(frameNum).padStart(3, '0')}</div>
-                            <span style={{ fontSize: 9, opacity: 0.5, marginTop: 4 }}>FRAME</span>
+                            <span style={{ fontSize: 11, opacity: 0.5, marginTop: 6, letterSpacing: '0.15em' }}>FRAME</span>
                             <div className="card-perf-bottom" />
                           </div>
                         );
@@ -1821,6 +1830,45 @@ export default function MintApp({
                     <line x1="84" y1="6" x2="144" y2="6" stroke="#d4af37" strokeWidth="1.5" opacity="0.45" />
                   </svg>
                   <div className="demo-hint">Create, edit, and inscribe sheet music scores.</div>
+                </div>
+              )}
+
+              {/* --- Magazine Demo: Open Publication Spread --- */}
+              {tokenisation.mode === 'magazine' && (
+                <div className="demo-container magazine-demo">
+                  <svg viewBox="0 0 440 280" width="440" height="280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Left page */}
+                    <rect x="20" y="20" width="195" height="240" rx="2" stroke="#d4af37" strokeWidth="1" opacity="0.4" />
+                    {/* Right page */}
+                    <rect x="225" y="20" width="195" height="240" rx="2" stroke="#d4af37" strokeWidth="1" opacity="0.4" />
+                    {/* Spine */}
+                    <line x1="220" y1="18" x2="220" y2="262" stroke="#d4af37" strokeWidth="1.5" opacity="0.5" />
+                    {/* Left page: headline block */}
+                    <rect x="36" y="36" width="100" height="8" rx="1" fill="#d4af37" opacity="0.35" />
+                    <rect x="36" y="50" width="70" height="5" rx="1" fill="#d4af37" opacity="0.15" />
+                    {/* Left page: text lines */}
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <rect key={`lt${i}`} x="36" y={68 + i * 12} width={150 - (i % 3) * 20} height="3" rx="1" fill="#d4af37" opacity="0.1" />
+                    ))}
+                    {/* Left page: image placeholder */}
+                    <rect x="36" y="220" width="163" height="24" rx="2" stroke="#d4af37" strokeWidth="0.5" opacity="0.2" strokeDasharray="3 2" />
+                    <text x="117" y="235" fontFamily="'IBM Plex Mono', monospace" fontSize="6" fill="#d4af37" opacity="0.2" textAnchor="middle">PHOTO</text>
+                    {/* Right page: large feature image */}
+                    <rect x="241" y="36" width="163" height="110" rx="3" stroke="#d4af37" strokeWidth="0.6" opacity="0.25" strokeDasharray="4 3" />
+                    <text x="322" y="95" fontFamily="'IBM Plex Mono', monospace" fontSize="8" fill="#d4af37" opacity="0.2" textAnchor="middle">FEATURE</text>
+                    {/* Right page: caption */}
+                    <rect x="241" y="156" width="120" height="6" rx="1" fill="#d4af37" opacity="0.25" />
+                    {/* Right page: body text */}
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <rect key={`rt${i}`} x="241" y={172 + i * 12} width={150 - (i % 2) * 30} height="3" rx="1" fill="#d4af37" opacity="0.1" />
+                    ))}
+                    {/* Page numbers */}
+                    <text x="42" y="254" fontFamily="'IBM Plex Mono', monospace" fontSize="7" fill="#d4af37" opacity="0.3">12</text>
+                    <text x="398" y="254" fontFamily="'IBM Plex Mono', monospace" fontSize="7" fill="#d4af37" opacity="0.3" textAnchor="end">13</text>
+                    {/* Masthead */}
+                    <text x="220" y="14" fontFamily="'IBM Plex Mono', monospace" fontSize="7" fill="#d4af37" opacity="0.3" textAnchor="middle" letterSpacing="4">THE MINT PRESS</text>
+                  </svg>
+                  <div className="demo-hint">Create magazines, zines, and publications. Each page is stamped and inscribed to chain.</div>
                 </div>
               )}
             </div>
