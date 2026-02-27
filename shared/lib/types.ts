@@ -97,7 +97,7 @@ export type TokenisationPiece = {
   status: 'pending' | 'hashing' | 'hashed' | 'stamping' | 'stamped' | 'minting' | 'minted' | 'error';
 };
 
-export type AppMode = 'stamp' | 'currency' | 'tokenise' | 'music' | 'magazine';
+export type AppMode = 'stamp' | 'currency' | 'tokenise' | 'music' | 'magazine' | 'qr';
 
 // --- MetaNet Tree types ---
 

@@ -189,6 +189,27 @@ export function useMintDesigner() {
     regenerateLayer(layer, doc.width, doc.height);
   }, [doc, pushUndo, regenerateLayer]);
 
+  const addImageLayer = useCallback((src: string, name: string) => {
+    pushUndo(doc);
+    const layer: MintLayer = {
+      id: crypto.randomUUID(),
+      name,
+      visible: true,
+      locked: false,
+      opacity: 1,
+      blendMode: 'source-over',
+      uvOnly: false,
+      transform: defaultTransform(),
+      filters: defaultFilters(),
+      type: 'image',
+      config: { src, fit: 'cover' as const, x: 0.5, y: 0.5, scale: 1 },
+    };
+    // Insert at index 0 so image sits behind all existing layers
+    setDoc((prev) => ({ ...prev, layers: [layer, ...prev.layers] }));
+    setSelectedLayerId(layer.id);
+    regenerateLayer(layer, doc.width, doc.height);
+  }, [doc, pushUndo, regenerateLayer]);
+
   const removeLayer = useCallback((id: string) => {
     pushUndo(doc);
     svgCache.current.delete(id);
@@ -464,6 +485,7 @@ export function useMintDesigner() {
     uvMode,
 
     addLayer,
+    addImageLayer,
     removeLayer,
     reorderLayer,
     updateLayerConfig,

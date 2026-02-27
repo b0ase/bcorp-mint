@@ -33,6 +33,9 @@ import {
   bytesFromHex,
 } from '@shared/lib/mint-vault';
 import { estimateUploadCost, uploadToUHRP, downloadFromUHRP } from '@shared/lib/uhrp-storage';
+import QRCanvas from '@shared/components/QRCanvas';
+import QRPanel from '@shared/components/QRPanel';
+import { useQREditor } from '@shared/hooks/useQREditor';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -231,6 +234,9 @@ export default function MintApp({
   // Music Editor state — use desktop hook if provided, otherwise shared
   const sharedMusic = useSharedMusicEditor();
   const music = useMusicEditorHook ? useMusicEditorHook() : sharedMusic;
+
+  // QR Code Editor state
+  const qr = useQREditor();
 
   // Wallet manager (conditional hook or default stub)
   const walletMgr = useWalletManagerHook ? useWalletManagerHook() : defaultWalletManager;
@@ -1418,7 +1424,7 @@ export default function MintApp({
 
       <div className="main">
         <aside className="panel left-panel">
-          <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : tokenisation.mode === 'magazine' ? 'Pages' : 'Images'}</h2>
+          <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : tokenisation.mode === 'magazine' ? 'Pages' : tokenisation.mode === 'qr' ? 'QR Codes' : 'Images'}</h2>
           <div className="image-list">
             {images.length === 0 ? (
               <div className="empty-sidebar">
@@ -1457,6 +1463,16 @@ export default function MintApp({
                       <div className="small" style={{ opacity: 0.4 }}>Logo &middot; Watermark &middot; Print &middot; Inscribe</div>
                     </div>
                   </>
+                ) : tokenisation.mode === 'qr' ? (
+                  <>
+                    <div className="empty-sidebar-icon">{'\u25A3'}</div>
+                    <div className="small" style={{ color: 'var(--accent-dim)' }}>QR Code Generator</div>
+                    <div className="small">Create scannable QR codes for URLs, wallets, tokens, contacts, and more.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                      <div className="small" style={{ opacity: 0.4 }}>URL &middot; vCard &middot; WiFi &middot; Token</div>
+                      <div className="small" style={{ opacity: 0.4 }}>Customise &middot; Batch &middot; Export &middot; Inscribe</div>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="empty-sidebar-icon">{'\u25C8'}</div>
@@ -1490,6 +1506,9 @@ export default function MintApp({
                         toggleImage(image.id);
                       }
                       setSelectedId(image.id);
+                      if (tokenisation.mode === 'currency' && image.mediaType === 'image') {
+                        mint.addImageLayer(image.url, image.name);
+                      }
                     }}
                   >
                     <div style={{ position: 'relative' }}>
@@ -1537,6 +1556,15 @@ export default function MintApp({
               showGrid={showMintGrid}
               animatePreview={mintAnimate}
             />
+          ) : /* QR Code mode */
+          tokenisation.mode === 'qr' ? (
+            <QRCanvas
+              project={qr.project}
+              matrix={qr.matrix}
+              version={qr.version}
+              dataString={qr.dataString}
+              renderToCanvas={qr.renderToCanvas}
+            />
           ) : /* Music mode: Sheet Music Notation Editor (desktop only) */
           tokenisation.mode === 'music' && MusicCanvas && music ? (
             <MusicCanvas
@@ -1577,6 +1605,7 @@ export default function MintApp({
               tokenisation.mode === 'tokenise' ? 'tokenise-empty' :
               tokenisation.mode === 'music' ? 'music-empty' :
               tokenisation.mode === 'magazine' ? 'magazine-empty' :
+              tokenisation.mode === 'qr' ? 'qr-empty' :
               'stamp-empty'
             }`}>
               {/* --- Currency Demo: Gold Banknote Blueprint --- */}
@@ -1871,6 +1900,45 @@ export default function MintApp({
                   <div className="demo-hint">Create magazines, zines, and publications. Each page is stamped and inscribed to chain.</div>
                 </div>
               )}
+
+              {/* --- QR Code Demo: Finder Patterns & Module Grid --- */}
+              {tokenisation.mode === 'qr' && (
+                <div className="demo-container qr-demo">
+                  <svg viewBox="0 0 320 320" width="320" height="320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {/* Top-left finder */}
+                    <rect x="20" y="20" width="56" height="56" rx="4" stroke="#d4af37" strokeWidth="2" opacity="0.6" />
+                    <rect x="28" y="28" width="40" height="40" rx="2" stroke="#d4af37" strokeWidth="1" opacity="0.4" />
+                    <rect x="36" y="36" width="24" height="24" rx="1" fill="#d4af37" opacity="0.35" />
+                    {/* Top-right finder */}
+                    <rect x="244" y="20" width="56" height="56" rx="4" stroke="#d4af37" strokeWidth="2" opacity="0.6" />
+                    <rect x="252" y="28" width="40" height="40" rx="2" stroke="#d4af37" strokeWidth="1" opacity="0.4" />
+                    <rect x="260" y="36" width="24" height="24" rx="1" fill="#d4af37" opacity="0.35" />
+                    {/* Bottom-left finder */}
+                    <rect x="20" y="244" width="56" height="56" rx="4" stroke="#d4af37" strokeWidth="2" opacity="0.6" />
+                    <rect x="28" y="252" width="40" height="40" rx="2" stroke="#d4af37" strokeWidth="1" opacity="0.4" />
+                    <rect x="36" y="260" width="24" height="24" rx="1" fill="#d4af37" opacity="0.35" />
+                    {/* Data modules grid */}
+                    {Array.from({ length: 12 }, (_, r) =>
+                      Array.from({ length: 12 }, (_, c) => {
+                        const x = 92 + c * 12;
+                        const y = 92 + r * 12;
+                        const on = ((r * 7 + c * 13 + r * c) % 5) < 3;
+                        return on ? (
+                          <rect key={`${r}-${c}`} x={x} y={y} width="10" height="10" rx="1.5" fill="#d4af37" opacity={0.15 + (r + c) % 3 * 0.08} />
+                        ) : null;
+                      })
+                    )}
+                    {/* Central logo circle */}
+                    <circle cx="160" cy="160" r="28" stroke="#d4af37" strokeWidth="1.2" opacity="0.4" strokeDasharray="3 2" />
+                    <circle cx="160" cy="160" r="18" stroke="#d4af37" strokeWidth="0.6" opacity="0.25" />
+                    <text x="160" y="164" fontFamily="'IBM Plex Mono', monospace" fontSize="10" fill="#d4af37" opacity="0.4" textAnchor="middle">QR</text>
+                    {/* Timing patterns */}
+                    <line x1="84" y1="48" x2="236" y2="48" stroke="#d4af37" strokeWidth="0.5" opacity="0.15" strokeDasharray="8 4" />
+                    <line x1="48" y1="84" x2="48" y2="236" stroke="#d4af37" strokeWidth="0.5" opacity="0.15" strokeDasharray="8 4" />
+                  </svg>
+                  <div className="demo-hint">Generate scannable QR codes. Customise, add logos, batch generate, and inscribe to chain.</div>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -1998,6 +2066,31 @@ export default function MintApp({
             animatePreview={mintAnimate}
             onToggleAnimate={() => setMintAnimate((prev) => !prev)}
             getThumbnailSrc={mint.getLayerThumbnailSrc}
+          />
+        ) : tokenisation.mode === 'qr' ? (
+          <QRPanel
+            project={qr.project}
+            dataString={qr.dataString}
+            version={qr.version}
+            batchDataStrings={qr.batchDataStrings}
+            onSetContentType={qr.setContentType}
+            onUpdateContentField={qr.updateContentField}
+            onSetStyle={qr.setStyle}
+            onSetLogo={qr.setLogo}
+            onUpdateLogo={qr.updateLogo}
+            onSetSize={qr.setSize}
+            onSetMargin={qr.setMargin}
+            onSetErrorCorrection={qr.setErrorCorrection}
+            onSetBatch={qr.setBatch}
+            canUndo={qr.canUndo}
+            canRedo={qr.canRedo}
+            onUndo={qr.undo}
+            onRedo={qr.redo}
+            onExportPng={qr.exportPng}
+            onExportSvg={qr.exportSvg}
+            onExportBatchPng={qr.exportBatchPng}
+            onCopyToClipboard={qr.copyToClipboard}
+            renderToCanvas={qr.renderToCanvas}
           />
         ) : tokenisation.mode === 'music' && MusicPanel && music ? (
           <MusicPanel

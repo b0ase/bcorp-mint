@@ -12,6 +12,7 @@ const MODES: { value: AppMode; label: string }[] = [
   { value: 'tokenise', label: 'Tokenise' },
   { value: 'music', label: 'Music' },
   { value: 'magazine', label: 'Magazine' },
+  { value: 'qr', label: 'QR' },
 ];
 
 export default function ModeToggle({ mode, onChange }: Props) {
