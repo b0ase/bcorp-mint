@@ -1294,7 +1294,7 @@ export default function MintApp({
               renderToCanvas={music.renderToCanvas}
             />
           ) : tokenisation.mode === 'music' && !MusicCanvas ? (
-            <div className="canvas-empty-state">
+            <div className="canvas-empty-state music-empty">
               <div className="canvas-empty-content">
                 <div className="canvas-empty-icon">{'\u266B'}</div>
                 <div className="canvas-empty-title">Music Editor</div>
@@ -1323,17 +1323,31 @@ export default function MintApp({
               parentId={selectedImage.id}
             />
           ) : images.length === 0 ? (
-            <div className={`canvas-empty-state ${tokenisation.mode === 'tokenise' ? 'tokenise-empty' : 'stamp-empty'}`}>
+            <div className={`canvas-empty-state ${
+              tokenisation.mode === 'currency' ? 'mint-empty' :
+              tokenisation.mode === 'tokenise' ? 'tokenise-empty' :
+              tokenisation.mode === 'music' ? 'music-empty' :
+              'stamp-empty'
+            }`}>
               <div className="canvas-empty-content">
                 <div className="canvas-empty-icon">
-                  {tokenisation.mode === 'tokenise' ? '\u2699' : '\u2756'}
+                  {tokenisation.mode === 'currency' ? '\u2756' :
+                   tokenisation.mode === 'tokenise' ? '\u2699' :
+                   tokenisation.mode === 'music' ? '\u266B' : '\u2756'}
                 </div>
                 <div className="canvas-empty-title">
-                  {tokenisation.mode === 'tokenise' ? 'Tokenise Media' : 'Load Media to Begin'}
+                  {tokenisation.mode === 'currency' ? 'Currency Designer' :
+                   tokenisation.mode === 'tokenise' ? 'Tokenise Media' :
+                   tokenisation.mode === 'music' ? 'Music Notation' :
+                   'Load Media to Begin'}
                 </div>
                 <div className="canvas-empty-hint">
-                  {tokenisation.mode === 'tokenise'
+                  {tokenisation.mode === 'currency'
+                    ? 'Design banknotes, certificates, and currency with the 18-layer visual editor.'
+                    : tokenisation.mode === 'tokenise'
                     ? 'Load video or audio files to extract frames and segments for tokenisation.'
+                    : tokenisation.mode === 'music'
+                    ? 'Create sheet music notation and export scores.'
                     : 'Drop files here, or use Load Folder / Add Media above to start framing and stamping.'}
                 </div>
               </div>

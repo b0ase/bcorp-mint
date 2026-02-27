@@ -2007,6 +2007,10 @@ select:focus {
   background-image: url('/bg-coin.jpg');
 }
 
+.canvas-empty-state.music-empty::before {
+  background-image: url('/bg-seal.jpg');
+}
+
 .canvas-empty-state::after {
   content: '';
   position: absolute;
