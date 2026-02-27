@@ -3,7 +3,7 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: { unoptimized: true },
-  serverExternalPackages: ['@handcash/handcash-connect'],
+  serverExternalPackages: ['@handcash/handcash-connect', 'sharp'],
   webpack: (config) => {
     config.resolve.alias['@shared'] = path.resolve(__dirname, '../shared');
     return config;

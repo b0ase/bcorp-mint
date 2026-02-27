@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   const redirectUrl = handCashConnect.getRedirectionUrl({
     referrerUrl: callbackUrl,
-    permissions: ['PAY', 'USER_PUBLIC_PROFILE'] as any,
+    permissions: ['PAY', 'USER_PUBLIC_PROFILE', 'SIGN_DATA'] as any,
   });
 
   return NextResponse.redirect(redirectUrl);

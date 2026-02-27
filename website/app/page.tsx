@@ -16,6 +16,12 @@ import {
   Hash,
   Github,
   Globe,
+  PenTool,
+  Lock,
+  FileSignature,
+  Fingerprint,
+  Users,
+  ScrollText,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import Link from 'next/link';
@@ -155,7 +161,7 @@ export default function HomePage() {
               <div className="text-[10px] uppercase tracking-[0.3em] text-amber-400/80 mb-1">
                 The Bitcoin Corporation
               </div>
-              <div className="text-sm text-zinc-500">Currency Designer</div>
+              <div className="text-sm text-zinc-500">Design, Sign & Seal on Bitcoin</div>
             </div>
           </motion.div>
 
@@ -224,7 +230,7 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
           >
-            Design. Print. Stamp. Mint.
+            Design. Sign. Seal. Mint.
           </motion.p>
 
           {/* Open Mint CTA */}
@@ -294,7 +300,7 @@ export default function HomePage() {
             transition={{ duration: 0.6, delay: 0.9 }}
           >
             <ShieldCheck size={14} className="text-zinc-600" />
-            No telemetry. No cloud. No accounts.
+            Privacy-first. E2E encrypted. Chain is truth.
           </motion.div>
         </div>
       </section>
@@ -325,6 +331,80 @@ export default function HomePage() {
             </motion.div>
           ))}
         </div>
+      </section>
+
+      {/* ── 2b. Signing & Identity ─────────────────────────── */}
+      <section className="px-4 md:px-8 py-20 max-w-5xl mx-auto">
+        <motion.h2
+          className="text-sm font-bold tracking-widest text-white/40 mb-8"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+        >
+          SIGN &middot; SEAL &middot; ATTEST
+        </motion.h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            {
+              icon: PenTool,
+              name: 'Sign',
+              description: 'Draw your sovereign signature or type to sign. Register it on-chain for $0.01.',
+            },
+            {
+              icon: Lock,
+              name: 'Vault',
+              description: 'E2E encrypted vault for signatures, documents, and media. Only you hold the keys.',
+            },
+            {
+              icon: FileSignature,
+              name: 'Seal',
+              description: 'Composite signature onto document, inscribe on BSV, burn TXID into the image.',
+            },
+            {
+              icon: Users,
+              name: 'Co-Sign',
+              description: 'Request co-signatures from peers. Multi-party signing with on-chain proof.',
+            },
+            {
+              icon: Fingerprint,
+              name: 'Identity',
+              description: 'Build identity strength (Lv.1-4) via OAuth, self-attestation, peer attestation, and ID docs.',
+            },
+            {
+              icon: ScrollText,
+              name: 'IP Vault',
+              description: 'Register sealed documents as IP threads. On-chain sequence proves creation order.',
+            },
+          ].map((item, i) => (
+            <motion.div
+              key={item.name}
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.08 }}
+              className="border border-white/10 bg-black/40 backdrop-blur-sm p-5 rounded-xl"
+            >
+              <item.icon size={20} className="text-amber-400 mb-3" />
+              <h3 className="font-bold text-sm uppercase tracking-wide mb-1">{item.name}</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">{item.description}</p>
+            </motion.div>
+          ))}
+        </div>
+        <motion.div
+          className="mt-6 text-center"
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.5 }}
+        >
+          <Link
+            href="/vault"
+            className="inline-flex items-center gap-2 px-6 py-3 border border-amber-500/40 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-bold text-sm uppercase tracking-widest transition-all rounded-full"
+          >
+            <Lock size={16} />
+            Open Vault
+          </Link>
+        </motion.div>
       </section>
 
       {/* ── 3. The Minting Process ───────────────────────────── */}
@@ -521,12 +601,12 @@ export default function HomePage() {
             Your printing press. Your rules.
           </h2>
           <p className="text-zinc-500 text-sm max-w-xl mx-auto mb-8">
-            Everything runs locally on your machine. No server calls. No analytics endpoints.
-            No user accounts. The app works fully offline — the only network call is the BSV
-            broadcast when you choose to inscribe.
+            Mint operations run locally — no server calls, no analytics. Signing features are opt-in:
+            connect HandCash to unlock your vault, sign documents, and build your identity.
+            Your vault is E2E encrypted — the server stores ciphertext, you hold the keys.
           </p>
           <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-            {['No telemetry', 'No cloud', 'No accounts', 'No analytics'].map((item, i) => (
+            {['No telemetry', 'E2E encrypted vault', 'Opt-in signing', 'Chain is truth'].map((item, i) => (
               <motion.div
                 key={item}
                 initial={{ opacity: 0, y: 10 }}

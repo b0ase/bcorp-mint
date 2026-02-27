@@ -16,13 +16,13 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Bitcoin Mint — The Currency Designer',
+  title: 'Bitcoin Mint — Design, Sign & Seal on Bitcoin',
   description:
-    'Design, print, stamp, and mint currency on BSV. A desktop application for creating cryptographic currency with 11 security layers, SHA-256 stamping, and BSV-20 token minting.',
+    'Design currency, sign documents, seal with on-chain proof, and manage your identity vault — all on BSV. E2E encrypted vault, co-signing, IP threads, and BSV-20 token minting.',
   openGraph: {
-    title: 'Bitcoin Mint — The Currency Designer',
+    title: 'Bitcoin Mint — Design, Sign & Seal on Bitcoin',
     description:
-      'Design, print, stamp, and mint currency on BSV. Free desktop app with zero telemetry.',
+      'Currency designer, document signing, identity vault, and on-chain proof — all in one PWA.',
     url: 'https://bitcoin-mint.com',
     siteName: 'Bitcoin Mint',
     type: 'website',
@@ -30,9 +30,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Bitcoin Mint — The Currency Designer',
+    title: 'Bitcoin Mint — Design, Sign & Seal on Bitcoin',
     description:
-      'Design, print, stamp, and mint currency on BSV. Free desktop app with zero telemetry.',
+      'Currency designer, document signing, identity vault, and on-chain proof — all in one PWA.',
     images: ['https://bitcoin-mint.com/og.jpg'],
   },
 };

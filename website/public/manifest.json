@@ -1,11 +1,11 @@
 {
   "name": "Bitcoin Mint",
   "short_name": "Mint",
-  "start_url": "/mint",
+  "start_url": "/vault",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
-  "description": "Hash documents and inscribe cryptographic proof to BSV.",
+  "description": "Design, Sign & Seal on Bitcoin. Currency designer, document signing, and identity vault.",
   "icons": [
     {
       "src": "/icon-192.png",

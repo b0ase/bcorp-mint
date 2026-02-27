@@ -1,0 +1,435 @@
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+
+const ses = new SESClient({
+  region: (process.env.AWS_SES_REGION || 'eu-north-1').trim(),
+  credentials: {
+    accessKeyId: (process.env.AWS_SES_ACCESS_KEY_ID || '').trim(),
+    secretAccessKey: (process.env.AWS_SES_SECRET_ACCESS_KEY || '').trim(),
+  },
+});
+
+interface SigningInvitationParams {
+  recipientEmail: string;
+  recipientName: string;
+  signerRole: string;
+  senderHandle: string;
+  documentTitle: string;
+  signingUrl: string;
+  message?: string;
+}
+
+export async function sendSigningInvitation({
+  recipientEmail,
+  recipientName,
+  signerRole,
+  senderHandle,
+  documentTitle,
+  signingUrl,
+  message,
+}: SigningInvitationParams): Promise<{ success: boolean; error?: string }> {
+  const fromEmail = process.env.EMAIL_FROM || 'noreply@bitcoin-mint.com';
+
+  const html = buildSigningEmailHtml({
+    recipientName,
+    signerRole,
+    senderHandle,
+    documentTitle,
+    signingUrl,
+    message,
+  });
+
+  return sendSesEmail({
+    from: fromEmail,
+    to: recipientEmail,
+    subject: `$${senderHandle} has sent you a document to sign: "${documentTitle}"`,
+    html,
+  });
+}
+
+function buildSigningEmailHtml({
+  recipientName,
+  signerRole,
+  senderHandle,
+  documentTitle,
+  signingUrl,
+  message,
+}: Omit<SigningInvitationParams, 'recipientEmail'>): string {
+  const messageBlock = message
+    ? `
+      <tr>
+        <td style="padding: 0 40px 32px;">
+          <div style="border-left: 3px solid #3f3f46; padding: 16px 20px; background: #18181b;">
+            <div style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a; margin-bottom: 8px;">Personal Message</div>
+            <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #d4d4d8; line-height: 1.6;">${escapeHtml(message)}</div>
+          </div>
+        </td>
+      </tr>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background: #000000; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background: #09090b; border: 1px solid #27272a; max-width: 600px;">
+          <tr>
+            <td style="padding: 40px 40px 24px;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #71717a; margin-bottom: 12px;">Signing Request</div>
+              <div style="font-family: -apple-system, sans-serif; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.02em;">${escapeHtml(documentTitle)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #27272a;">
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #27272a;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">From</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">$${escapeHtml(senderHandle)}</div>
+                  </td>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #27272a; border-left: 1px solid #27272a;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">Your Role</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">${escapeHtml(signerRole)}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding: 12px 16px;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">Recipient</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">${escapeHtml(recipientName)}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ${messageBlock}
+          <tr>
+            <td style="padding: 0 40px 40px;" align="center">
+              <a href="${signingUrl}" target="_blank" style="display: inline-block; padding: 16px 48px; background: #ffffff; color: #000000; font-family: -apple-system, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">Review &amp; Sign Document</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <div style="padding: 16px; background: #18181b; border: 1px solid #27272a; border-radius: 6px;">
+                <span style="font-family: -apple-system, sans-serif; font-size: 13px; color: #a1a1aa; line-height: 1.6;">
+                  You'll need a <a href="https://handcash.io" style="color: #22c55e; text-decoration: none; font-weight: 600;">HandCash</a> wallet to verify your identity and sign.
+                  Your signature will be permanently recorded on the Bitcoin blockchain.
+                </span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px; border-top: 1px solid #27272a;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #52525b; line-height: 1.8;">
+                Bitcoin Mint &mdash; Design, Sign &amp; Seal on Bitcoin<br>
+                <a href="https://bitcoin-mint.com" style="color: #71717a; text-decoration: none;">bitcoin-mint.com</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+interface VaultShareParams {
+  recipientEmail: string;
+  senderHandle: string;
+  itemType: string;
+  itemLabel: string;
+  claimUrl: string;
+  message?: string;
+}
+
+export async function sendVaultShareInvitation({
+  recipientEmail,
+  senderHandle,
+  itemType,
+  itemLabel,
+  claimUrl,
+  message,
+}: VaultShareParams): Promise<{ success: boolean; error?: string }> {
+  const fromEmail = process.env.EMAIL_FROM || 'noreply@bitcoin-mint.com';
+
+  const messageBlock = message
+    ? `
+      <tr>
+        <td style="padding: 0 40px 32px;">
+          <div style="border-left: 3px solid #3f3f46; padding: 16px 20px; background: #18181b;">
+            <div style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a; margin-bottom: 8px;">Personal Message</div>
+            <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #d4d4d8; line-height: 1.6;">${escapeHtml(message)}</div>
+          </div>
+        </td>
+      </tr>`
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background: #000000; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background: #09090b; border: 1px solid #27272a; max-width: 600px;">
+          <tr>
+            <td style="padding: 40px 40px 24px;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #71717a; margin-bottom: 12px;">Shared with you</div>
+              <div style="font-family: -apple-system, sans-serif; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.02em;">You've received a ${escapeHtml(itemLabel)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #27272a;">
+                <tr>
+                  <td style="padding: 12px 16px;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">From</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">$${escapeHtml(senderHandle)}</div>
+                  </td>
+                  <td style="padding: 12px 16px; border-left: 1px solid #27272a;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">Type</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">${escapeHtml(itemLabel)}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ${messageBlock}
+          <tr>
+            <td style="padding: 0 40px 40px;" align="center">
+              <a href="${claimUrl}" target="_blank" style="display: inline-block; padding: 16px 48px; background: #ffffff; color: #000000; font-family: -apple-system, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">View on Bitcoin Mint</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px; border-top: 1px solid #27272a;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #52525b; line-height: 1.8;">
+                Bitcoin Mint &mdash; Design, Sign &amp; Seal on Bitcoin<br>
+                <a href="https://bitcoin-mint.com" style="color: #71717a; text-decoration: none;">bitcoin-mint.com</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return sendSesEmail({
+    from: fromEmail,
+    to: recipientEmail,
+    subject: `$${senderHandle} sent you a ${itemType.toLowerCase()} on Bitcoin Mint`,
+    html,
+  });
+}
+
+interface CoSignNotificationParams {
+  recipientEmail: string;
+  signerHandle: string;
+  documentName: string;
+  viewUrl: string;
+}
+
+export async function sendCoSignNotification({
+  recipientEmail,
+  signerHandle,
+  documentName,
+  viewUrl,
+}: CoSignNotificationParams): Promise<{ success: boolean; error?: string }> {
+  const fromEmail = process.env.EMAIL_FROM || 'noreply@bitcoin-mint.com';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background: #000000; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background: #09090b; border: 1px solid #27272a; max-width: 600px;">
+          <tr>
+            <td style="padding: 40px 40px 24px;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #71717a; margin-bottom: 12px;">Co-Sign Complete</div>
+              <div style="font-family: -apple-system, sans-serif; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.02em;">Your document has been co-signed</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #27272a;">
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #27272a;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">Co-Signed by</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">$${escapeHtml(signerHandle)}</div>
+                  </td>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #27272a; border-left: 1px solid #27272a;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">Document</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">${escapeHtml(documentName)}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 40px;" align="center">
+              <a href="${viewUrl}" target="_blank" style="display: inline-block; padding: 16px 48px; background: #ffffff; color: #000000; font-family: -apple-system, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">View Co-Signed Document</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px; border-top: 1px solid #27272a;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #52525b; line-height: 1.8;">
+                Bitcoin Mint &mdash; Design, Sign &amp; Seal on Bitcoin<br>
+                <a href="https://bitcoin-mint.com" style="color: #71717a; text-decoration: none;">bitcoin-mint.com</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return sendSesEmail({
+    from: fromEmail,
+    to: recipientEmail,
+    subject: `$${signerHandle} co-signed "${documentName}" on Bitcoin Mint`,
+    html,
+  });
+}
+
+interface CoSignRequestParams {
+  recipientEmail: string;
+  senderHandle: string;
+  documentName: string;
+  claimUrl: string;
+  message?: string;
+}
+
+export async function sendCoSignRequestEmail({
+  recipientEmail,
+  senderHandle,
+  documentName,
+  claimUrl,
+  message,
+}: CoSignRequestParams): Promise<{ success: boolean; error?: string }> {
+  const fromEmail = process.env.EMAIL_FROM || 'noreply@bitcoin-mint.com';
+
+  const messageBlock = message
+    ? `
+      <tr>
+        <td style="padding: 0 40px 32px;">
+          <div style="border-left: 3px solid #3f3f46; padding: 16px 20px; background: #18181b;">
+            <div style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a; margin-bottom: 8px;">Personal Message</div>
+            <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #d4d4d8; line-height: 1.6;">${escapeHtml(message)}</div>
+          </div>
+        </td>
+      </tr>`
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background: #000000; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background: #09090b; border: 1px solid #27272a; max-width: 600px;">
+          <tr>
+            <td style="padding: 40px 40px 24px;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #71717a; margin-bottom: 12px;">Co-Sign Request</div>
+              <div style="font-family: -apple-system, sans-serif; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.02em;">${escapeHtml(documentName)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #27272a;">
+                <tr>
+                  <td style="padding: 12px 16px;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">From</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #ffffff; font-weight: 600; margin-top: 4px;">$${escapeHtml(senderHandle)}</div>
+                  </td>
+                  <td style="padding: 12px 16px; border-left: 1px solid #27272a;">
+                    <span style="font-family: -apple-system, sans-serif; font-size: 11px; color: #71717a;">Action Required</span>
+                    <div style="font-family: -apple-system, sans-serif; font-size: 14px; color: #f59e0b; font-weight: 600; margin-top: 4px;">Co-Sign Document</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ${messageBlock}
+          <tr>
+            <td style="padding: 0 40px 40px;" align="center">
+              <a href="${claimUrl}" target="_blank" style="display: inline-block; padding: 16px 48px; background: #ffffff; color: #000000; font-family: -apple-system, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">Review &amp; Co-Sign</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px; border-top: 1px solid #27272a;">
+              <div style="font-family: -apple-system, sans-serif; font-size: 12px; color: #52525b; line-height: 1.8;">
+                Bitcoin Mint &mdash; Design, Sign &amp; Seal on Bitcoin<br>
+                <a href="https://bitcoin-mint.com" style="color: #71717a; text-decoration: none;">bitcoin-mint.com</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return sendSesEmail({
+    from: fromEmail,
+    to: recipientEmail,
+    subject: `$${senderHandle} requests your co-signature on "${documentName}"`,
+    html,
+  });
+}
+
+async function sendSesEmail({
+  from,
+  to,
+  subject,
+  html,
+}: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await ses.send(
+      new SendEmailCommand({
+        Source: `Bitcoin Mint <${from}>`,
+        Destination: { ToAddresses: [to] },
+        Message: {
+          Subject: { Data: subject, Charset: 'UTF-8' },
+          Body: { Html: { Data: html, Charset: 'UTF-8' } },
+        },
+      })
+    );
+    console.log('[email] SES send OK:', { to, messageId: result.MessageId });
+    return { success: true };
+  } catch (err: any) {
+    const code = err.name || err.Code || err.$metadata?.httpStatusCode || 'unknown';
+    const region = process.env.AWS_SES_REGION || 'eu-north-1';
+    console.error('[email] SES send failed:', {
+      code,
+      message: err.message,
+      from,
+      to,
+      region,
+      hasAccessKey: !!process.env.AWS_SES_ACCESS_KEY_ID,
+      hasSecretKey: !!process.env.AWS_SES_SECRET_ACCESS_KEY,
+    });
+    return { success: false, error: `${code}: ${err.message}` };
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

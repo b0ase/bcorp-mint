@@ -10,7 +10,7 @@ interface HashEntry {
 }
 
 export async function POST(request: NextRequest) {
-  const authToken = request.cookies.get('bm_handcash_token')?.value;
+  const authToken = request.cookies.get('handcash_auth_token')?.value || request.cookies.get('bm_handcash_token')?.value;
   if (!authToken) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }

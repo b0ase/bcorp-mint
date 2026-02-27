@@ -1,42 +1,128 @@
-import { handCashConnect } from '@/lib/handcash';
 import { NextRequest, NextResponse } from 'next/server';
+import { handCashConnect } from '@/lib/handcash';
+import { mapHandCashUser, supabaseAdmin } from '@/lib/supabase';
+import { getCookieDomain } from '@/lib/auth';
+import { inscribeBitSignData } from '@/lib/bsv-inscription';
+import { linkExistingVaultItems } from '@/lib/identity-strands';
 
 export async function GET(request: NextRequest) {
-  const authToken = request.nextUrl.searchParams.get('authToken');
-  const origin = request.nextUrl.origin;
+    const authToken = request.nextUrl.searchParams.get('authToken');
+    const origin = request.nextUrl.origin;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
 
-  if (!authToken) {
-    return NextResponse.redirect(new URL('/hash?error=no_token', origin));
-  }
+    if (!authToken || !handCashConnect) {
+        return NextResponse.redirect(new URL('/?error=no_token', appUrl));
+    }
 
-  if (!handCashConnect) {
-    return NextResponse.redirect(new URL('/hash?error=not_configured', origin));
-  }
+    try {
+        const account = handCashConnect.getAccountFromAuthToken(authToken);
+        const { publicProfile } = await account.profile.getCurrentProfile();
 
-  try {
-    const account = handCashConnect.getAccountFromAuthToken(authToken);
-    const { publicProfile } = await account.profile.getCurrentProfile();
-    const handle = publicProfile.handle;
+        // Persist user in Supabase with encrypted auth token
+        try {
+            await mapHandCashUser({
+                handle: publicProfile.handle,
+                displayName: publicProfile.displayName,
+                avatarUrl: publicProfile.avatarUrl,
+            }, authToken);
+            console.log(`[Auth] User ${publicProfile.handle} persisted in Supabase`);
+        } catch (dbError) {
+            console.error(`[Auth] Database persistence failed for ${publicProfile.handle}:`, dbError);
+        }
 
-    const response = NextResponse.redirect(new URL('/hash', origin));
+        // Sync avatar to bit_sign_identities if empty
+        if (publicProfile.avatarUrl) {
+            try {
+                const { data: identity } = await supabaseAdmin
+                    .from('bit_sign_identities')
+                    .select('id, avatar_url')
+                    .eq('user_handle', publicProfile.handle)
+                    .maybeSingle();
+                if (identity && !identity.avatar_url) {
+                    await supabaseAdmin
+                        .from('bit_sign_identities')
+                        .update({ avatar_url: publicProfile.avatarUrl })
+                        .eq('id', identity.id);
+                }
+            } catch {
+                // Non-fatal
+            }
+        }
 
-    const cookieOptions = {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30,
-      sameSite: 'lax' as const,
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-    };
+        // Auto-mint identity if no bit_sign_identities row exists
+        try {
+            const { data: existingIdentity } = await supabaseAdmin
+                .from('bit_sign_identities')
+                .select('id, token_id')
+                .eq('user_handle', publicProfile.handle)
+                .maybeSingle();
 
-    response.cookies.set('bm_handcash_token', authToken, cookieOptions);
-    response.cookies.set('bm_user_handle', handle, {
-      ...cookieOptions,
-      httpOnly: false, // Readable by client for display
-    });
+            if (!existingIdentity) {
+                console.log(`[Auth] No identity for ${publicProfile.handle}, auto-minting...`);
+                let tokenId = 'pending';
+                try {
+                    const inscriptionResult = await inscribeBitSignData({
+                        type: 'identity_root',
+                        walletAddress: publicProfile.handle,
+                        documentHash: `identity-root-${publicProfile.handle}-${Date.now()}`,
+                    });
+                    tokenId = inscriptionResult.txid;
+                    console.log(`[Auth] Identity inscribed: ${tokenId}`);
+                } catch (inscribeErr) {
+                    console.error(`[Auth] Inscription failed for ${publicProfile.handle}:`, inscribeErr);
+                }
 
-    return response;
-  } catch (error) {
-    console.error('[BitcoinMint] HandCash callback error:', error);
-    return NextResponse.redirect(new URL('/hash?error=auth_failed', origin));
-  }
+                const { data: newIdentity } = await supabaseAdmin
+                    .from('bit_sign_identities')
+                    .insert({
+                        user_handle: publicProfile.handle,
+                        token_id: tokenId,
+                        metadata: { symbol: `$${publicProfile.handle.toUpperCase()}`, type: 'Identity Root' },
+                        avatar_url: publicProfile.avatarUrl || null,
+                        identity_strength: 1,
+                    })
+                    .select('id')
+                    .single();
+
+                if (newIdentity && tokenId !== 'pending') {
+                    try {
+                        await linkExistingVaultItems(newIdentity.id, tokenId, publicProfile.handle);
+                    } catch (linkErr) {
+                        console.error(`[Auth] linkExistingVaultItems failed:`, linkErr);
+                    }
+                }
+            }
+        } catch (mintErr) {
+            console.error(`[Auth] Auto-mint failed for ${publicProfile.handle}:`, mintErr);
+        }
+
+        const returnTo = request.cookies.get('auth_return_to')?.value || '/vault';
+        const response = NextResponse.redirect(new URL(returnTo, appUrl));
+        const domain = getCookieDomain();
+
+        response.cookies.set('handcash_auth_token', authToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 30,
+            path: '/',
+            ...(domain && { domain }),
+        });
+
+        response.cookies.set('handcash_handle', publicProfile.handle, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 30,
+            path: '/',
+            ...(domain && { domain }),
+        });
+
+        response.cookies.delete('auth_return_to');
+
+        return response;
+    } catch (error) {
+        console.error('[Auth] HandCash callback error:', error);
+        return NextResponse.redirect(new URL('/?error=auth_failed', appUrl));
+    }
 }

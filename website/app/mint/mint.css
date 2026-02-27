@@ -1,7 +1,0 @@
-/* Import shared Mint styles from the unified CSS */
-@import '../../../shared/styles/mint-app.css';
-
-/* Website-specific overrides */
-body {
-  overflow: auto;
-}
