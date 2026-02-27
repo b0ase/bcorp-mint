@@ -69,6 +69,23 @@ const BUNDLED_NOTES = [
   src: `/bcorp notes landscape/${name}.jpg`,
 }));
 
+type QRExample = { label: string; icon: string; type: import('@shared/lib/qr-types').QRContentType; content: Record<string, string> };
+
+const QR_EXAMPLES: QRExample[] = [
+  { label: 'Website', icon: '\u{1F310}', type: 'url', content: { url: 'https://bcorpmint.com' } },
+  { label: 'Bitcoin Address', icon: '\u20BF', type: 'wallet', content: { address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' } },
+  { label: 'BSV-20 Token', icon: '\u{1FA99}', type: 'token', content: { symbol: 'BCORP', supply: '100000000000', protocol: 'BSV-20', address: '' } },
+  { label: 'Contact Card', icon: '\u{1F4C7}', type: 'vcard', content: { name: 'Satoshi Nakamoto', email: 'satoshi@bitcoin.org', phone: '+1-555-0100', org: 'Bitcoin Corporation' } },
+  { label: 'WiFi Network', icon: '\u{1F4F6}', type: 'wifi', content: { ssid: 'bCorp-Guest', password: 'goldstandard', encryption: 'WPA' } },
+  { label: 'Email', icon: '\u2709', type: 'email', content: { address: 'mint@bcorp.com', subject: 'PoW Note Enquiry', body: 'I am interested in acquiring a PoW Note.' } },
+  { label: 'Plain Text', icon: '\u{1F4DD}', type: 'text', content: { text: 'This note is backed by Proof of Work. SHA-256 verified.' } },
+  { label: '$401 Identity', icon: '\u{1F512}', type: 'url', content: { url: 'https://path401.com/verify/satoshi' } },
+  { label: 'Mint Receipt', icon: '\u{1F4DC}', type: 'text', content: { text: 'STAMP|$BCORP/SERIES-01/NOTE-001|sha256:e3b0c44298fc1c149afbf4c8996fb924|2026-02-27T00:00:00Z' } },
+  { label: 'GitHub Repo', icon: '\u{1F4E6}', type: 'url', content: { url: 'https://github.com/b0ase/bcorp-mint' } },
+  { label: '$402 Payment', icon: '\u{1F4B0}', type: 'url', content: { url: 'https://path402.com/pay/0.01' } },
+  { label: 'PoW Note #001', icon: '\u26A1', type: 'text', content: { text: 'POW-NOTE|001|DIFFICULTY:2^32|REWARD:0.001BSV|HASH:0000000000000003fa2e6...' } },
+];
+
 // ---------------------------------------------------------------------------
 // Spread helpers
 // ---------------------------------------------------------------------------
@@ -1433,6 +1450,25 @@ export default function MintApp({
       <div className="main">
         <aside className="panel left-panel">
           <h2>{tokenisation.mode === 'currency' ? 'Assets' : tokenisation.mode === 'tokenise' ? 'Media' : tokenisation.mode === 'music' ? 'Scores' : tokenisation.mode === 'magazine' ? 'Pages' : tokenisation.mode === 'qr' ? 'QR Codes' : 'Images'}</h2>
+
+          {/* QR Examples — preset examples for QR mode */}
+          {tokenisation.mode === 'qr' && (
+            <div className="qr-examples">
+              <div className="small" style={{ color: 'var(--accent-dim)', marginBottom: 6 }}>Examples</div>
+              <div className="qr-examples-list">
+                {QR_EXAMPLES.map((ex) => (
+                  <button
+                    key={ex.label}
+                    className="qr-example-btn"
+                    onClick={() => qr.loadPreset(ex.type, ex.content)}
+                  >
+                    <span className="qr-example-icon">{ex.icon}</span>
+                    <span className="qr-example-label">{ex.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Note Gallery — bundled artwork for currency mode */}
           {tokenisation.mode === 'currency' && (

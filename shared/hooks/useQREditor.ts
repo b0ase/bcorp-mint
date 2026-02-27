@@ -65,6 +65,11 @@ export function useQREditor() {
     setProject(prev => ({ ...prev, content }));
   }, [project, pushUndo]);
 
+  const loadPreset = useCallback((contentType: QRContentType, content: Record<string, string>) => {
+    pushUndo(project);
+    setProject(prev => ({ ...prev, contentType, content }));
+  }, [project, pushUndo]);
+
   const updateContentField = useCallback((key: string, value: string) => {
     pushUndo(project);
     setProject(prev => ({ ...prev, content: { ...prev.content, [key]: value } }));
@@ -255,6 +260,7 @@ export function useQREditor() {
     project,
     setContentType,
     setContent,
+    loadPreset,
     updateContentField,
     setStyle,
     setLogo,

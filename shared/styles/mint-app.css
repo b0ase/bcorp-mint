@@ -313,6 +313,7 @@ select {
   flex-direction: column;
   gap: 4px;
   min-height: 0;
+  overflow: hidden;
   box-shadow: var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.02);
 }
@@ -614,6 +615,8 @@ select:focus {
   overflow-x: auto;
   border-top: 1px solid rgba(201, 168, 76, 0.06);
   background: #040404;
+  position: relative;
+  z-index: 2;
 }
 
 .page-strip::-webkit-scrollbar {
@@ -3396,6 +3399,57 @@ select:focus {
 /* ---------------------------------------------------------------------------
    Note Gallery — bundled artwork for currency mode
    --------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   QR Examples — preset examples for QR mode
+   --------------------------------------------------------------------------- */
+
+.qr-examples {
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.08);
+}
+
+.qr-examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.qr-example-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  text-align: left;
+}
+
+.qr-example-btn:hover {
+  border-color: var(--accent-dim);
+  background: var(--panel-3);
+}
+
+.qr-example-icon {
+  font-size: 15px;
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.qr-example-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .note-gallery {
   padding: 8px 12px 4px;
