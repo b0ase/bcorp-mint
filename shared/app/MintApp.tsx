@@ -1175,7 +1175,7 @@ export default function MintApp({
           </button>
           {showDownloadButton && (
             <a
-              href="https://github.com/nicholasgriffintn/bcorp-mint/releases"
+              href="https://github.com/b0ase/bcorp-mint/releases"
               target="_blank"
               rel="noopener noreferrer"
               className="secondary"
