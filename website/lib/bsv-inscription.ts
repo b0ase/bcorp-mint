@@ -43,6 +43,7 @@ export interface BitSignInscriptionData {
   // For ip_thread
   threadTitle?: string;
   threadSequence?: number;
+  documentType?: string;
 }
 
 export interface BitSignInscriptionResult {
@@ -181,6 +182,7 @@ function generateBitSignJson(data: BitSignInscriptionData): string {
     inscriptionData.schema = '401-ip-thread-v1';
     inscriptionData.rootTxid = data.rootTxid;
     inscriptionData.documentHash = data.documentHash;
+    inscriptionData.documentType = data.documentType || 'DOCUMENT';
     inscriptionData.threadTitle = data.threadTitle;
     inscriptionData.threadSequence = data.threadSequence || 1;
     if (data.userHandle) inscriptionData.userHandle = data.userHandle;
