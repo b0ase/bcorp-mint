@@ -1,7 +1,8 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow } from 'electron';
 
 type ProbeResult = {
@@ -22,7 +23,7 @@ type ExtractOptions = {
   quality?: 'low' | 'medium' | 'high'; // jpeg 60%, jpeg 85%, png
 };
 
-// Lazy-resolved dev path — avoids top-level import that crashes packaged app
+// Lazy-resolved dev path
 let _devFfmpegPath: string | null = null;
 
 function getFfmpegPath(): string {
@@ -30,13 +31,17 @@ function getFfmpegPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'ffmpeg');
   }
-  // In development, resolve ffmpeg-static from node_modules lazily
+  // In development, resolve ffmpeg binary from node_modules directly
+  // (avoids require('ffmpeg-static') which ESM linker chokes on in asar)
   if (_devFfmpegPath === null) {
-    try {
-      const req = createRequire(import.meta.url);
-      _devFfmpegPath = req('ffmpeg-static');
-    } catch {
-      throw new Error('ffmpeg-static not found. Run: pnpm install');
+    const thisDir = path.dirname(fileURLToPath(import.meta.url));
+    // Walk up from out/main/ to project root
+    const root = path.resolve(thisDir, '..', '..');
+    const candidate = path.join(root, 'node_modules', 'ffmpeg-static', 'ffmpeg');
+    if (existsSync(candidate)) {
+      _devFfmpegPath = candidate;
+    } else {
+      throw new Error('ffmpeg-static binary not found at ' + candidate + '. Run: pnpm install');
     }
   }
   if (!_devFfmpegPath) throw new Error('ffmpeg-static binary not found');

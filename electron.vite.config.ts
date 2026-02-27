@@ -5,11 +5,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   main: {
     entry: 'src/main/index.ts',
-    build: {
-      rollupOptions: {
-        external: ['ffmpeg-static']
-      }
-    }
   },
   preload: {
     input: {
