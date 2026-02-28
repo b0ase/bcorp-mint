@@ -9,3 +9,6 @@ release
 *.dmg
 *.tgz
 website/.next/
+
+# Confidential patent filings — NEVER commit
+UKIPO-*
