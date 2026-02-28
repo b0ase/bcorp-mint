@@ -201,6 +201,25 @@ export async function keystoreDeleteMaster(): Promise<void> {
   await walletKeys.delete();
 }
 
+// --- Helpers ---
+
+const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
+
+async function fetchUtxosForAddress(address: string) {
+  const res = await fetch(`${WHATSONCHAIN_API}/address/${address}/unspent`);
+  if (!res.ok) throw new Error('Failed to fetch UTXOs');
+  const utxos = await res.json();
+  if (!utxos?.length) throw new Error(`No funds at ${address}. Send BSV to this address first.`);
+  return utxos;
+}
+
+async function fetchSourceTx(txHash: string) {
+  const sdk = await import('@bsv/sdk');
+  const res = await fetch(`${WHATSONCHAIN_API}/tx/${txHash}/hex`);
+  if (!res.ok) throw new Error('Failed to fetch source transaction');
+  return sdk.Transaction.fromHex(await res.text());
+}
+
 // --- Inscription ---
 
 export async function inscribeStamp(opts: {
@@ -274,6 +293,143 @@ export async function inscribeStamp(opts: {
       `Inscription failed: ${e instanceof Error ? e.message : e}`
     );
   }
+}
+
+// --- BSV-21 Token Minting (1Sat Ordinal inscription) ---
+
+/**
+ * Build a 1Sat Ordinal inscription locking script with BSV-21 token metadata.
+ * Format: OP_FALSE OP_IF "ord" OP_1 <content-type> OP_0 <content> OP_ENDIF <P2PKH>
+ */
+async function buildOrdinalInscriptionScript(
+  contentType: string,
+  content: Uint8Array,
+  address: any
+) {
+  const { Script, P2PKH, LockingScript } = await import('@bsv/sdk');
+  const enc = new TextEncoder();
+
+  const inscriptionScript = new Script();
+  inscriptionScript.writeOpCode(0x00); // OP_FALSE
+  inscriptionScript.writeOpCode(0x63); // OP_IF
+  inscriptionScript.writeBin(Array.from(enc.encode('ord')));
+  inscriptionScript.writeOpCode(0x51); // OP_1 (content type flag)
+  inscriptionScript.writeBin(Array.from(enc.encode(contentType)));
+  inscriptionScript.writeOpCode(0x00); // OP_0 (body flag)
+  inscriptionScript.writeBin(Array.from(content));
+  inscriptionScript.writeOpCode(0x68); // OP_ENDIF
+
+  // Get P2PKH lock script and combine
+  const p2pkhLock = new P2PKH().lock(address);
+  return LockingScript.fromHex(inscriptionScript.toHex() + p2pkhLock.toHex());
+}
+
+/**
+ * Mint a BSV-21 token as a 1Sat Ordinal inscription.
+ * Creates a deploy+mint inscription on-chain with the token metadata.
+ * Compatible with 1Sat Ordinals indexer and BRC-100 wallet interface.
+ */
+export async function mintStampToken(opts: {
+  path: string;
+  hash: string;
+  name: string;
+  iconDataB64?: string;
+  iconContentType?: string;
+}): Promise<{ tokenId: string }> {
+  const masterHex = await getDecryptedMasterKey();
+  const { deriveChildKey } = await import('./wallet-derivation');
+  const childKey = await deriveChildKey(masterHex, 'token', opts.path);
+  const pubKey = childKey.toPublicKey();
+  const address = pubKey.toAddress();
+
+  const utxos = await fetchUtxosForAddress(address.toString());
+  const utxo = utxos[0];
+  const sourceTx = await fetchSourceTx(utxo.tx_hash);
+
+  const { Transaction, P2PKH } = await import('@bsv/sdk');
+
+  // Build BSV-21 token metadata
+  const symbol = opts.name.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 10) || 'STAMP';
+  const tokenMeta: Record<string, string> = {
+    p: 'bsv-20',
+    op: 'deploy+mint',
+    sym: symbol,
+    amt: '1',
+    dec: '0',
+  };
+
+  const enc = new TextEncoder();
+  const contentBytes = enc.encode(JSON.stringify(tokenMeta));
+  const tokenLockingScript = await buildOrdinalInscriptionScript(
+    'application/bsv-20',
+    contentBytes,
+    address
+  );
+
+  const tx = new Transaction();
+  tx.addInput({
+    sourceTransaction: sourceTx,
+    sourceOutputIndex: utxo.tx_pos,
+    unlockingScriptTemplate: new P2PKH().unlock(childKey),
+  });
+
+  // Output 0: Token inscription (1 satoshi — required by 1Sat Ordinals)
+  tx.addOutput({ satoshis: 1, lockingScript: tokenLockingScript });
+
+  // Change output
+  const fee = 500;
+  const changeSats = utxo.value - 1 - fee;
+  if (changeSats > 546) {
+    tx.addOutput({
+      satoshis: changeSats,
+      lockingScript: new P2PKH().lock(address),
+    });
+  } else if (changeSats < 0) {
+    throw new Error('Insufficient sats for minting. Need at least 501 sats.');
+  }
+
+  await tx.sign();
+  const result = await broadcastTx(tx.toHex());
+  return { tokenId: `${result.txid}_0` };
+}
+
+/**
+ * Batch mint BSV-21 tokens for multiple pieces (frames/segments).
+ * Rate-limited at 200ms between mints.
+ */
+export async function batchMintTokens(pieces: Array<{
+  path: string;
+  hash: string;
+  name: string;
+  iconDataB64?: string;
+  iconContentType?: string;
+}>): Promise<void> {
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i];
+    try {
+      await mintStampToken(piece);
+    } catch (err) {
+      console.error(`Batch mint failed at piece ${i}:`, err);
+    }
+    // Rate limit: 200ms between mints
+    if (i < pieces.length - 1) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+}
+
+// --- Message Signing ---
+
+export async function signMessage(message: string): Promise<{ signature: string; address: string }> {
+  const masterHex = await getDecryptedMasterKey();
+  const { deriveChildKey } = await import('./wallet-derivation');
+  const childKey = await deriveChildKey(masterHex, 'sign', 'message');
+  const address = childKey.toPublicKey().toAddress().toString();
+  // Hash the message and sign with the private key
+  const msgHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
+  const hashBytes = Array.from(new Uint8Array(msgHash));
+  const sig = childKey.sign(hashBytes);
+  return { signature: sig.toDER('hex') as string, address };
 }
 
 // --- Blockchain (broadcast relay) ---

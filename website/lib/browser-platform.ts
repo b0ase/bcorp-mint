@@ -173,5 +173,19 @@ export const browserPlatform: MintPlatform = {
     return bridge.inscribeStamp(opts);
   },
 
-  // Desktop-only features are undefined (not in supportedFeatures)
+  // --- Token minting (BSV-21 via 1Sat Ordinals) ---
+
+  async mintStampToken(opts) {
+    return bridge.mintStampToken(opts);
+  },
+
+  async batchMintTokens(pieces) {
+    return bridge.batchMintTokens(pieces);
+  },
+
+  // --- Message signing ---
+
+  async signMessage(message: string) {
+    return bridge.signMessage(message);
+  },
 };
