@@ -202,7 +202,7 @@ export async function linkExistingVaultItems(identityId: string, rootTxid: strin
         strandSubtype: 'github',
         providerHandle: identity.github_handle,
         providerId: identity.github_id || undefined,
-        label: `GitHub @${identity.github_handle}`,
+        label: 'GitHub verified',
         userHandle,
       });
     } catch (err) {

@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
                     strandSubtype: 'github',
                     providerHandle: githubHandle,
                     providerId: githubId,
-                    label: `GitHub @${githubHandle}`,
+                    label: 'GitHub verified',
                     userHandle: handle,
                 });
             }

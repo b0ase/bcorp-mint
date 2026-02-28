@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
             identityId: identity.id,
             rootTxid: identity.token_id,
             strandType: 'self_attestation',
-            label: `Self-attested: ${fullName.trim()}`,
+            label: 'Self-attested identity',
             metadata: {
                 fullName: fullName.trim(),
                 addressLine1: addressLine1.trim(),

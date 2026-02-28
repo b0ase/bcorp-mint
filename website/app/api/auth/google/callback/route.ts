@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
                     strandSubtype: 'google',
                     providerHandle: googleEmail,
                     providerId: googleId,
-                    label: `Google ${googleEmail}`,
+                    label: 'Google verified',
                     userHandle: handle,
                 });
             }

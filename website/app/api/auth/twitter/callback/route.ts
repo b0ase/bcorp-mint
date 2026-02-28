@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
                     strandSubtype: 'twitter',
                     providerHandle: twitterHandle,
                     providerId: twitterId,
-                    label: `X @${twitterHandle}`,
+                    label: 'X verified',
                     userHandle: handle,
                 });
             }

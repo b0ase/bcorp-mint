@@ -148,7 +148,7 @@ async function handleRespond(attestorHandle: string, body: any) {
                 strandType: 'peer_attestation',
                 strandSubtype: 'cosign',
                 providerHandle: attestorHandle,
-                label: `Peer attestation by ${attestorHandle}`,
+                label: 'Peer attestation',
                 metadata: {
                     attestorHandle,
                     declaration,
