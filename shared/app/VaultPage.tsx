@@ -667,7 +667,11 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
       {/* IP Vault (Bit Trust) */}
       {vaultTab === 'ip-vault' && (
         <div className="px-4">
-          <BitTrustPanel />
+          <BitTrustPanel
+            identity={identity}
+            handle={handle}
+            api={api}
+          />
         </div>
       )}
 

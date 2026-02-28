@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Shield, Upload, FileText, Hash, Lock, ExternalLink, Copy, Check,
-  ChevronDown, Trash2, Download, X, AlertTriangle, Fingerprint,
+  Shield, Hash, Lock, ExternalLink, Copy, Check, Link2,
+  ChevronDown, Trash2, Download, AlertTriangle, Fingerprint,
 } from 'lucide-react';
 import {
   type BitTrustRegistration,
@@ -18,16 +18,36 @@ import {
   formatFileSize,
 } from '@shared/lib/bit-trust';
 
+// --- Types ---
+
+interface Identity {
+  id: string;
+  user_handle: string;
+  token_id: string;
+  identity_strength: number;
+  avatar_url?: string;
+}
+
+interface IPThread {
+  id: string;
+  title: string;
+  documentHash: string;
+  documentType: string;
+  sequence: number;
+  txid: string;
+  createdAt: string;
+}
+
+interface ApiClient {
+  get: (path: string, opts?: RequestInit) => Promise<Response>;
+  post: (path: string, body?: unknown, opts?: RequestInit) => Promise<Response>;
+}
+
 // --- Helpers ---
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function truncateHash(hash: string): string {
-  if (hash.length <= 16) return hash;
-  return `${hash.slice(0, 8)}...${hash.slice(-8)}`;
 }
 
 function statusLabel(status: BitTrustRegistration['status']): { text: string; color: string } {
@@ -39,6 +59,21 @@ function statusLabel(status: BitTrustRegistration['status']): { text: string; co
     case 'failed': return { text: 'Failed', color: 'text-red-400' };
     default: return { text: status, color: 'text-zinc-500' };
   }
+}
+
+/** Map $401 identity level to maximum allowed Bit Trust tier */
+function maxTierForIdentityLevel(level: number): TrustTier {
+  if (level >= 4) return 5;
+  if (level >= 3) return 4;
+  if (level >= 2) return 3;
+  return 1;
+}
+
+function identityLevelLabel(level: number): { label: string; color: string } {
+  if (level >= 4) return { label: 'Sovereign', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' };
+  if (level >= 3) return { label: 'Strong', color: 'text-green-400 border-green-500/30 bg-green-500/10' };
+  if (level >= 2) return { label: 'Verified', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10' };
+  return { label: 'Basic', color: 'text-zinc-400 border-zinc-500/30 bg-zinc-500/10' };
 }
 
 function TierBadge({ tier }: { tier: TrustTier }) {
@@ -60,18 +95,45 @@ function TierBadge({ tier }: { tier: TrustTier }) {
 // --- Main Component ---
 
 interface BitTrustPanelProps {
+  /** $401 identity (from bit-sign API) */
+  identity?: Identity | null;
+  /** Authenticated user handle */
+  handle?: string | null;
+  /** API client for bit-sign calls */
+  api?: ApiClient | null;
+  /** Local wallet inscription callback */
   onInscribe?: (reg: BitTrustRegistration) => Promise<{ txid: string }>;
+  /** Local wallet signing callback */
   onSign?: (reg: BitTrustRegistration) => Promise<{ signature: string; address: string }>;
 }
 
-export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps) {
+export default function BitTrustPanel({ identity, handle, api, onInscribe, onSign }: BitTrustPanelProps) {
   const [registrations, setRegistrations] = useState<BitTrustRegistration[]>([]);
+  const [ipThreads, setIpThreads] = useState<IPThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [processingLabel, setProcessingLabel] = useState('Registering IP...');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const maxTier = identity ? maxTierForIdentityLevel(identity.identity_strength) : 1;
+
+  // --- Data Fetching ---
+
+  const fetchIPThreads = useCallback(async () => {
+    if (!api || !handle) return;
+    try {
+      const res = await api.get('/api/bitsign/ip-thread');
+      if (res.ok) {
+        const data = await res.json();
+        setIpThreads(data.threads || []);
+      }
+    } catch (err) {
+      console.error('[bit-trust] Failed to fetch IP threads:', err);
+    }
+  }, [api, handle]);
 
   const refresh = useCallback(async () => {
     try {
@@ -84,23 +146,56 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    fetchIPThreads();
+  }, [refresh, fetchIPThreads]);
 
   // --- Registration ---
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     setProcessing(true);
+    setProcessingLabel('Hashing & encrypting...');
     try {
       for (const file of Array.from(files)) {
-        await registerIP(file, { encrypt: true });
+        const reg = await registerIP(file, { encrypt: true });
+
+        // Auto-link $401 identity if available
+        if (identity?.token_id) {
+          await updateRegistration(reg.id, { identityRef: identity.token_id });
+        }
+
+        // Auto-register as IP thread on bit-sign if authenticated
+        if (api && handle && identity) {
+          setProcessingLabel('Registering IP thread on-chain...');
+          try {
+            const res = await api.post('/api/bitsign/ip-thread', {
+              documentHash: reg.contentHash,
+              title: reg.name,
+              description: `Bit Trust registration: ${reg.fileName} (${formatFileSize(reg.fileSize)})`,
+            });
+            if (res.ok) {
+              const data = await res.json();
+              // Update local registration with on-chain strand info
+              await updateRegistration(reg.id, {
+                txid: data.inscriptionTxid || data.strandTxid || null,
+                status: data.inscriptionTxid ? 'inscribed' : reg.status,
+                identityRef: identity.token_id,
+              });
+            }
+          } catch (err) {
+            console.warn('[bit-trust] IP thread registration failed (non-fatal):', err);
+          }
+        }
       }
       await refresh();
+      await fetchIPThreads();
     } catch (err) {
       console.error('[bit-trust] Registration failed:', err);
     } finally {
       setProcessing(false);
     }
-  }, [refresh]);
+  }, [refresh, fetchIPThreads, identity, api, handle]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) handleFiles(e.target.files);
@@ -124,6 +219,7 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
   const handleInscribe = useCallback(async (reg: BitTrustRegistration) => {
     if (!onInscribe) return;
     setProcessing(true);
+    setProcessingLabel('Inscribing to BSV...');
     try {
       const { txid } = await onInscribe(reg);
       await updateRegistration(reg.id, { txid, status: 'inscribed' });
@@ -140,6 +236,7 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
   const handleSign = useCallback(async (reg: BitTrustRegistration) => {
     if (!onSign) return;
     setProcessing(true);
+    setProcessingLabel('Signing registration...');
     try {
       const { signature, address } = await onSign(reg);
       await updateRegistration(reg.id, {
@@ -154,6 +251,36 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
       setProcessing(false);
     }
   }, [onSign, refresh]);
+
+  const handleLinkIdentity = useCallback(async (reg: BitTrustRegistration) => {
+    if (!api || !handle || !identity) return;
+    setProcessing(true);
+    setProcessingLabel('Linking to $401 identity...');
+    try {
+      const res = await api.post('/api/bitsign/ip-thread', {
+        documentHash: reg.contentHash,
+        title: reg.name,
+        description: `Bit Trust registration: ${reg.fileName}`,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await updateRegistration(reg.id, {
+          identityRef: identity.token_id,
+          txid: data.inscriptionTxid || data.strandTxid || reg.txid,
+          status: data.inscriptionTxid ? 'inscribed' : reg.status,
+        });
+        await refresh();
+        await fetchIPThreads();
+      } else {
+        const err = await res.json();
+        console.error('[bit-trust] Link failed:', err.error);
+      }
+    } catch (err) {
+      console.error('[bit-trust] Link identity failed:', err);
+    } finally {
+      setProcessing(false);
+    }
+  }, [api, handle, identity, refresh, fetchIPThreads]);
 
   const handleCopyHash = useCallback((hash: string) => {
     navigator.clipboard.writeText(hash);
@@ -185,6 +312,62 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
 
   return (
     <div>
+      {/* Identity Status Banner */}
+      {identity ? (
+        <div className="mb-4 border border-zinc-800 rounded-xl p-3 flex items-center gap-3">
+          {identity.avatar_url ? (
+            <img src={identity.avatar_url} alt="" className="w-8 h-8 rounded-full border border-zinc-700" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400">
+              {(handle || '?').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">${handle}</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${identityLevelLabel(identity.identity_strength).color}`}>
+                <Shield size={10} />
+                Lv.{identity.identity_strength} {identityLevelLabel(identity.identity_strength).label}
+              </span>
+            </div>
+            <p className="text-[10px] text-zinc-500 mt-0.5">
+              $401 identity linked. Max trust tier: T{maxTier} ({TRUST_TIER_LABELS[maxTier]})
+            </p>
+          </div>
+          {identity.token_id && (
+            <a
+              href={`https://whatsonchain.com/tx/${identity.token_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-zinc-500 hover:text-white transition-colors"
+              title="View $401 identity on-chain"
+            >
+              <ExternalLink size={14} />
+            </a>
+          )}
+        </div>
+      ) : handle ? (
+        <div className="mb-4 border border-amber-500/30 bg-amber-500/5 rounded-xl p-3 flex items-center gap-3">
+          <AlertTriangle size={16} className="text-amber-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-amber-300 font-medium">No $401 identity minted</p>
+            <p className="text-[10px] text-zinc-500 mt-0.5">
+              Registrations will be Tier 1 (Self-Signed) only. Mint your identity on the Identity tab to unlock higher trust tiers.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4 border border-zinc-800 rounded-xl p-3 flex items-center gap-3">
+          <Shield size={16} className="text-zinc-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-zinc-400">Not signed in</p>
+            <p className="text-[10px] text-zinc-600 mt-0.5">
+              Files are hashed and encrypted locally. Sign in to link registrations to your $401 identity.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Drop Zone / Register */}
       <div
         className={`mb-4 border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
@@ -204,7 +387,9 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
           <div>
             <p className="text-sm font-medium">Register Intellectual Property</p>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Drop files here or click to browse. Files are hashed (SHA-256) and encrypted (AES-256-GCM) locally.
+              {identity
+                ? 'Drop files to hash, encrypt, and register as $401 IP thread on-chain.'
+                : 'Drop files here or click to browse. Files are hashed (SHA-256) and encrypted (AES-256-GCM) locally.'}
             </p>
           </div>
         </div>
@@ -218,11 +403,15 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
       </div>
 
       {/* Stats */}
-      {registrations.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 mb-4">
+      {(registrations.length > 0 || ipThreads.length > 0) && (
+        <div className="grid grid-cols-4 gap-2 mb-4">
           <div className="border border-zinc-800 rounded-lg p-2 text-center">
             <p className="text-lg font-bold">{registrations.length}</p>
-            <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Registered</p>
+            <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Local</p>
+          </div>
+          <div className="border border-zinc-800 rounded-lg p-2 text-center">
+            <p className="text-lg font-bold">{ipThreads.length}</p>
+            <p className="text-[9px] text-zinc-500 uppercase tracking-wider">$401 Threads</p>
           </div>
           <div className="border border-zinc-800 rounded-lg p-2 text-center">
             <p className="text-lg font-bold">{registrations.filter(r => r.status === 'inscribed').length}</p>
@@ -235,8 +424,47 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
         </div>
       )}
 
-      {/* Registration List */}
-      {registrations.length === 0 ? (
+      {/* Server-side IP Threads (from $401 identity) */}
+      {ipThreads.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold mb-2">$401 IP Threads</p>
+          <div className="space-y-1">
+            {ipThreads.map(thread => (
+              <div key={thread.id} className="flex items-center gap-3 px-3 py-2 border border-zinc-800 rounded-lg">
+                <div className="w-6 h-6 rounded flex items-center justify-center bg-blue-500/10 text-blue-400 text-[10px] font-bold">
+                  #{thread.sequence}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{thread.title}</p>
+                  <div className="flex items-center gap-2 text-[10px] text-zinc-600">
+                    <span>{formatDate(thread.createdAt)}</span>
+                    <span className="text-green-600">{thread.txid ? 'On-chain' : ''}</span>
+                  </div>
+                </div>
+                {thread.txid && (
+                  <a
+                    href={`https://whatsonchain.com/tx/${thread.txid}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 text-zinc-500 hover:text-white transition-colors"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Local Registration List */}
+      {registrations.length > 0 && (
+        <div className="mb-2">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold mb-2">Local Registrations</p>
+        </div>
+      )}
+
+      {registrations.length === 0 && ipThreads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Shield size={32} className="text-zinc-700 mb-4" />
           <p className="text-zinc-500 text-sm mb-1">No IP registrations yet</p>
@@ -249,6 +477,7 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
           {registrations.map(reg => {
             const isExpanded = expandedId === reg.id;
             const st = statusLabel(reg.status);
+            const isLinked = !!reg.identityRef;
 
             return (
               <div key={reg.id} className="border border-zinc-800 rounded-xl overflow-hidden">
@@ -264,10 +493,15 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{reg.name}</p>
-                    <div className="flex items-center gap-2 text-[10px]">
+                    <div className="flex items-center gap-2 text-[10px] flex-wrap">
                       <span className="text-zinc-600">{formatDate(reg.registeredAt)}</span>
                       <span className={st.color}>{st.text}</span>
                       <TierBadge tier={reg.tier} />
+                      {isLinked && (
+                        <span className="text-blue-400 flex items-center gap-0.5">
+                          <Link2 size={8} /> $401
+                        </span>
+                      )}
                     </div>
                   </div>
                   <ChevronDown
@@ -314,6 +548,22 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
                         <span className="text-zinc-600">Encryption</span>
                         <p className="text-zinc-400">{reg.encryptedContent ? 'AES-256-GCM' : 'None'}</p>
                       </div>
+                      {reg.identityRef && (
+                        <div className="col-span-2">
+                          <span className="text-zinc-600">$401 Identity</span>
+                          <div className="flex items-center gap-1">
+                            <p className="text-blue-400 font-mono truncate flex-1">{reg.identityRef}</p>
+                            <a
+                              href={`https://whatsonchain.com/tx/${reg.identityRef}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-500 hover:text-white transition-colors"
+                            >
+                              <ExternalLink size={10} />
+                            </a>
+                          </div>
+                        </div>
+                      )}
                       {reg.signerAddress && (
                         <div className="col-span-2">
                           <span className="text-zinc-600">Signer</span>
@@ -340,6 +590,14 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
 
                     {/* Actions */}
                     <div className="flex flex-wrap gap-1 pt-1">
+                      {!reg.identityRef && identity && api && (
+                        <button
+                          onClick={() => handleLinkIdentity(reg)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-blue-400 hover:bg-zinc-800 rounded transition-colors"
+                        >
+                          <Link2 size={12} /> Link $401
+                        </button>
+                      )}
                       {!reg.signature && onSign && (
                         <button
                           onClick={() => handleSign(reg)}
@@ -382,7 +640,7 @@ export default function BitTrustPanel({ onInscribe, onSign }: BitTrustPanelProps
         <div className="fixed inset-0 z-40 bg-black/60 flex items-center justify-center">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-6 py-4 flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
-            <span className="text-sm">Registering IP...</span>
+            <span className="text-sm">{processingLabel}</span>
           </div>
         </div>
       )}
