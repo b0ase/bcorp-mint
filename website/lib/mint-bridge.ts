@@ -432,6 +432,76 @@ export async function signMessage(message: string): Promise<{ signature: string;
   return { signature: sig.toDER('hex') as string, address };
 }
 
+// --- Bit Trust Inscription ---
+
+export async function inscribeBitTrust(opts: {
+  contentHash: string;
+  timestamp: string;
+  tier: number;
+  identityRef?: string;
+}): Promise<{ txid: string }> {
+  const masterHex = await getDecryptedMasterKey();
+  const { deriveChildKey } = await import('./wallet-derivation');
+  const childKey = await deriveChildKey(masterHex, 'bittrust', opts.contentHash.slice(0, 16));
+  const address = childKey.toPublicKey().toAddress().toString();
+
+  const utxos = await fetchUtxosForAddress(address);
+  const utxo = utxos[0];
+  const sourceTx = await fetchSourceTx(utxo.tx_hash);
+
+  const { Transaction, P2PKH, LockingScript } = await import('@bsv/sdk');
+
+  // Build OP_RETURN: BITTRUST | hash | signer | timestamp | TIER:N [| $401:ref]
+  const parts = [
+    'BITTRUST',
+    opts.contentHash,
+    address,
+    opts.timestamp,
+    `TIER:${opts.tier}`,
+  ];
+  if (opts.identityRef) parts.push(`$401:${opts.identityRef}`);
+  const opReturn = parts.join(' | ');
+  const opReturnBytes = Array.from(new TextEncoder().encode(opReturn));
+  const pushLen = opReturnBytes.length;
+  const scriptHex = [0x00, 0x6a, pushLen, ...opReturnBytes]
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const tx = new Transaction();
+  tx.addInput({
+    sourceTransaction: sourceTx,
+    sourceOutputIndex: utxo.tx_pos,
+    unlockingScriptTemplate: new P2PKH().unlock(childKey),
+  });
+
+  tx.addOutput({
+    satoshis: 0,
+    lockingScript: LockingScript.fromHex(scriptHex),
+  });
+
+  const fee = 500;
+  const changeSats = utxo.value - fee;
+  if (changeSats > 546) {
+    tx.addOutput({
+      satoshis: changeSats,
+      lockingScript: new P2PKH().lock(childKey.toPublicKey().toAddress()),
+    });
+  }
+
+  await tx.sign();
+  return broadcastTx(tx.toHex());
+}
+
+export async function signBitTrustMessage(message: string): Promise<{ signature: string; address: string }> {
+  const masterHex = await getDecryptedMasterKey();
+  const { deriveChildKey } = await import('./wallet-derivation');
+  const childKey = await deriveChildKey(masterHex, 'bittrust', 'sign');
+  const address = childKey.toPublicKey().toAddress().toString();
+  const msgHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
+  const hashBytes = Array.from(new Uint8Array(msgHash));
+  const sig = childKey.sign(hashBytes);
+  return { signature: sig.toDER('hex') as string, address };
+}
+
 // --- Blockchain (broadcast relay) ---
 
 export async function broadcastTx(rawHex: string): Promise<{ txid: string }> {

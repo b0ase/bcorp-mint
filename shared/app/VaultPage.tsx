@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import SovereignSignature from '@shared/components/SovereignSignature';
 import MediaCapture from '@shared/components/MediaCapture';
+import BitTrustPanel from '@shared/components/BitTrustPanel';
 import DocumentCanvas, { type PlacedElement } from '@shared/components/DocumentCanvas';
 import ShareModal from '@shared/components/ShareModal';
 import WalletSigningModal from '@shared/components/WalletSigningModal';
@@ -57,7 +58,7 @@ interface Strand {
 
 // --- Helpers ---
 
-type VaultTab = 'all' | 'documents' | 'sealed' | 'signatures' | 'media' | 'received' | 'sent' | 'trash';
+type VaultTab = 'all' | 'documents' | 'sealed' | 'signatures' | 'media' | 'received' | 'sent' | 'ip-vault' | 'trash';
 
 const VAULT_TABS: { key: VaultTab; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -65,6 +66,7 @@ const VAULT_TABS: { key: VaultTab; label: string }[] = [
   { key: 'sealed', label: 'Sealed' },
   { key: 'signatures', label: 'Signatures' },
   { key: 'media', label: 'Media' },
+  { key: 'ip-vault', label: 'IP Vault' },
   { key: 'received', label: 'Received' },
   { key: 'sent', label: 'Sent' },
   { key: 'trash', label: 'Trash' },
@@ -662,8 +664,15 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
         </div>
       </div>
 
+      {/* IP Vault (Bit Trust) */}
+      {vaultTab === 'ip-vault' && (
+        <div className="px-4">
+          <BitTrustPanel />
+        </div>
+      )}
+
       {/* Vault Items */}
-      <div className="px-4">
+      {vaultTab !== 'ip-vault' && <div className="px-4">
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             {vaultTab === 'trash' ? (
@@ -875,7 +884,7 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
             })}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Processing overlay */}
       {isProcessing && (
