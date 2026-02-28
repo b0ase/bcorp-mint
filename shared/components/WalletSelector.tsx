@@ -45,8 +45,11 @@ export default function WalletSelector({ walletState, onSwitchProvider, onConnec
         {walletState.connected ? (
           <span className="wallet-info">
             {shortAddress}
-            {walletState.balance !== null && (
+            {walletState.balance !== null && walletState.balance >= 0 && (
               <span className="wallet-balance"> ({walletState.balance.toLocaleString()} sats)</span>
+            )}
+            {walletState.provider === 'metanet' && (
+              <span className="wallet-brc100-badge">BRC-100</span>
             )}
           </span>
         ) : (
@@ -69,6 +72,7 @@ export default function WalletSelector({ walletState, onSwitchProvider, onConnec
             >
               <span className="wallet-provider-icon">{PROVIDER_ICONS[p.type as WalletProviderType]}</span>
               <span>{p.label}</span>
+              {p.type === 'metanet' && <span className="wallet-brc100-tag">BRC-100</span>}
               {!p.available && <span className="wallet-unavailable">Not Available</span>}
               {p.available && p.type === 'metanet' && <span className="wallet-detected">Detected</span>}
               {p.type === walletState.provider && <span className="wallet-active-badge">Active</span>}

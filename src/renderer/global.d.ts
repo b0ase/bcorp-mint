@@ -121,6 +121,18 @@ declare global {
         pieceIndex?: number;
         totalPieces?: number;
       }) => Promise<{ txid: string }>;
+      inscribeDocumentHash: (payload: {
+        hashes: Array<{ file: string; sha256: string }>;
+        provider: 'local' | 'handcash' | 'metanet';
+      }) => Promise<{ txid: string }>;
+      inscribeBitTrust: (payload: {
+        contentHash: string;
+        tier: number;
+        title: string;
+        filing?: string;
+        identityRef?: string;
+        provider: 'local' | 'handcash' | 'metanet';
+      }) => Promise<{ txid: string }>;
       mintStampToken: (payload: {
         path: string;
         hash: string;

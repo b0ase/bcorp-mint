@@ -214,4 +214,7 @@ export const electronPlatform: MintPlatform = {
   async inscribeDocumentHash(payload) {
     await m().inscribeDocumentHash(payload);
   },
+  async inscribeBitTrust(payload) {
+    return m().inscribeBitTrust(payload);
+  },
 };

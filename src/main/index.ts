@@ -5,9 +5,9 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey, hasMasterKey, saveMasterKey, loadMasterKey, deleteMasterKey, migrateLegacyKey, exportMasterKeyBackup, importMasterKeyBackup } from './keystore';
-import { inscribeStamp, inscribeDocumentHash } from './bsv';
+import { inscribeStamp, inscribeDocumentHash, inscribeBitTrust } from './bsv';
 import { getRedirectUrl, getOAuthUrl, startOAuthFlow, getWalletState, getBitsignAuthState, loadPersistedAuth, disconnect as walletDisconnect } from './handcash';
-import { mintStampToken, batchMintTokens } from './token-mint';
+import { mintStampToken, batchMintTokens, assertLocalProvider } from './token-mint';
 import { generateMasterKey, deriveChildInfo, getMasterKeyInfo, buildManifest } from './wallet-derivation';
 import { WalletManager } from './wallet-manager';
 import type { WalletProviderType } from './wallet-provider';
@@ -424,14 +424,42 @@ ipcMain.handle('inscribe-stamp', async (_e, payload: {
   pieceIndex?: number;
   totalPieces?: number;
 }) => {
-  return inscribeStamp(payload);
+  // Route through active wallet provider if it supports createAction (BRC-100)
+  const active = walletManager.getActive();
+  return inscribeStamp({
+    ...payload,
+    provider: active.supportsCreateAction ? active : undefined,
+  });
 });
 
 ipcMain.handle('inscribe-document-hash', async (_e, payload: {
   hashes: Array<{ file: string; sha256: string }>;
-  provider: 'local' | 'handcash';
+  provider: 'local' | 'handcash' | 'metanet';
 }) => {
-  return inscribeDocumentHash(payload);
+  const activeType = walletManager.getActiveType();
+  const active = walletManager.getActive();
+  return inscribeDocumentHash({
+    ...payload,
+    provider: activeType === 'metanet' ? 'metanet' : payload.provider,
+    walletProvider: active.supportsCreateAction ? active : undefined,
+  });
+});
+
+ipcMain.handle('inscribe-bittrust', async (_e, payload: {
+  contentHash: string;
+  tier: number;
+  title: string;
+  filing?: string;
+  identityRef?: string;
+  provider: 'local' | 'handcash' | 'metanet';
+}) => {
+  const activeType = walletManager.getActiveType();
+  const active = walletManager.getActive();
+  return inscribeBitTrust({
+    ...payload,
+    provider: activeType === 'metanet' ? 'metanet' : payload.provider,
+    walletProvider: active.supportsCreateAction ? active : undefined,
+  });
 });
 
 ipcMain.handle('mint-stamp-token', async (_e, payload: {
@@ -441,6 +469,7 @@ ipcMain.handle('mint-stamp-token', async (_e, payload: {
   iconDataB64?: string;
   iconContentType?: string;
 }) => {
+  assertLocalProvider(walletManager.getActiveType());
   return mintStampToken(payload);
 });
 
@@ -451,6 +480,7 @@ ipcMain.handle('batch-mint-tokens', async (_e, pieces: Array<{
   iconDataB64?: string;
   iconContentType?: string;
 }>) => {
+  assertLocalProvider(walletManager.getActiveType());
   return batchMintTokens(pieces);
 });
 

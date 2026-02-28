@@ -1,8 +1,9 @@
 import { PrivateKey, Transaction, P2PKH, Script } from '@bsv/sdk';
 import { loadPrivateKey, loadMasterKey, hasMasterKey } from './keystore';
 import { deriveChildKey } from './wallet-derivation';
-import { inscribeHashesViaHandCash } from './handcash-pay';
+import { inscribeHashesViaHandCash, inscribeBitTrustViaHandCash } from './handcash-pay';
 import { getTreasuryAddress, MINT_FEE_SATS } from './treasury';
+import type { WalletProvider } from './wallet-provider';
 
 const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
 
@@ -43,6 +44,103 @@ async function resolveSigningKey(derivation?: { protocol: string; slug: string }
   return PrivateKey.fromWif(wif);
 }
 
+/** Helper: build a local-signed tx with OP_RETURN + treasury fee + change */
+async function buildAndBroadcastOpReturn(
+  privateKey: PrivateKey,
+  opReturn: Script,
+): Promise<string> {
+  const address = privateKey.toPublicKey().toAddress();
+  const utxos = await fetchUtxos(address);
+  if (utxos.length === 0) {
+    throw new Error('No UTXOs found. Please fund your stamper wallet.');
+  }
+
+  const tx = new Transaction();
+  const utxo = utxos[0];
+
+  tx.addInput({
+    sourceTXID: utxo.tx_hash,
+    sourceOutputIndex: utxo.tx_pos,
+    unlockingScriptTemplate: new P2PKH().unlock(privateKey)
+  });
+
+  tx.addOutput({ lockingScript: opReturn, satoshis: 0 });
+
+  // Treasury fee — resolve paymail, skip if resolution fails
+  let treasuryFee = 0;
+  try {
+    const treasuryAddr = await getTreasuryAddress();
+    tx.addOutput({ lockingScript: new P2PKH().lock(treasuryAddr), satoshis: MINT_FEE_SATS });
+    treasuryFee = MINT_FEE_SATS;
+  } catch {
+    // Don't block the user's inscription if treasury resolution fails
+  }
+
+  const minerFee = 500;
+  const change = utxo.value - minerFee - treasuryFee;
+  if (change < 0) throw new Error('Insufficient satoshis for miner fee');
+  if (change > 0) {
+    tx.addOutput({ lockingScript: new P2PKH().lock(address), satoshis: change });
+  }
+
+  await tx.sign();
+  return broadcastTx(tx.toHex());
+}
+
+/**
+ * Build an OP_RETURN locking script from data fields and return as hex string.
+ * Used by BRC-100 routing to pass scripts to createAction().
+ */
+export function buildOpReturnScriptHex(dataFields: (string | Buffer)[]): string {
+  const script = new Script();
+  script.writeOpCode(0);   // OP_FALSE
+  script.writeOpCode(106); // OP_RETURN
+  for (const field of dataFields) {
+    const buf = typeof field === 'string' ? Buffer.from(field, 'utf8') : field;
+    script.writeBin(Array.from(buf));
+  }
+  return script.toHex();
+}
+
+/**
+ * Route an OP_RETURN inscription through the appropriate wallet provider.
+ * - Local wallet: uses existing buildAndBroadcastOpReturn with resolveSigningKey
+ * - BRC-100 wallet (MetaNet): converts data fields to lockingScript, calls createAction()
+ */
+export async function routeOpReturnInscription(
+  dataFields: (string | Buffer)[],
+  opts: {
+    provider?: WalletProvider;
+    description?: string;
+    labels?: string[];
+    derivation?: { protocol: string; slug: string };
+  } = {},
+): Promise<{ txid: string }> {
+  const { provider, description, labels, derivation } = opts;
+
+  // BRC-100 route: provider has createAction
+  if (provider && provider.supportsCreateAction && provider.createAction) {
+    const lockingScript = buildOpReturnScriptHex(dataFields);
+    const result = await provider.createAction({
+      description: description || 'Mint inscription',
+      outputs: [{ lockingScript, satoshis: 1 }],
+      labels: labels || ['mint', 'inscription'],
+    });
+    return { txid: result.txid };
+  }
+
+  // Local wallet route (default)
+  const privateKey = await resolveSigningKey(derivation);
+  const opReturn = new Script();
+  opReturn.writeOpCode(106); // OP_RETURN
+  for (const field of dataFields) {
+    const buf = typeof field === 'string' ? Buffer.from(field, 'utf8') : field;
+    opReturn.writeBin(Array.from(buf));
+  }
+  const txid = await buildAndBroadcastOpReturn(privateKey, opReturn);
+  return { txid };
+}
+
 /**
  * Inscribe a stamp on BSV via OP_RETURN.
  * Format: OP_RETURN | STAMP | <path> | <sha256> | <iso-timestamp>
@@ -58,66 +156,26 @@ export async function inscribeStamp(payload: {
   pieceIndex?: number;
   totalPieces?: number;
   derivation?: { protocol: string; slug: string };
+  provider?: WalletProvider;
 }): Promise<{ txid: string }> {
-  const privateKey = await resolveSigningKey(payload.derivation);
-  const address = privateKey.toPublicKey().toAddress();
+  // Build data fields for OP_RETURN
+  const dataFields: string[] = [
+    'STAMP',
+    payload.path,
+    payload.hash,
+    payload.timestamp,
+  ];
 
-  const utxos = await fetchUtxos(address);
-  if (utxos.length === 0) {
-    throw new Error('No UTXOs found. Please fund your stamper wallet.');
-  }
+  if (payload.parentHash) dataFields.push(`PARENT:${payload.parentHash}`);
+  if (payload.pieceIndex !== undefined) dataFields.push(`INDEX:${payload.pieceIndex}`);
+  if (payload.totalPieces !== undefined) dataFields.push(`TOTAL:${payload.totalPieces}`);
 
-  const tx = new Transaction();
-  const utxo = utxos[0];
-
-  tx.addInput({
-    sourceTXID: utxo.tx_hash,
-    sourceOutputIndex: utxo.tx_pos,
-    unlockingScriptTemplate: new P2PKH().unlock(privateKey)
+  return routeOpReturnInscription(dataFields, {
+    provider: payload.provider,
+    description: `Stamp inscription: ${payload.path}`,
+    labels: ['mint', 'stamp'],
+    derivation: payload.derivation,
   });
-
-  // Build OP_RETURN: STAMP | path | hash | timestamp [| PARENT:hash | INDEX:n | TOTAL:n]
-  const opReturn = new Script();
-  opReturn.writeOpCode(106); // OP_RETURN
-  opReturn.writeBin(Array.from(Buffer.from('STAMP', 'utf8')));
-  opReturn.writeBin(Array.from(Buffer.from(payload.path, 'utf8')));
-  opReturn.writeBin(Array.from(Buffer.from(payload.hash, 'utf8')));
-  opReturn.writeBin(Array.from(Buffer.from(payload.timestamp, 'utf8')));
-
-  // Extended metadata for tokenised pieces
-  if (payload.parentHash) {
-    opReturn.writeBin(Array.from(Buffer.from(`PARENT:${payload.parentHash}`, 'utf8')));
-  }
-  if (payload.pieceIndex !== undefined) {
-    opReturn.writeBin(Array.from(Buffer.from(`INDEX:${payload.pieceIndex}`, 'utf8')));
-  }
-  if (payload.totalPieces !== undefined) {
-    opReturn.writeBin(Array.from(Buffer.from(`TOTAL:${payload.totalPieces}`, 'utf8')));
-  }
-
-  tx.addOutput({ lockingScript: opReturn, satoshis: 0 });
-
-  // Treasury fee — resolve paymail, skip if resolution fails
-  let treasuryFee = 0;
-  try {
-    const treasuryAddr = await getTreasuryAddress();
-    tx.addOutput({ lockingScript: new P2PKH().lock(treasuryAddr), satoshis: MINT_FEE_SATS });
-    treasuryFee = MINT_FEE_SATS;
-  } catch {
-    // Don't block the user's inscription if treasury resolution fails
-  }
-
-  // Change
-  const minerFee = 500;
-  const change = utxo.value - minerFee - treasuryFee;
-  if (change < 0) throw new Error('Insufficient satoshis for miner fee');
-  if (change > 0) {
-    tx.addOutput({ lockingScript: new P2PKH().lock(address), satoshis: change });
-  }
-
-  await tx.sign();
-  const txid = await broadcastTx(tx.toHex());
-  return { txid };
 }
 
 /**
@@ -128,61 +186,84 @@ export async function inscribeStamp(payload: {
  */
 export async function inscribeDocumentHash(payload: {
   hashes: Array<{ file: string; sha256: string }>;
-  provider: 'local' | 'handcash';
+  provider: 'local' | 'handcash' | 'metanet';
+  walletProvider?: WalletProvider;
   derivation?: { protocol: string; slug: string };
 }): Promise<{ txid: string }> {
   if (payload.provider === 'handcash') {
     return inscribeHashesViaHandCash(payload.hashes);
   }
 
-  // Local wallet signing
-  const privateKey = await resolveSigningKey(payload.derivation);
-  const address = privateKey.toPublicKey().toAddress();
-
-  const utxos = await fetchUtxos(address);
-  if (utxos.length === 0) {
-    throw new Error('No UTXOs found. Please fund your stamper wallet.');
-  }
-
-  const tx = new Transaction();
-  const utxo = utxos[0];
-
-  tx.addInput({
-    sourceTXID: utxo.tx_hash,
-    sourceOutputIndex: utxo.tx_pos,
-    unlockingScriptTemplate: new P2PKH().unlock(privateKey)
-  });
-
   const timestamp = new Date().toISOString();
-  const opReturn = new Script();
-  opReturn.writeOpCode(106); // OP_RETURN
-  opReturn.writeBin(Array.from(Buffer.from('BCORP_IP_HASH', 'utf8')));
-  opReturn.writeBin(Array.from(Buffer.from(`ts:${timestamp}`, 'utf8')));
+  const dataFields: string[] = [
+    'BCORP_IP_HASH',
+    `ts:${timestamp}`,
+    ...payload.hashes.map((h) => `${h.file}:${h.sha256}`),
+  ];
 
-  for (const h of payload.hashes) {
-    opReturn.writeBin(Array.from(Buffer.from(`${h.file}:${h.sha256}`, 'utf8')));
+  return routeOpReturnInscription(dataFields, {
+    provider: payload.walletProvider,
+    description: `Document hash inscription (${payload.hashes.length} file${payload.hashes.length > 1 ? 's' : ''})`,
+    labels: ['mint', 'document-hash'],
+    derivation: payload.derivation,
+  });
+}
+
+/**
+ * Inscribe a Bit Trust IP registration on BSV.
+ *
+ * OP_RETURN format: BITTRUST | hash | signer | timestamp | TIER:N [| FILING:ref] [| $401:identity]
+ *
+ * Routes to HandCash or local wallet depending on provider.
+ * Each document gets its own transaction — call once per registration.
+ */
+export async function inscribeBitTrust(payload: {
+  contentHash: string;
+  tier: number;
+  title: string;
+  filing?: string;
+  identityRef?: string;
+  provider: 'local' | 'handcash' | 'metanet';
+  walletProvider?: WalletProvider;
+  derivation?: { protocol: string; slug: string };
+}): Promise<{ txid: string }> {
+  const timestamp = new Date().toISOString();
+
+  if (payload.provider === 'handcash') {
+    return inscribeBitTrustViaHandCash({
+      contentHash: payload.contentHash,
+      tier: payload.tier,
+      title: payload.title,
+      filing: payload.filing,
+      identityRef: payload.identityRef,
+      timestamp,
+    });
   }
 
-  tx.addOutput({ lockingScript: opReturn, satoshis: 0 });
-
-  // Treasury fee
-  let treasuryFee = 0;
-  try {
-    const treasuryAddr = await getTreasuryAddress();
-    tx.addOutput({ lockingScript: new P2PKH().lock(treasuryAddr), satoshis: MINT_FEE_SATS });
-    treasuryFee = MINT_FEE_SATS;
-  } catch {
-    // Don't block inscription if treasury resolution fails
+  // For MetaNet provider, get address from wallet; for local, resolve signing key
+  let signerAddress: string;
+  if (payload.walletProvider && payload.walletProvider.supportsCreateAction) {
+    signerAddress = await payload.walletProvider.getAddress();
+  } else {
+    const privateKey = await resolveSigningKey(payload.derivation);
+    signerAddress = privateKey.toPublicKey().toAddress().toString();
   }
 
-  const minerFee = 500;
-  const change = utxo.value - minerFee - treasuryFee;
-  if (change < 0) throw new Error('Insufficient satoshis for miner fee');
-  if (change > 0) {
-    tx.addOutput({ lockingScript: new P2PKH().lock(address), satoshis: change });
-  }
+  const dataFields: string[] = [
+    'BITTRUST',
+    payload.contentHash,
+    signerAddress,
+    timestamp,
+    `TIER:${payload.tier}`,
+  ];
 
-  await tx.sign();
-  const txid = await broadcastTx(tx.toHex());
-  return { txid };
+  if (payload.filing) dataFields.push(`FILING:${payload.filing}`);
+  if (payload.identityRef) dataFields.push(`$401:${payload.identityRef}`);
+
+  return routeOpReturnInscription(dataFields, {
+    provider: payload.walletProvider,
+    description: `Bit Trust registration: ${payload.title}`,
+    labels: ['mint', 'bittrust'],
+    derivation: payload.derivation,
+  });
 }

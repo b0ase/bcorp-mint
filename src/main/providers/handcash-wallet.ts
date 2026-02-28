@@ -5,6 +5,7 @@ import { shell } from 'electron';
 
 export class HandCashWallet implements WalletProvider {
   type = 'handcash' as const;
+  supportsCreateAction = false;
 
   async connect(): Promise<void> {
     const url = await getRedirectUrl();

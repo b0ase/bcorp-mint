@@ -5,7 +5,7 @@ import {
   Fingerprint, Shield, LogIn, ExternalLink, Copy, Check,
   ChevronDown, ChevronRight, User, Mail, Github, Globe,
   FileText, Camera, Stamp, Link2, AlertCircle, Plus,
-  Upload, Hash, Image as ImageIcon, Video, Filter, Loader2
+  Upload, Hash, Image as ImageIcon, Video, Loader2, Wallet
 } from 'lucide-react';
 import { useToast } from '@shared/components/Toast';
 import { useAuth } from '@shared/lib/auth-context';
@@ -58,10 +58,10 @@ function formatDate(iso: string): string {
 }
 
 const STRENGTH_LEVELS = [
-  { min: 0, label: 'Basic', color: 'text-zinc-400', bg: 'bg-zinc-500/10 border-zinc-500/30' },
-  { min: 2, label: 'Verified', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' },
-  { min: 3, label: 'Strong', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/30' },
-  { min: 4, label: 'Sovereign', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
+  { min: 0, label: 'Basic', color: 'var(--muted)', bg: 'rgba(90, 88, 80, 0.08)', border: 'rgba(90, 88, 80, 0.2)' },
+  { min: 2, label: 'Verified', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.08)', border: 'rgba(96, 165, 250, 0.2)' },
+  { min: 3, label: 'Strong', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.2)' },
+  { min: 4, label: 'Sovereign', color: '#c9a84c', bg: 'rgba(201, 168, 76, 0.08)', border: 'rgba(201, 168, 76, 0.2)' },
 ];
 
 function getStrength(score: number) {
@@ -91,8 +91,6 @@ export default function IdentityPage() {
   // UI
   const [copiedTxid, setCopiedTxid] = useState<string | null>(null);
   const [selfAttestOpen, setSelfAttestOpen] = useState(false);
-  const [strandsOpen, setStrandsOpen] = useState(false);
-  const [ipOpen, setIpOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Self-attestation form
@@ -196,7 +194,6 @@ export default function IdentityPage() {
           return;
         }
 
-        // Step 1: Upload document
         const reader = new FileReader();
         const base64: string = await new Promise((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string);
@@ -216,7 +213,6 @@ export default function IdentityPage() {
         }
         const { id: documentId } = await uploadRes.json();
 
-        // Step 2: Register IP thread
         const res = await api.post('/api/bitsign/ip-thread', {
           documentId,
           title: ipForm.title.trim(),
@@ -229,7 +225,6 @@ export default function IdentityPage() {
         const result = await res.json();
         addToast(`IP registered! Seq #${result.sequence}`, 'success');
       } else {
-        // Hash-only mode
         if (!bitTrustHashInput.trim()) {
           addToast('Enter a hash', 'error');
           return;
@@ -298,25 +293,27 @@ export default function IdentityPage() {
   // --- Loading / Auth gate ---
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ width: 24, height: 24, border: '2px solid var(--muted)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   if (!handle) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4">
-        <Fingerprint size={48} className="text-zinc-700 mb-6" />
-        <h1 className="text-2xl font-black tracking-tight mb-2">Identity</h1>
-        <p className="text-zinc-500 text-sm text-center mb-8 max-w-xs">
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+        <Fingerprint size={40} style={{ color: 'var(--muted)', marginBottom: 8 }} />
+        <h2 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>Identity</h2>
+        <p className="small" style={{ color: 'var(--muted)', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
           Connect your HandCash wallet to view your identity strands and attestations.
         </p>
-        <button
-          onClick={login}
-          className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-sm uppercase tracking-widest transition-all rounded-full"
-        >
-          <LogIn size={16} />
+        <button onClick={login} style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', borderRadius: 8,
+          background: 'linear-gradient(135deg, #c9a84c, #e6c665)',
+          border: 'none', color: '#000', fontSize: 12, fontWeight: 800,
+          textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer',
+        }}>
+          <Wallet size={14} />
           Connect HandCash
         </button>
       </div>
@@ -326,155 +323,166 @@ export default function IdentityPage() {
   const strength = getStrength(identity?.identity_strength || 0);
 
   return (
-    <div className="min-h-screen pb-4">
-      {/* Identity Card */}
-      <header className="px-4 pt-6 pb-4">
-        <div className="border border-zinc-800 rounded-2xl p-5">
-          <div className="flex items-center gap-4 mb-4">
-            {identity?.avatar_url ? (
-              <img src={identity.avatar_url} alt="" className="w-14 h-14 rounded-full border border-zinc-700" />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-600/20 flex items-center justify-center border border-amber-500/30">
-                <span className="text-lg font-black text-amber-400">
-                  {handle.charAt(0).toUpperCase()}
+    <div className="main" style={{ gridTemplateColumns: '260px 1fr 320px' }}>
+      {/* Left panel — Identity Card */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        <h2>Identity</h2>
+
+        {/* Avatar + Handle */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+          background: 'rgba(201, 168, 76, 0.04)',
+          border: '1px solid rgba(201, 168, 76, 0.08)',
+        }}>
+          {identity?.avatar_url ? (
+            <img src={identity.avatar_url} alt="" style={{
+              width: 40, height: 40, borderRadius: '50%',
+              border: '1px solid rgba(201, 168, 76, 0.2)',
+            }} />
+          ) : (
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(201, 168, 76, 0.15), rgba(201, 168, 76, 0.05))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '1px solid rgba(201, 168, 76, 0.2)',
+              fontSize: 16, fontWeight: 800, color: 'var(--accent)',
+            }}>
+              {handle.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>${handle}</div>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '1px 6px', fontSize: 9, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              borderRadius: 10, border: `1px solid ${strength.border}`,
+              background: strength.bg, color: strength.color,
+            }}>
+              <Shield size={9} />
+              Lv.{identity?.identity_strength || 1} {strength.label}
+            </span>
+          </div>
+          {identity?.token_id && (
+            <a href={`https://whatsonchain.com/tx/${identity.token_id}`} target="_blank" rel="noopener noreferrer"
+              style={{ color: 'var(--muted)', padding: 2 }} title="View identity root on-chain">
+              <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
+
+        {/* Connected Providers */}
+        <h3>Connected Providers</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {OAUTH_PROVIDERS.map(({ key, label, icon: Icon, field }) => {
+            const connected = identity ? (identity as any)[field] : null;
+            return (
+              <div key={key} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', borderRadius: 6, fontSize: 11,
+                background: connected ? 'rgba(34, 197, 94, 0.04)' : 'var(--panel-2)',
+                border: `1px solid ${connected ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255, 255, 255, 0.03)'}`,
+                color: connected ? '#22c55e' : 'var(--muted)',
+              }}>
+                <Icon size={12} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {connected || label}
                 </span>
+                {!connected && (
+                  <a href={`/api/auth/${key}`} style={{ fontSize: 9, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+                    Link
+                  </a>
+                )}
               </div>
-            )}
-            <div className="flex-1">
-              <p className="font-bold text-lg">${handle}</p>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${strength.bg} ${strength.color}`}>
-                <Shield size={10} />
-                Lv.{identity?.identity_strength || 1} {strength.label}
-              </span>
-            </div>
-            {identity?.token_id && (
-              <a
-                href={`https://whatsonchain.com/tx/${identity.token_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 text-zinc-500 hover:text-white transition-colors"
-                title="View identity root on-chain"
-              >
-                <ExternalLink size={16} />
-              </a>
-            )}
-          </div>
-
-          {/* Connected Providers */}
-          <div className="grid grid-cols-2 gap-2">
-            {OAUTH_PROVIDERS.map(({ key, label, icon: Icon, field }) => {
-              const connected = identity ? (identity as any)[field] : null;
-              return (
-                <div key={key} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
-                  connected ? 'bg-green-950/30 border border-green-900/30 text-green-400' : 'bg-zinc-900 border border-zinc-800 text-zinc-600'
-                }`}>
-                  <Icon size={14} />
-                  <span className="flex-1 truncate">{connected || label}</span>
-                  {!connected && (
-                    <a href={`/api/auth/${key}`} className="text-[10px] text-zinc-500 hover:text-white">
-                      Link
-                    </a>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
-      </header>
 
-      {/* Registered Signature */}
-      {registeredSigSvg && (
-        <div className="px-4 mb-4">
-          <div className="border border-zinc-800 rounded-xl p-4">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Stamp size={12} /> Registered Signature
-            </h3>
-            <div
-              className="bg-white rounded-lg p-3 max-h-24 overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: registeredSigSvg }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Self-Attestation */}
-      <div className="px-4 mb-4">
-        <button
-          onClick={() => setSelfAttestOpen(!selfAttestOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <User size={16} className="text-blue-400" />
-            <span className="text-sm font-bold">Self-Attestation</span>
-            {(identity?.identity_strength || 0) >= 2 && (
-              <span className="text-[10px] text-green-500 bg-green-950/30 px-2 py-0.5 rounded-full">Completed</span>
-            )}
-          </div>
-          {selfAttestOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-
-        {selfAttestOpen && (
-          <div className="mt-2 border border-zinc-800 rounded-xl p-4 space-y-3">
-            <p className="text-xs text-zinc-500">
-              Verify your name and address to upgrade from Lv.1 &rarr; Lv.2. This is stored on-chain as a self-attestation strand.
-            </p>
-            <input
-              type="text" placeholder="Full Legal Name"
-              value={selfAttestForm.fullName}
-              onChange={e => setSelfAttestForm(f => ({ ...f, fullName: e.target.value }))}
-              className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
-            />
-            <input
-              type="text" placeholder="Address"
-              value={selfAttestForm.address}
-              onChange={e => setSelfAttestForm(f => ({ ...f, address: e.target.value }))}
-              className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text" placeholder="City"
-                value={selfAttestForm.city}
-                onChange={e => setSelfAttestForm(f => ({ ...f, city: e.target.value }))}
-                className="px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
-              />
-              <input
-                type="text" placeholder="Postcode"
-                value={selfAttestForm.postcode}
-                onChange={e => setSelfAttestForm(f => ({ ...f, postcode: e.target.value }))}
-                className="px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
-              />
-            </div>
-            <input
-              type="text" placeholder="Country"
-              value={selfAttestForm.country}
-              onChange={e => setSelfAttestForm(f => ({ ...f, country: e.target.value }))}
-              className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
-            />
-            <label className="flex items-start gap-2 text-xs text-zinc-500">
-              <input
-                type="checkbox" checked={selfAttestForm.agreed}
-                onChange={e => setSelfAttestForm(f => ({ ...f, agreed: e.target.checked }))}
-                className="mt-0.5 accent-amber-500"
-              />
-              I declare this information is true and correct to the best of my knowledge.
-            </label>
-            <button
-              onClick={submitSelfAttestation}
-              disabled={isProcessing || !selfAttestForm.fullName || !selfAttestForm.agreed}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg disabled:opacity-50 transition-colors"
-            >
-              {isProcessing ? 'Submitting...' : 'Submit Self-Attestation'}
-            </button>
-          </div>
+        {/* Registered Signature */}
+        {registeredSigSvg && (
+          <>
+            <h3>Registered Signature</h3>
+            <div style={{
+              background: 'white', borderRadius: 6, padding: 8,
+              maxHeight: 64, overflow: 'hidden',
+            }} dangerouslySetInnerHTML={{ __html: registeredSigSvg }} />
+          </>
         )}
       </div>
 
-      {/* ID Documents */}
-      <div className="px-4 mb-4">
-        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
-          <FileText size={12} /> Identity Documents
+      {/* Center panel — Strands + Self-Attestation + ID Docs */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        {/* Self-Attestation */}
+        <div style={{
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid rgba(201, 168, 76, 0.08)',
+          overflow: 'hidden',
+        }}>
+          <button className="ghost" onClick={() => setSelfAttestOpen(!selfAttestOpen)} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', padding: '10px 12px', background: 'var(--panel-2)',
+            border: 'none', cursor: 'pointer',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <User size={14} style={{ color: '#60a5fa' }} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>Self-Attestation</span>
+              {(identity?.identity_strength || 0) >= 2 && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, color: '#22c55e',
+                  background: 'rgba(34, 197, 94, 0.08)', padding: '1px 6px', borderRadius: 10,
+                }}>Completed</span>
+              )}
+            </div>
+            {selfAttestOpen ? <ChevronDown size={12} style={{ color: 'var(--muted)' }} /> : <ChevronRight size={12} style={{ color: 'var(--muted)' }} />}
+          </button>
+
+          {selfAttestOpen && (
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--panel-3)' }}>
+              <div className="small" style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+                Verify your name and address to upgrade from Lv.1 to Lv.2. Stored on-chain as a self-attestation strand.
+              </div>
+              <input type="text" placeholder="Full Legal Name" value={selfAttestForm.fullName}
+                onChange={e => setSelfAttestForm(f => ({ ...f, fullName: e.target.value }))}
+                style={inputStyle} />
+              <input type="text" placeholder="Address" value={selfAttestForm.address}
+                onChange={e => setSelfAttestForm(f => ({ ...f, address: e.target.value }))}
+                style={inputStyle} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <input type="text" placeholder="City" value={selfAttestForm.city}
+                  onChange={e => setSelfAttestForm(f => ({ ...f, city: e.target.value }))}
+                  style={inputStyle} />
+                <input type="text" placeholder="Postcode" value={selfAttestForm.postcode}
+                  onChange={e => setSelfAttestForm(f => ({ ...f, postcode: e.target.value }))}
+                  style={inputStyle} />
+              </div>
+              <input type="text" placeholder="Country" value={selfAttestForm.country}
+                onChange={e => setSelfAttestForm(f => ({ ...f, country: e.target.value }))}
+                style={inputStyle} />
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 10, color: 'var(--muted)' }}>
+                <input type="checkbox" checked={selfAttestForm.agreed}
+                  onChange={e => setSelfAttestForm(f => ({ ...f, agreed: e.target.checked }))}
+                  style={{ marginTop: 2 }} />
+                I declare this information is true and correct to the best of my knowledge.
+              </label>
+              <button onClick={submitSelfAttestation} disabled={isProcessing || !selfAttestForm.fullName || !selfAttestForm.agreed}
+                style={{
+                  width: '100%', padding: '8px 16px', borderRadius: 6,
+                  background: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
+                  border: 'none', color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  opacity: isProcessing || !selfAttestForm.fullName || !selfAttestForm.agreed ? 0.4 : 1,
+                }}>
+                {isProcessing ? 'Submitting...' : 'Submit Self-Attestation'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Identity Documents */}
+        <h3 style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+          Identity Documents
         </h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           {[
             { type: 'passport', label: 'Passport' },
             { type: 'driving_licence', label: 'Licence' },
@@ -482,259 +490,243 @@ export default function IdentityPage() {
           ].map(doc => {
             const hasDoc = strands.some(s => s.strand_subtype === doc.type);
             return (
-              <label key={doc.type} className={`flex flex-col items-center gap-1.5 p-3 border rounded-xl cursor-pointer transition-colors ${
-                hasDoc
-                  ? 'border-green-800 bg-green-950/20 text-green-400'
-                  : 'border-zinc-800 hover:bg-zinc-900 text-zinc-500'
-              }`}>
-                <Camera size={16} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{doc.label}</span>
-                {hasDoc && <Check size={12} className="text-green-400" />}
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  className="hidden"
-                  onChange={e => handleIdDocUpload(e, doc.type)}
-                />
+              <label key={doc.type} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                padding: '10px 6px', borderRadius: 8, cursor: 'pointer',
+                border: `1px solid ${hasDoc ? 'rgba(34, 197, 94, 0.15)' : 'rgba(201, 168, 76, 0.08)'}`,
+                background: hasDoc ? 'rgba(34, 197, 94, 0.04)' : 'var(--panel-2)',
+              }}>
+                <Camera size={14} style={{ color: hasDoc ? '#22c55e' : 'var(--muted)' }} />
+                <span style={{ fontSize: 9, fontWeight: 700, color: hasDoc ? '#22c55e' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {doc.label}
+                </span>
+                {hasDoc && <Check size={10} style={{ color: '#22c55e' }} />}
+                <input type="file" accept="image/*,.pdf" className="hidden"
+                  onChange={e => handleIdDocUpload(e, doc.type)} />
               </label>
             );
           })}
         </div>
-      </div>
 
-      {/* Identity Strands Timeline */}
-      <div className="px-4 mb-4">
-        <button
-          onClick={() => setStrandsOpen(!strandsOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Fingerprint size={16} className="text-amber-400" />
-            <span className="text-sm font-bold">Identity Strands</span>
-            <span className="text-[10px] text-zinc-600">({strands.length})</span>
-          </div>
-          {strandsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-
-        {strandsOpen && (
-          <div className="mt-2 border border-zinc-800 rounded-xl overflow-hidden divide-y divide-zinc-800">
-            {strands.length === 0 ? (
-              <div className="p-4 text-center text-xs text-zinc-600">
-                No strands yet. Connect providers or add attestations.
-              </div>
-            ) : (
-              strands.map(strand => (
-                <div key={strand.id} className="px-4 py-3 flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    strand.strand_txid ? 'bg-green-500' : 'bg-zinc-600'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">
-                      {strand.label || `${strand.strand_type}${strand.strand_subtype ? ` / ${strand.strand_subtype}` : ''}`}
-                    </p>
-                    <p className="text-[10px] text-zinc-600">
-                      {formatDate(strand.created_at)}
-                      {strand.provider_handle && ` \u00B7 ${strand.provider_handle}`}
-                    </p>
-                  </div>
-                  {strand.strand_txid && (
-                    <button
-                      onClick={() => copyTxid(strand.strand_txid!)}
-                      className="p-1 text-zinc-600 hover:text-white transition-colors"
-                      title="Copy TXID"
-                    >
-                      {copiedTxid === strand.strand_txid ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Bit Trust IP Vault */}
-      <div className="px-4 mb-4">
-        <button
-          onClick={() => setIpOpen(!ipOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 border border-amber-900/40 rounded-xl hover:bg-zinc-900 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Shield size={16} className="text-amber-400" />
-            <span className="text-sm font-bold text-amber-400">Bit Trust IP Vault</span>
-            <span className="text-[10px] text-zinc-600">({ipThreads.length})</span>
-          </div>
-          {ipOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-
-        {ipOpen && (
-          <div className="mt-2 space-y-2">
-            {/* Thread list */}
-            {ipThreads.length > 0 && (
-              <div className="border border-zinc-800 rounded-xl overflow-hidden divide-y divide-zinc-800">
-                {ipThreads.map(thread => {
-                  const typeIcon = thread.documentType === 'HASH_ONLY' ? Hash
-                    : ['IMAGE', 'PHOTO'].includes(thread.documentType) ? ImageIcon
-                    : thread.documentType === 'VIDEO' ? Video
-                    : FileText;
-                  const TypeIcon = typeIcon;
-                  const badgeColor = thread.documentType === 'HASH_ONLY' ? 'bg-green-950/30 text-green-400'
-                    : ['IMAGE', 'PHOTO'].includes(thread.documentType) ? 'bg-purple-950/30 text-purple-400'
-                    : thread.documentType === 'VIDEO' ? 'bg-pink-950/30 text-pink-400'
-                    : 'bg-blue-950/30 text-blue-400';
-                  const badgeLabel = thread.documentType === 'HASH_ONLY' ? 'Hash'
-                    : thread.documentType === 'SEALED_DOCUMENT' ? 'Sealed'
-                    : thread.documentType === 'PDF' ? 'PDF'
-                    : ['IMAGE', 'PHOTO'].includes(thread.documentType) ? 'Image'
-                    : thread.documentType === 'VIDEO' ? 'Video'
-                    : 'Doc';
-
-                  return (
-                    <div key={thread.id} className="px-4 py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center flex-shrink-0">
-                        <TypeIcon size={14} className="text-zinc-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-xs font-medium truncate">{thread.title}</p>
-                          <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${badgeColor}`}>
-                            {badgeLabel}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-zinc-600">#{thread.sequence}</span>
-                          <span className="text-[10px] text-zinc-600">{formatDate(thread.createdAt)}</span>
-                          {thread.txid && (
-                            <>
-                              <button
-                                onClick={() => copyTxid(thread.txid)}
-                                className="text-[10px] text-amber-600 hover:text-amber-400 font-mono flex items-center gap-0.5"
-                              >
-                                <Copy size={8} />
-                                {copiedTxid === thread.txid ? 'Copied' : `${thread.txid.slice(0, 8)}...`}
-                              </button>
-                              <a
-                                href={`https://whatsonchain.com/tx/${thread.txid}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-zinc-600 hover:text-white"
-                              >
-                                <ExternalLink size={10} />
-                              </a>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <span className={`px-2 py-0.5 text-[10px] rounded flex-shrink-0 ${
-                        thread.txid ? 'bg-green-950/30 text-green-400' : 'bg-yellow-950/30 text-yellow-400'
-                      }`}>
-                        {thread.txid ? 'On-chain' : 'Pending'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* New thread form */}
-            <div className="border border-zinc-800 rounded-xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-zinc-500">Register New IP Thread</h4>
-
-              {/* Mode toggle */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setBitTrustMode('upload')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    bitTrustMode === 'upload'
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-zinc-900 text-zinc-500 border border-zinc-800'
-                  }`}
-                >
-                  <Upload size={12} />
-                  Upload
-                </button>
-                <button
-                  onClick={() => setBitTrustMode('hash')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    bitTrustMode === 'hash'
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-zinc-900 text-zinc-500 border border-zinc-800'
-                  }`}
-                >
-                  <Hash size={12} />
-                  Hash Only
-                </button>
-              </div>
-
-              {bitTrustMode === 'upload' ? (
-                <>
-                  <input
-                    type="file"
-                    onChange={handleBitTrustFileSelect}
-                    className="w-full text-xs text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-zinc-800 file:text-white cursor-pointer"
-                  />
-                  {bitTrustHash && (
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
-                      <span className="text-[9px] text-zinc-500 uppercase tracking-wider">SHA-256</span>
-                      <p className="text-[10px] text-green-400 font-mono break-all mt-0.5">{bitTrustHash}</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <input
-                  type="text"
-                  placeholder="Paste SHA-256 hash (64 hex chars)"
-                  value={bitTrustHashInput}
-                  onChange={e => setBitTrustHashInput(e.target.value)}
-                  className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-amber-600"
-                />
-              )}
-
-              <input
-                type="text"
-                placeholder="Title (e.g., 'Patent: Novel Algorithm v1')"
-                value={ipForm.title}
-                onChange={e => setIpForm(f => ({ ...f, title: e.target.value }))}
-                className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-600"
-              />
-              <input
-                type="text"
-                placeholder="Description (optional)"
-                value={ipForm.description}
-                onChange={e => setIpForm(f => ({ ...f, description: e.target.value }))}
-                className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
-              />
-              <button
-                onClick={submitIpThread}
-                disabled={isProcessing || !ipForm.title || (bitTrustMode === 'upload' ? !bitTrustHash : !bitTrustHashInput.trim())}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold rounded-lg disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Registering...
-                  </>
-                ) : (
-                  <>
-                    <Shield size={14} />
-                    {bitTrustMode === 'upload' ? 'Register IP' : 'Register Hash'}
-                  </>
-                )}
-              </button>
+        {/* Identity Strands Timeline */}
+        <h3 style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+          Identity Strands ({strands.length})
+        </h3>
+        {strands.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <Fingerprint size={24} style={{ margin: '0 auto 6px', color: 'rgba(201, 168, 76, 0.15)' }} />
+            <div className="small" style={{ color: 'var(--muted)' }}>
+              No strands yet. Connect providers or add attestations.
             </div>
           </div>
+        ) : (
+          <div style={{
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid rgba(201, 168, 76, 0.06)',
+            overflow: 'hidden',
+          }}>
+            {strands.map((strand, i) => (
+              <div key={strand.id} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px',
+                borderBottom: i < strands.length - 1 ? '1px solid rgba(255, 255, 255, 0.03)' : 'none',
+              }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                  background: strand.strand_txid ? '#22c55e' : 'var(--muted)',
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {strand.label || `${strand.strand_type}${strand.strand_subtype ? ` / ${strand.strand_subtype}` : ''}`}
+                  </div>
+                  <div style={{ fontSize: 9, color: 'var(--muted)' }}>
+                    {formatDate(strand.created_at)}
+                    {strand.provider_handle && ` \u00B7 ${strand.provider_handle}`}
+                  </div>
+                </div>
+                {strand.strand_txid && (
+                  <button className="ghost" onClick={() => copyTxid(strand.strand_txid!)} title="Copy TXID"
+                    style={{ padding: 2 }}>
+                    {copiedTxid === strand.strand_txid
+                      ? <Check size={10} style={{ color: '#22c55e' }} />
+                      : <Copy size={10} style={{ color: 'var(--muted)' }} />}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         )}
+      </div>
+
+      {/* Right panel — Bit Trust IP Vault */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        <h2 style={{ color: 'var(--accent)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Shield size={13} />
+            IP Vault
+          </div>
+        </h2>
+
+        {/* Thread list */}
+        {ipThreads.length > 0 && (
+          <div style={{
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid rgba(201, 168, 76, 0.08)',
+            overflow: 'hidden',
+          }}>
+            {ipThreads.map((thread, i) => {
+              const TypeIcon = thread.documentType === 'HASH_ONLY' ? Hash
+                : ['IMAGE', 'PHOTO'].includes(thread.documentType) ? ImageIcon
+                : thread.documentType === 'VIDEO' ? Video
+                : FileText;
+
+              return (
+                <div key={thread.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px',
+                  borderBottom: i < ipThreads.length - 1 ? '1px solid rgba(255, 255, 255, 0.03)' : 'none',
+                }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 6,
+                    background: 'var(--panel-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <TypeIcon size={12} style={{ color: 'var(--muted)' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {thread.title}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--muted)' }}>
+                      <span>#{thread.sequence}</span>
+                      <span>{formatDate(thread.createdAt)}</span>
+                      {thread.txid && (
+                        <button className="ghost" onClick={() => copyTxid(thread.txid)}
+                          style={{ padding: 0, fontSize: 9, color: 'var(--accent)', fontFamily: "'IBM Plex Mono', monospace", display: 'flex', alignItems: 'center', gap: 2, border: 'none', background: 'none', cursor: 'pointer' }}>
+                          <Copy size={7} />
+                          {copiedTxid === thread.txid ? 'Copied' : `${thread.txid.slice(0, 8)}...`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{
+                    padding: '1px 6px', borderRadius: 8, fontSize: 9, fontWeight: 600, flexShrink: 0,
+                    background: thread.txid ? 'rgba(34, 197, 94, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                    color: thread.txid ? '#22c55e' : '#f59e0b',
+                  }}>
+                    {thread.txid ? 'On-chain' : 'Pending'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* New thread form */}
+        <div style={{
+          padding: 12, borderRadius: 'var(--radius-sm)',
+          border: '1px solid rgba(201, 168, 76, 0.08)',
+          background: 'var(--panel-2)',
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <h3 style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+            Register New IP
+          </h3>
+
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => setBitTrustMode('upload')} style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+              borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              border: 'none',
+              background: bitTrustMode === 'upload' ? 'linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(201, 168, 76, 0.08))' : 'var(--panel-3)',
+              color: bitTrustMode === 'upload' ? 'var(--accent)' : 'var(--muted)',
+            }}>
+              <Upload size={10} /> Upload
+            </button>
+            <button onClick={() => setBitTrustMode('hash')} style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+              borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              border: 'none',
+              background: bitTrustMode === 'hash' ? 'linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(201, 168, 76, 0.08))' : 'var(--panel-3)',
+              color: bitTrustMode === 'hash' ? 'var(--accent)' : 'var(--muted)',
+            }}>
+              <Hash size={10} /> Hash Only
+            </button>
+          </div>
+
+          {bitTrustMode === 'upload' ? (
+            <>
+              <input type="file" onChange={handleBitTrustFileSelect}
+                style={{ fontSize: 10, color: 'var(--muted)' }} />
+              {bitTrustHash && (
+                <div style={{
+                  padding: '6px 8px', borderRadius: 4,
+                  background: 'var(--panel-3)', border: '1px solid rgba(201, 168, 76, 0.06)',
+                }}>
+                  <span style={{ fontSize: 8, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>SHA-256</span>
+                  <div style={{
+                    fontSize: 9, color: '#22c55e',
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    wordBreak: 'break-all', marginTop: 2,
+                  }}>{bitTrustHash}</div>
+                </div>
+              )}
+            </>
+          ) : (
+            <input type="text" placeholder="Paste SHA-256 hash (64 hex chars)"
+              value={bitTrustHashInput}
+              onChange={e => setBitTrustHashInput(e.target.value)}
+              style={{ ...inputStyle, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }} />
+          )}
+
+          <input type="text" placeholder="Title (e.g., 'Patent: Novel Algorithm v1')"
+            value={ipForm.title}
+            onChange={e => setIpForm(f => ({ ...f, title: e.target.value }))}
+            style={inputStyle} />
+          <input type="text" placeholder="Description (optional)"
+            value={ipForm.description}
+            onChange={e => setIpForm(f => ({ ...f, description: e.target.value }))}
+            style={inputStyle} />
+          <button onClick={submitIpThread}
+            disabled={isProcessing || !ipForm.title || (bitTrustMode === 'upload' ? !bitTrustHash : !bitTrustHashInput.trim())}
+            style={{
+              width: '100%', padding: '8px 16px', borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: 'linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(201, 168, 76, 0.08))',
+              border: '1px solid rgba(201, 168, 76, 0.2)',
+              color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              opacity: isProcessing || !ipForm.title || (bitTrustMode === 'upload' ? !bitTrustHash : !bitTrustHashInput.trim()) ? 0.4 : 1,
+            }}>
+            {isProcessing ? (
+              <><Loader2 size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> Registering...</>
+            ) : (
+              <><Shield size={12} /> {bitTrustMode === 'upload' ? 'Register IP' : 'Register Hash'}</>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Processing overlay */}
       {isProcessing && (
-        <div className="fixed inset-0 z-40 bg-black/60 flex items-center justify-center">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-6 py-4 flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
-            <span className="text-sm">Processing...</span>
+        <div className="logo-designer-overlay">
+          <div style={{
+            background: 'var(--panel)', border: '1px solid rgba(201, 168, 76, 0.15)',
+            borderRadius: 12, padding: '16px 24px',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{ width: 20, height: 20, border: '2px solid var(--muted)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            <span style={{ fontSize: 13 }}>Processing...</span>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// --- Shared input style ---
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '6px 10px', borderRadius: 6,
+  background: 'var(--bg)', border: '1px solid rgba(201, 168, 76, 0.08)',
+  color: 'var(--text)', fontSize: 11,
+  outline: 'none',
+};

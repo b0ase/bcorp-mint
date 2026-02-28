@@ -1,17 +1,10 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useCallback, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Upload,
-  Hash,
-  ShieldCheck,
-  Wallet,
-  CheckCircle,
-  X,
-  ExternalLink,
-  LogOut,
-  FileText,
+  Upload, Hash, ShieldCheck, Wallet, CheckCircle,
+  X, ExternalLink, FileText, Copy, Check,
 } from 'lucide-react';
 import { useAuth } from '@shared/lib/auth-context';
 import { useApiClient } from '@shared/lib/api-client';
@@ -26,8 +19,9 @@ interface HashedFile {
 async function hashFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function formatSize(bytes: number): string {
@@ -43,6 +37,7 @@ export default function HashPage() {
   const [txid, setTxid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const { handle, login, logout } = useAuth();
   const api = useApiClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +46,6 @@ export default function HashPage() {
     setHashing(true);
     setError(null);
     setTxid(null);
-
     try {
       const newFiles: HashedFile[] = [];
       for (const file of Array.from(fileList)) {
@@ -81,23 +75,21 @@ export default function HashPage() {
     [processFiles]
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => setDragOver(false), []);
-
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
     setTxid(null);
+  };
+
+  const copyHash = (hash: string) => {
+    navigator.clipboard.writeText(hash);
+    setCopiedHash(hash);
+    setTimeout(() => setCopiedHash(null), 2000);
   };
 
   const inscribe = async () => {
     if (!files.length) return;
     setInscribing(true);
     setError(null);
-
     try {
       const res = await api.post('/api/inscribe', {
         hashes: files.map((f) => ({
@@ -106,10 +98,8 @@ export default function HashPage() {
           timestamp: f.timestamp,
         })),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Inscription failed');
-
       setTxid(data.txid);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Inscription failed');
@@ -119,235 +109,308 @@ export default function HashPage() {
   };
 
   return (
-    <div className="font-[family-name:var(--font-mono)] min-h-screen relative">
-      {/* Background */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/80 to-black" />
-      </div>
-
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 md:px-8 py-4 max-w-5xl mx-auto">
-        <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-            Bitcoin Mint
-          </span>
+    <div className="main" style={{ gridTemplateColumns: '1fr 2fr 1fr' }}>
+      {/* Left panel — Info */}
+      <div className="panel">
+        <h2>SHA-256 Hash</h2>
+        <div className="small" style={{ color: 'var(--muted)', lineHeight: 1.7 }}>
+          Drop any file to compute its SHA-256 fingerprint locally.
+          The file never leaves your device — only the hash goes on-chain.
         </div>
 
-        {handle ? (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-amber-400/80 font-bold tracking-wider">
-              {handle}
+        <div style={{
+          padding: '10px 12px',
+          borderRadius: 'var(--radius)',
+          background: 'rgba(201, 168, 76, 0.04)',
+          border: '1px solid rgba(201, 168, 76, 0.08)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <ShieldCheck size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Privacy
             </span>
-            <button
-              onClick={logout}
-              className="text-zinc-600 hover:text-zinc-400 transition-colors"
-              title="Disconnect"
-            >
-              <LogOut size={14} />
+          </div>
+          <div className="small" style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+            Files are hashed in-browser using the Web Crypto API.
+            No data is uploaded, transmitted, or stored.
+          </div>
+        </div>
+
+        {/* Wallet status */}
+        {handle ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 12px', borderRadius: 8,
+            border: '1px solid rgba(34, 197, 94, 0.15)',
+            background: 'rgba(34, 197, 94, 0.04)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="wallet-dot connected" />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#22c55e' }}>{handle}</span>
+            </div>
+            <button className="ghost" onClick={logout} title="Disconnect" style={{ padding: '2px 6px' }}>
+              <X size={12} />
             </button>
           </div>
-        ) : null}
-      </header>
+        ) : (
+          <button onClick={login} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '10px 16px', borderRadius: 8, width: '100%',
+            background: 'linear-gradient(135deg, rgba(201, 168, 76, 0.15), rgba(201, 168, 76, 0.05))',
+            border: '1px solid rgba(201, 168, 76, 0.2)',
+            color: 'var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}>
+            <Wallet size={14} />
+            Connect HandCash
+          </button>
+        )}
 
-      {/* Main Content */}
-      <main className="px-4 md:px-8 py-12 max-w-5xl mx-auto">
-        {/* Title */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <h1
-            className="text-4xl md:text-6xl font-black tracking-tighter text-white mb-3"
-            style={{ fontFamily: 'var(--font-orbitron), Orbitron, sans-serif' }}
-          >
-            HASH
-          </h1>
-          <p className="text-zinc-500 text-sm max-w-md mx-auto">
-            Drop files to compute SHA-256 hashes locally, then inscribe the proof to BSV.
-          </p>
-        </motion.div>
+        <div style={{ fontSize: 10, color: 'var(--muted)', textAlign: 'center', marginTop: 'auto' }}>
+          {files.length} file{files.length !== 1 ? 's' : ''} hashed
+        </div>
+      </div>
 
-        {/* Drop Zone */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+      {/* Center panel — Drop zone + results */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        <h2>Files</h2>
+
+        {/* Drop zone */}
+        <div
           onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
           onClick={() => inputRef.current?.click()}
-          className={`
-            relative cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center
-            transition-all duration-200
-            ${
-              dragOver
-                ? 'border-amber-400 bg-amber-400/5 scale-[1.01]'
-                : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
-            }
-          `}
+          style={{
+            position: 'relative',
+            cursor: 'pointer',
+            borderRadius: 'var(--radius)',
+            border: `2px dashed ${dragOver ? 'var(--accent)' : 'rgba(201, 168, 76, 0.12)'}`,
+            padding: files.length > 0 ? '16px 20px' : '40px 20px',
+            textAlign: 'center',
+            transition: 'all 0.2s',
+            background: dragOver ? 'rgba(201, 168, 76, 0.04)' : 'transparent',
+          }}
         >
           <input
             ref={inputRef}
             type="file"
             multiple
             className="hidden"
-            onChange={(e) => e.target.files && processFiles(e.target.files)}
+            onChange={(e) => { if (e.target.files) processFiles(e.target.files); e.target.value = ''; }}
           />
-          <Upload
-            size={32}
-            className={`mx-auto mb-4 transition-colors ${
-              dragOver ? 'text-amber-400' : 'text-zinc-600'
-            }`}
-          />
-          <p className="text-sm text-zinc-400 mb-1">
+          <Upload size={files.length > 0 ? 16 : 28} style={{
+            margin: '0 auto', marginBottom: files.length > 0 ? 4 : 12,
+            color: dragOver ? 'var(--accent)' : 'var(--muted)',
+            transition: 'color 0.2s',
+          }} />
+          <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, marginBottom: 2 }}>
             {hashing ? 'Hashing...' : 'Drop files here or click to browse'}
-          </p>
-          <p className="text-xs text-zinc-600">
-            Any file type. Files never leave your device.
-          </p>
-        </motion.div>
-
-        {/* Hash Results */}
-        <AnimatePresence>
-          {files.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-8 space-y-3"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xs font-bold tracking-widest text-white/40 uppercase">
-                  Hashed Files ({files.length})
-                </h2>
-                <button
-                  onClick={() => {
-                    setFiles([]);
-                    setTxid(null);
-                  }}
-                  className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
-                >
-                  Clear all
-                </button>
-              </div>
-
-              {files.map((file, i) => (
-                <motion.div
-                  key={`${file.filename}-${file.sha256}`}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="border border-white/10 bg-white/[0.03] rounded-xl p-4 group"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <FileText
-                        size={16}
-                        className="text-amber-400 shrink-0 mt-0.5"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="text-sm font-bold truncate">
-                            {file.filename}
-                          </span>
-                          <span className="text-[10px] text-zinc-600 shrink-0">
-                            {formatSize(file.size)}
-                          </span>
-                        </div>
-                        <code className="text-[11px] text-amber-400/70 break-all leading-relaxed block">
-                          {file.sha256}
-                        </code>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeFile(i)}
-                      className="text-zinc-700 hover:text-zinc-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+          </div>
+          {files.length === 0 && (
+            <div className="small" style={{ color: 'var(--muted)' }}>
+              Any file type accepted
+            </div>
           )}
+        </div>
+
+        {/* File list */}
+        <AnimatePresence>
+          {files.map((file, i) => (
+            <motion.div
+              key={`${file.filename}-${file.sha256}`}
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              transition={{ delay: i * 0.03 }}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '10px 12px', borderRadius: 8,
+                border: '1px solid rgba(201, 168, 76, 0.06)',
+                background: 'rgba(201, 168, 76, 0.02)',
+              }}
+            >
+              <FileText size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {file.filename}
+                  </span>
+                  <span className="small" style={{ color: 'var(--muted)', flexShrink: 0 }}>
+                    {formatSize(file.size)}
+                  </span>
+                </div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <code style={{
+                    fontSize: 10, color: 'var(--accent)', opacity: 0.7,
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    wordBreak: 'break-all', lineHeight: 1.5,
+                  }}>
+                    {file.sha256}
+                  </code>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); copyHash(file.sha256); }}
+                    className="ghost"
+                    style={{ padding: 2, flexShrink: 0 }}
+                    title="Copy hash"
+                  >
+                    {copiedHash === file.sha256
+                      ? <Check size={11} style={{ color: '#22c55e' }} />
+                      : <Copy size={11} style={{ color: 'var(--muted)' }} />
+                    }
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={() => removeFile(i)}
+                className="ghost"
+                style={{ padding: 2, flexShrink: 0, opacity: 0.4 }}
+                title="Remove"
+              >
+                <X size={12} />
+              </button>
+            </motion.div>
+          ))}
         </AnimatePresence>
 
-        {/* Actions */}
-        {files.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 flex flex-col items-center gap-4"
-          >
+        {/* Empty state */}
+        {files.length === 0 && !hashing && (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <Hash size={28} style={{ margin: '0 auto 8px', color: 'rgba(201, 168, 76, 0.15)' }} />
+            <div className="small" style={{ color: 'var(--muted)' }}>
+              No files hashed yet
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right panel — Inscribe */}
+      <div className="panel">
+        <h2>Inscribe</h2>
+
+        {files.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <ShieldCheck size={28} style={{ margin: '0 auto 8px', color: 'rgba(201, 168, 76, 0.15)' }} />
+            <div className="small" style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+              Hash files first, then inscribe the proof to BSV.
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Summary */}
+            <div style={{
+              padding: '12px 14px', borderRadius: 8,
+              border: '1px solid rgba(201, 168, 76, 0.08)',
+              background: 'rgba(201, 168, 76, 0.03)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="small" style={{ color: 'var(--muted)' }}>Files</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{files.length}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="small" style={{ color: 'var(--muted)' }}>Format</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', fontFamily: "'IBM Plex Mono', monospace" }}>BCORP_IP_HASH</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="small" style={{ color: 'var(--muted)' }}>Network</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>BSV Mainnet</span>
+              </div>
+            </div>
+
+            {/* Inscribe button */}
             {!handle ? (
-              <button
-                onClick={login}
-                className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 rounded-full"
-              >
-                <Wallet size={16} />
-                Connect HandCash to Inscribe
+              <button onClick={login} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 16px', borderRadius: 8, width: '100%',
+                background: 'linear-gradient(135deg, #c9a84c, #e6c665)',
+                border: 'none', color: '#000', fontSize: 12, fontWeight: 800,
+                textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer',
+              }}>
+                <Wallet size={14} />
+                Connect to Inscribe
               </button>
             ) : (
-              <button
-                onClick={inscribe}
-                disabled={inscribing}
-                className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 disabled:from-zinc-700 disabled:to-zinc-800 disabled:text-zinc-500 text-black font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 disabled:shadow-none rounded-full"
-              >
-                <Hash size={16} />
-                {inscribing ? 'Inscribing...' : 'Inscribe to BSV'}
+              <button onClick={inscribe} disabled={inscribing} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 16px', borderRadius: 8, width: '100%',
+                background: inscribing ? '#222' : 'linear-gradient(135deg, #c9a84c, #e6c665)',
+                border: 'none', color: inscribing ? '#666' : '#000', fontSize: 12, fontWeight: 800,
+                textTransform: 'uppercase', letterSpacing: '0.12em',
+                cursor: inscribing ? 'wait' : 'pointer',
+                boxShadow: inscribing ? 'none' : '0 4px 16px rgba(201, 168, 76, 0.2)',
+              }}>
+                <Hash size={14} />
+                {inscribing ? 'Inscribing...' : `Inscribe ${files.length} Hash${files.length !== 1 ? 'es' : ''}`}
               </button>
             )}
 
-            {/* Error */}
-            {error && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-red-400 text-xs text-center"
-              >
-                {error}
-              </motion.p>
-            )}
-
-            {/* Success */}
-            {txid && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="border border-green-500/20 bg-green-500/5 rounded-xl p-6 text-center w-full max-w-lg"
-              >
-                <CheckCircle size={24} className="text-green-400 mx-auto mb-3" />
-                <p className="text-sm font-bold text-green-400 mb-2">
-                  Inscribed on BSV
-                </p>
-                <a
-                  href={`https://whatsonchain.com/tx/${txid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-xs text-amber-400 hover:text-amber-300 transition-colors break-all"
-                >
-                  <code>{txid}</code>
-                  <ExternalLink size={12} className="shrink-0" />
-                </a>
-              </motion.div>
-            )}
-          </motion.div>
+            {/* Clear all */}
+            <button
+              onClick={() => { setFiles([]); setTxid(null); }}
+              className="ghost"
+              style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', width: '100%', padding: '6px 0' }}
+            >
+              Clear all
+            </button>
+          </>
         )}
 
-        {/* Privacy Notice */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-16 text-center"
-        >
-          <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-zinc-600">
-            <ShieldCheck size={14} />
-            Files never leave your device. Only the SHA-256 hash goes on-chain.
+        {/* Error */}
+        {error && (
+          <div style={{
+            padding: '8px 12px', borderRadius: 8,
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'rgba(239, 68, 68, 0.05)',
+            fontSize: 11, color: '#ef4444',
+          }}>
+            {error}
           </div>
-        </motion.div>
-      </main>
+        )}
+
+        {/* Success */}
+        {txid && (
+          <div style={{
+            padding: '12px 14px', borderRadius: 8,
+            border: '1px solid rgba(34, 197, 94, 0.2)',
+            background: 'rgba(34, 197, 94, 0.04)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <CheckCircle size={14} style={{ color: '#22c55e' }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>Inscribed on BSV</span>
+            </div>
+            <a
+              href={`https://whatsonchain.com/tx/${txid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 10, color: 'var(--accent)',
+                fontFamily: "'IBM Plex Mono', monospace",
+                wordBreak: 'break-all', lineHeight: 1.5,
+                textDecoration: 'none',
+              }}
+            >
+              {txid}
+              <ExternalLink size={10} style={{ flexShrink: 0 }} />
+            </a>
+          </div>
+        )}
+
+        {/* OP_RETURN preview */}
+        <div style={{ marginTop: 'auto' }}>
+          <div className="small" style={{ fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>
+            On-chain format
+          </div>
+          <code style={{
+            display: 'block', fontSize: 9, color: 'var(--accent)', opacity: 0.5,
+            fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1.6,
+            wordBreak: 'break-all',
+          }}>
+            BCORP_IP_HASH | ts:&lt;iso&gt; | file:&lt;sha256&gt;
+          </code>
+        </div>
+      </div>
     </div>
   );
 }

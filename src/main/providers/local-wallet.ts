@@ -8,6 +8,7 @@ const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
 
 export class LocalWallet implements WalletProvider {
   type = 'local' as const;
+  supportsCreateAction = false;
   private connected = false;
 
   async connect(): Promise<void> {

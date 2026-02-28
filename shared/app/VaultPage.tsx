@@ -6,7 +6,7 @@ import {
   ChevronDown, X, Download, ExternalLink, Shield, Eye,
   MoreVertical, RotateCcw, AlertTriangle, Send, Users,
   FileText, Image as ImageIcon, Stamp, Inbox, ArrowLeft,
-  Share2, Copy, Check, Upload
+  Share2, Copy, Check, Upload, Wallet
 } from 'lucide-react';
 import SovereignSignature from '@shared/components/SovereignSignature';
 import MediaCapture from '@shared/components/MediaCapture';
@@ -111,7 +111,6 @@ function resolveDocName(sig: Signature): string {
 // --- Main Component ---
 
 interface VaultPageProps {
-  /** Optional PDF-to-image converter (website-only, uses pdfjs-dist) */
   pdfToImageFn?: (arrayBuffer: ArrayBuffer) => Promise<{ blob: Blob; numPages: number }>;
 }
 
@@ -259,7 +258,6 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
 
         if (file.type === 'application/pdf') {
           sigType = 'PDF';
-          // PDF-to-image conversion — website-only, skip on desktop
           if (typeof window !== 'undefined' && pdfToImageFn) {
             try {
               const arrayBuffer = await file.arrayBuffer();
@@ -523,25 +521,27 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
   // --- Loading / Auth gate ---
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ width: 24, height: 24, border: '2px solid var(--muted)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   if (!handle) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4">
-        <Lock size={48} className="text-zinc-700 mb-6" />
-        <h1 className="text-2xl font-black tracking-tight mb-2">Vault</h1>
-        <p className="text-zinc-500 text-sm text-center mb-8 max-w-xs">
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+        <Lock size={40} style={{ color: 'var(--muted)', marginBottom: 8 }} />
+        <h2 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>Vault</h2>
+        <p className="small" style={{ color: 'var(--muted)', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
           Connect your HandCash wallet to access your encrypted signature vault.
         </p>
-        <button
-          onClick={login}
-          className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-black text-sm uppercase tracking-widest transition-all rounded-full"
-        >
-          <LogIn size={16} />
+        <button onClick={login} style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', borderRadius: 8,
+          background: 'linear-gradient(135deg, #c9a84c, #e6c665)',
+          border: 'none', color: '#000', fontSize: 12, fontWeight: 800,
+          textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer',
+        }}>
+          <Wallet size={14} />
           Connect HandCash
         </button>
       </div>
@@ -565,71 +565,89 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
 
   // --- Main Vault UI ---
   return (
-    <div className="min-h-screen pb-4">
-      {/* Header */}
-      <header className="px-4 pt-6 pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {identity?.avatar_url ? (
-              <img src={identity.avatar_url} alt="" className="w-10 h-10 rounded-full border border-zinc-700" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-sm font-bold text-zinc-400">
-                {handle.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <h1 className="text-lg font-black tracking-tight">${handle}</h1>
-              {identity && (
-                <StrengthBadge strength={identity.identity_strength} />
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {identity?.token_id && (
-              <a
-                href={`https://whatsonchain.com/tx/${identity.token_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 text-zinc-500 hover:text-white transition-colors"
-                title="View identity on-chain"
-              >
-                <ExternalLink size={16} />
-              </a>
-            )}
-          </div>
-        </div>
-      </header>
+    <div className="main" style={{ gridTemplateColumns: '260px 1fr 320px' }}>
+      {/* Left panel — Identity + Quick Actions */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        <h2>Vault</h2>
 
-      {/* Quick Actions */}
-      <div className="px-4 mb-6">
-        <div className="grid grid-cols-4 gap-2">
-          <button
-            onClick={() => setSignatureModalOpen(true)}
-            className="flex flex-col items-center gap-1.5 p-3 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-colors"
-          >
-            <PenTool size={18} className="text-amber-400" />
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Sign</span>
+        {/* Identity card */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+          background: 'rgba(201, 168, 76, 0.04)',
+          border: '1px solid rgba(201, 168, 76, 0.08)',
+        }}>
+          {identity?.avatar_url ? (
+            <img src={identity.avatar_url} alt="" style={{
+              width: 36, height: 36, borderRadius: '50%',
+              border: '1px solid rgba(201, 168, 76, 0.2)',
+            }} />
+          ) : (
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(201, 168, 76, 0.15), rgba(201, 168, 76, 0.05))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '1px solid rgba(201, 168, 76, 0.2)',
+              fontSize: 14, fontWeight: 800, color: 'var(--accent)',
+            }}>
+              {handle.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              ${handle}
+            </div>
+            {identity && (
+              <StrengthBadge strength={identity.identity_strength} />
+            )}
+          </div>
+          {identity?.token_id && (
+            <a
+              href={`https://whatsonchain.com/tx/${identity.token_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--muted)', padding: 2 }}
+              title="View identity on-chain"
+            >
+              <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <h3>Quick Actions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <button className="ghost" onClick={() => setSignatureModalOpen(true)} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            padding: '10px 6px', borderRadius: 8,
+            border: '1px solid rgba(201, 168, 76, 0.08)', background: 'var(--panel-2)',
+          }}>
+            <PenTool size={16} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Sign</span>
           </button>
-          <button
-            onClick={() => setCaptureMode('PHOTO')}
-            className="flex flex-col items-center gap-1.5 p-3 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-colors"
-          >
-            <Camera size={18} className="text-blue-400" />
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Photo</span>
+          <button className="ghost" onClick={() => setCaptureMode('PHOTO')} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            padding: '10px 6px', borderRadius: 8,
+            border: '1px solid rgba(201, 168, 76, 0.08)', background: 'var(--panel-2)',
+          }}>
+            <Camera size={16} style={{ color: '#60a5fa' }} />
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Photo</span>
           </button>
-          <button
-            onClick={() => setCaptureMode('VIDEO')}
-            className="flex flex-col items-center gap-1.5 p-3 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-colors"
-          >
-            <Video size={18} className="text-purple-400" />
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Video</span>
+          <button className="ghost" onClick={() => setCaptureMode('VIDEO')} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            padding: '10px 6px', borderRadius: 8,
+            border: '1px solid rgba(201, 168, 76, 0.08)', background: 'var(--panel-2)',
+          }}>
+            <Video size={16} style={{ color: '#a78bfa' }} />
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Video</span>
           </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center gap-1.5 p-3 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-colors"
-          >
-            <Upload size={18} className="text-green-400" />
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Upload</span>
+          <button className="ghost" onClick={() => fileInputRef.current?.click()} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            padding: '10px 6px', borderRadius: 8,
+            border: '1px solid rgba(201, 168, 76, 0.08)', background: 'var(--panel-2)',
+          }}>
+            <Upload size={16} style={{ color: '#4ade80' }} />
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upload</span>
           </button>
         </div>
         <input
@@ -640,262 +658,370 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
           onChange={handleFileUpload}
           className="hidden"
         />
+
+        {/* Counts */}
+        <div style={{ fontSize: 10, color: 'var(--muted)', textAlign: 'center', marginTop: 'auto' }}>
+          {signatures.length} item{signatures.length !== 1 ? 's' : ''} in vault
+          {trashItems.length > 0 && ` \u00B7 ${trashItems.length} in trash`}
+        </div>
       </div>
 
-      {/* Vault Tabs */}
-      <div className="px-4 mb-4">
-        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+      {/* Center panel — Vault Items */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {VAULT_TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => setVaultTab(tab.key)}
-              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full whitespace-nowrap transition-colors ${
-                vaultTab === tab.key
-                  ? 'bg-white text-black'
-                  : 'text-zinc-500 hover:text-white hover:bg-zinc-800'
-              }`}
+              style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+                cursor: 'pointer', whiteSpace: 'nowrap', border: 'none',
+                background: vaultTab === tab.key
+                  ? 'linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(201, 168, 76, 0.08))'
+                  : 'transparent',
+                color: vaultTab === tab.key ? 'var(--accent-2)' : 'var(--muted)',
+                transition: 'all 0.15s',
+              }}
             >
               {tab.label}
               {tab.key === 'trash' && trashItems.length > 0 && (
-                <span className="ml-1 text-[10px] text-red-400">({trashItems.length})</span>
+                <span style={{ marginLeft: 4, color: '#ef4444' }}>({trashItems.length})</span>
               )}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* IP Vault (Bit Trust) */}
-      {vaultTab === 'ip-vault' && (
-        <div className="px-4">
+        {/* IP Vault (Bit Trust) */}
+        {vaultTab === 'ip-vault' && (
           <BitTrustPanel
             identity={identity}
             handle={handle}
             api={api}
           />
-        </div>
-      )}
+        )}
 
-      {/* Vault Items */}
-      {vaultTab !== 'ip-vault' && <div className="px-4">
-        {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            {vaultTab === 'trash' ? (
-              <>
-                <Trash2 size={32} className="text-zinc-700 mb-4" />
-                <p className="text-zinc-500 text-sm">Trash is empty</p>
-              </>
+        {/* Item List */}
+        {vaultTab !== 'ip-vault' && (
+          <>
+            {filteredItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                {vaultTab === 'trash' ? (
+                  <>
+                    <Trash2 size={28} style={{ margin: '0 auto 8px', color: 'rgba(201, 168, 76, 0.15)' }} />
+                    <div className="small" style={{ color: 'var(--muted)' }}>Trash is empty</div>
+                  </>
+                ) : (
+                  <>
+                    <Lock size={28} style={{ margin: '0 auto 8px', color: 'rgba(201, 168, 76, 0.15)' }} />
+                    <div className="small" style={{ color: 'var(--muted)', marginBottom: 2 }}>No items found</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      {vaultTab === 'all'
+                        ? 'Draw a signature or upload a document to get started.'
+                        : `No ${vaultTab} in your vault yet.`}
+                    </div>
+                  </>
+                )}
+              </div>
             ) : (
-              <>
-                <Lock size={32} className="text-zinc-700 mb-4" />
-                <p className="text-zinc-500 text-sm mb-1">No items found</p>
-                <p className="text-zinc-600 text-xs">
-                  {vaultTab === 'all'
-                    ? 'Draw a signature or upload a document to get started.'
-                    : `No ${vaultTab} in your vault yet.`}
-                </p>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredItems.map(sig => {
-              const Icon = getItemIcon(sig.signature_type);
-              const isExpanded = expandedSig === sig.id;
-              const isTrash = vaultTab === 'trash';
-              const isSealed = sig.signature_type === 'SEALED_DOCUMENT';
-              const isDoc = ['DOCUMENT', 'PDF'].includes(sig.signature_type);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {filteredItems.map(sig => {
+                  const Icon = getItemIcon(sig.signature_type);
+                  const isExpanded = expandedSig === sig.id;
+                  const isTrash = vaultTab === 'trash';
+                  const isSealed = sig.signature_type === 'SEALED_DOCUMENT';
+                  const isDoc = ['DOCUMENT', 'PDF'].includes(sig.signature_type);
 
-              return (
-                <div key={sig.id} className="border border-zinc-800 rounded-xl overflow-hidden">
-                  {/* Item row */}
-                  <div
-                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-900/50 transition-colors ${
-                      isExpanded ? 'bg-zinc-900/50' : ''
-                    }`}
-                    onClick={() => previewItem(sig.id)}
-                  >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                      isSealed ? 'bg-amber-500/10 text-amber-400' :
-                      isDoc ? 'bg-blue-500/10 text-blue-400' :
-                      'bg-zinc-800 text-zinc-400'
-                    }`}>
-                      <Icon size={16} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{resolveDocName(sig)}</p>
-                      <div className="flex items-center gap-2 text-[10px] text-zinc-600">
-                        <span>{formatDate(sig.created_at)}</span>
-                        {sig.txid && !sig.txid.startsWith('pending-') && (
-                          <span className="text-green-600">On-chain</span>
-                        )}
-                        {sig.wallet_signed && (
-                          <span className="text-blue-600">Attested</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                      {isTrash ? (
-                        <button
-                          onClick={() => restoreItem(sig.id)}
-                          className="p-1.5 text-zinc-500 hover:text-green-400 transition-colors"
-                          title="Restore"
-                        >
-                          <RotateCcw size={14} />
-                        </button>
-                      ) : (
-                        <>
-                          {isDoc && (
-                            <button
-                              onClick={() => openDocInCanvas(sig.id)}
-                              className="p-1.5 text-zinc-500 hover:text-amber-400 transition-colors"
-                              title="Sign this document"
-                            >
-                              <PenTool size={14} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setContextMenu(contextMenu === sig.id ? null : sig.id)}
-                            className="p-1.5 text-zinc-500 hover:text-white transition-colors"
-                          >
-                            <MoreVertical size={14} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Context menu */}
-                  {contextMenu === sig.id && (
-                    <div className="border-t border-zinc-800 bg-zinc-950 px-2 py-1">
-                      <div className="flex flex-wrap gap-1">
-                        <button
-                          onClick={() => downloadItem(sig.id, resolveDocName(sig))}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
-                        >
-                          <Download size={12} /> Download
-                        </button>
-                        {sig.txid && !sig.txid.startsWith('pending-') && (
-                          <button
-                            onClick={() => copyTxid(sig.txid!)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
-                          >
-                            {copiedTxid === sig.txid ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                            TXID
-                          </button>
-                        )}
-                        {sig.txid && !sig.txid.startsWith('pending-') && (
-                          <a
-                            href={`https://whatsonchain.com/tx/${sig.txid}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
-                          >
-                            <ExternalLink size={12} /> Explorer
-                          </a>
-                        )}
-                        {!sig.wallet_signed && (
-                          <button
-                            onClick={() => attestItem(sig.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
-                          >
-                            <Shield size={12} /> Attest
-                          </button>
-                        )}
-                        {['TLDRAW', 'TYPED'].includes(sig.signature_type) && (
-                          <button
-                            onClick={() => registerSignature(sig.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded transition-colors"
-                          >
-                            <Stamp size={12} /> Register
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { setShareModalOpen(sig.id); setContextMenu(null); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
-                        >
-                          <Share2 size={12} /> Share
-                        </button>
-                        <button
-                          onClick={() => deleteItem(sig.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-500 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Preview panel */}
-                  {isExpanded && (
-                    <div className="border-t border-zinc-800 p-4 bg-zinc-950">
-                      {previewLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+                  return (
+                    <div key={sig.id} style={{
+                      borderRadius: 'var(--radius-sm)',
+                      border: isSealed
+                        ? '1px solid rgba(201, 168, 76, 0.12)'
+                        : '1px solid rgba(255, 255, 255, 0.04)',
+                      background: isExpanded ? 'var(--panel-2)' : 'rgba(255, 255, 255, 0.01)',
+                      overflow: 'hidden',
+                    }}>
+                      {/* Item row */}
+                      <div
+                        onClick={() => previewItem(sig.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px', cursor: 'pointer',
+                          transition: 'background 0.15s',
+                        }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: isSealed ? 'rgba(201, 168, 76, 0.08)' : 'var(--panel-3)',
+                          flexShrink: 0,
+                        }}>
+                          <Icon size={14} style={{
+                            color: isSealed ? 'var(--accent)' : isDoc ? '#60a5fa' : 'var(--muted)',
+                          }} />
                         </div>
-                      ) : previewData ? (
-                        <div className="space-y-3">
-                          {previewData.startsWith('data:image') || previewData.startsWith('<svg') ? (
-                            previewData.startsWith('<svg') ? (
-                              <div
-                                className="bg-white rounded-lg p-4 max-h-64 overflow-auto"
-                                dangerouslySetInnerHTML={{ __html: previewData }}
-                              />
-                            ) : (
-                              <img
-                                src={previewData}
-                                alt="Preview"
-                                className="max-w-full max-h-64 rounded-lg mx-auto"
-                              />
-                            )
-                          ) : previewData.startsWith('data:video') ? (
-                            <video
-                              src={previewData}
-                              controls
-                              className="max-w-full max-h-64 rounded-lg mx-auto"
-                            />
-                          ) : (
-                            <div className="text-xs text-zinc-500 font-mono break-all max-h-32 overflow-auto">
-                              {previewData.slice(0, 200)}...
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-2 text-[10px]">
-                            <div>
-                              <span className="text-zinc-600">Type</span>
-                              <p className="text-zinc-400">{sig.signature_type}</p>
-                            </div>
-                            <div>
-                              <span className="text-zinc-600">Created</span>
-                              <p className="text-zinc-400">{formatDate(sig.created_at)}</p>
-                            </div>
-                            {sig.txid && (
-                              <div className="col-span-2">
-                                <span className="text-zinc-600">TXID</span>
-                                <p className="text-zinc-400 font-mono truncate">{sig.txid}</p>
-                              </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {resolveDocName(sig)}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--muted)' }}>
+                            <span>{formatDate(sig.created_at)}</span>
+                            {sig.txid && !sig.txid.startsWith('pending-') && (
+                              <span style={{ color: '#22c55e' }}>On-chain</span>
+                            )}
+                            {sig.wallet_signed && (
+                              <span style={{ color: '#60a5fa' }}>Attested</span>
                             )}
                           </div>
                         </div>
-                      ) : (
-                        <p className="text-zinc-500 text-xs text-center py-4">No preview available</p>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }} onClick={e => e.stopPropagation()}>
+                          {isTrash ? (
+                            <button className="ghost" onClick={() => restoreItem(sig.id)} title="Restore" style={{ padding: 4 }}>
+                              <RotateCcw size={12} style={{ color: '#22c55e' }} />
+                            </button>
+                          ) : (
+                            <>
+                              {isDoc && (
+                                <button className="ghost" onClick={() => openDocInCanvas(sig.id)} title="Sign this document" style={{ padding: 4 }}>
+                                  <PenTool size={12} style={{ color: 'var(--accent)' }} />
+                                </button>
+                              )}
+                              <button
+                                className="ghost"
+                                onClick={() => setContextMenu(contextMenu === sig.id ? null : sig.id)}
+                                style={{ padding: 4 }}
+                              >
+                                <MoreVertical size={12} style={{ color: 'var(--muted)' }} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Context menu */}
+                      {contextMenu === sig.id && (
+                        <div style={{
+                          borderTop: '1px solid rgba(201, 168, 76, 0.06)',
+                          padding: '6px 8px',
+                          display: 'flex', flexWrap: 'wrap', gap: 4,
+                          background: 'var(--panel-3)',
+                        }}>
+                          <button className="ghost" onClick={() => downloadItem(sig.id, resolveDocName(sig))}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: 'var(--muted)' }}>
+                            <Download size={10} /> Download
+                          </button>
+                          {sig.txid && !sig.txid.startsWith('pending-') && (
+                            <button className="ghost" onClick={() => copyTxid(sig.txid!)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: copiedTxid === sig.txid ? '#22c55e' : 'var(--muted)' }}>
+                              {copiedTxid === sig.txid ? <Check size={10} /> : <Copy size={10} />} TXID
+                            </button>
+                          )}
+                          {sig.txid && !sig.txid.startsWith('pending-') && (
+                            <a href={`https://whatsonchain.com/tx/${sig.txid}`} target="_blank" rel="noopener noreferrer"
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: 'var(--muted)', textDecoration: 'none' }}>
+                              <ExternalLink size={10} /> Explorer
+                            </a>
+                          )}
+                          {!sig.wallet_signed && (
+                            <button className="ghost" onClick={() => attestItem(sig.id)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: 'var(--muted)' }}>
+                              <Shield size={10} /> Attest
+                            </button>
+                          )}
+                          {['TLDRAW', 'TYPED'].includes(sig.signature_type) && (
+                            <button className="ghost" onClick={() => registerSignature(sig.id)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: 'var(--accent)' }}>
+                              <Stamp size={10} /> Register
+                            </button>
+                          )}
+                          <button className="ghost" onClick={() => { setShareModalOpen(sig.id); setContextMenu(null); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: 'var(--muted)' }}>
+                            <Share2 size={10} /> Share
+                          </button>
+                          <button className="ghost" onClick={() => deleteItem(sig.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, padding: '4px 8px', borderRadius: 4, color: '#ef4444' }}>
+                            <Trash2 size={10} /> Delete
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Preview panel */}
+                      {isExpanded && (
+                        <div style={{
+                          borderTop: '1px solid rgba(201, 168, 76, 0.06)',
+                          padding: 14, background: 'var(--panel-3)',
+                        }}>
+                          {previewLoading ? (
+                            <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+                              <div style={{ width: 20, height: 20, border: '2px solid var(--muted)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            </div>
+                          ) : previewData ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              {previewData.startsWith('data:image') || previewData.startsWith('<svg') ? (
+                                previewData.startsWith('<svg') ? (
+                                  <div style={{
+                                    background: 'white', borderRadius: 8, padding: 12,
+                                    maxHeight: 200, overflow: 'auto',
+                                  }} dangerouslySetInnerHTML={{ __html: previewData }} />
+                                ) : (
+                                  <img src={previewData} alt="Preview" style={{
+                                    maxWidth: '100%', maxHeight: 200, borderRadius: 8, margin: '0 auto', display: 'block',
+                                  }} />
+                                )
+                              ) : previewData.startsWith('data:video') ? (
+                                <video src={previewData} controls style={{
+                                  maxWidth: '100%', maxHeight: 200, borderRadius: 8, margin: '0 auto', display: 'block',
+                                }} />
+                              ) : (
+                                <div style={{
+                                  fontSize: 10, color: 'var(--muted)', fontFamily: "'IBM Plex Mono', monospace",
+                                  wordBreak: 'break-all', maxHeight: 80, overflow: 'auto',
+                                }}>
+                                  {previewData.slice(0, 200)}...
+                                </div>
+                              )}
+
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10 }}>
+                                <div>
+                                  <div style={{ color: 'var(--muted)', marginBottom: 2 }}>Type</div>
+                                  <div style={{ color: 'var(--text)' }}>{sig.signature_type}</div>
+                                </div>
+                                <div>
+                                  <div style={{ color: 'var(--muted)', marginBottom: 2 }}>Created</div>
+                                  <div style={{ color: 'var(--text)' }}>{formatDate(sig.created_at)}</div>
+                                </div>
+                                {sig.txid && (
+                                  <div style={{ gridColumn: '1 / -1' }}>
+                                    <div style={{ color: 'var(--muted)', marginBottom: 2 }}>TXID</div>
+                                    <div style={{
+                                      color: 'var(--accent)', fontFamily: "'IBM Plex Mono', monospace",
+                                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                    }}>{sig.txid}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="small" style={{ color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>
+                              No preview available
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Right panel — Details / Registered Sig */}
+      <div className="panel" style={{ overflow: 'auto' }}>
+        <h2>Details</h2>
+
+        {/* Registered Signature */}
+        {registeredSigSvg && (
+          <div style={{
+            padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+            border: '1px solid rgba(201, 168, 76, 0.08)',
+            background: 'rgba(201, 168, 76, 0.02)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Stamp size={12} style={{ color: 'var(--accent)' }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Registered Signature
+              </span>
+            </div>
+            <div style={{
+              background: 'white', borderRadius: 6, padding: 8,
+              maxHeight: 80, overflow: 'hidden',
+            }} dangerouslySetInnerHTML={{ __html: registeredSigSvg }} />
           </div>
         )}
-      </div>}
+
+        {/* Selected item info */}
+        {expandedSig && filteredItems.find(s => s.id === expandedSig) ? (() => {
+          const sig = filteredItems.find(s => s.id === expandedSig)!;
+          return (
+            <div style={{
+              padding: '12px 14px', borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(201, 168, 76, 0.08)',
+              background: 'rgba(201, 168, 76, 0.03)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{resolveDocName(sig)}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="small" style={{ color: 'var(--muted)' }}>Type</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{sig.signature_type}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="small" style={{ color: 'var(--muted)' }}>Created</span>
+                  <span style={{ fontSize: 11, color: 'var(--text)' }}>{formatDate(sig.created_at)}</span>
+                </div>
+                {sig.txid && (
+                  <div>
+                    <div className="small" style={{ color: 'var(--muted)', marginBottom: 3 }}>TXID</div>
+                    <div style={{
+                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
+                      color: 'var(--accent)', wordBreak: 'break-all', lineHeight: 1.5,
+                      cursor: 'pointer',
+                    }} onClick={() => copyTxid(sig.txid!)}>
+                      {sig.txid}
+                    </div>
+                  </div>
+                )}
+                {sig.wallet_signed && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Shield size={12} style={{ color: '#60a5fa' }} />
+                    <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600 }}>Wallet Attested</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })() : (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <Lock size={28} style={{ margin: '0 auto 8px', color: 'rgba(201, 168, 76, 0.15)' }} />
+            <div className="small" style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+              Select an item from the vault to see its details.
+            </div>
+          </div>
+        )}
+
+        {/* Privacy notice */}
+        <div style={{
+          padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+          background: 'rgba(201, 168, 76, 0.04)',
+          border: '1px solid rgba(201, 168, 76, 0.08)',
+          marginTop: 'auto',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <Shield size={12} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Encrypted
+            </span>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.6 }}>
+            All vault items are encrypted at rest and accessible only with your wallet credentials.
+          </div>
+        </div>
+      </div>
 
       {/* Processing overlay */}
       {isProcessing && (
-        <div className="fixed inset-0 z-40 bg-black/60 flex items-center justify-center">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-6 py-4 flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
-            <span className="text-sm">Processing...</span>
+        <div className="logo-designer-overlay">
+          <div style={{
+            background: 'var(--panel)', border: '1px solid rgba(201, 168, 76, 0.15)',
+            borderRadius: 12, padding: '16px 24px',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{ width: 20, height: 20, border: '2px solid var(--muted)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            <span style={{ fontSize: 13 }}>Processing...</span>
           </div>
         </div>
       )}
@@ -942,16 +1068,22 @@ export default function VaultPage({ pdfToImageFn }: VaultPageProps = {}) {
 
 function StrengthBadge({ strength }: { strength: number }) {
   const config = strength >= 4
-    ? { label: 'Sovereign', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
+    ? { label: 'Sovereign', color: '#c9a84c', bg: 'rgba(201, 168, 76, 0.08)', border: 'rgba(201, 168, 76, 0.2)' }
     : strength >= 3
-    ? { label: 'Strong', color: 'text-green-400 bg-green-500/10 border-green-500/30' }
+    ? { label: 'Strong', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.2)' }
     : strength >= 2
-    ? { label: 'Verified', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' }
-    : { label: 'Basic', color: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30' };
+    ? { label: 'Verified', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.08)', border: 'rgba(96, 165, 250, 0.2)' }
+    : { label: 'Basic', color: 'var(--muted)', bg: 'rgba(90, 88, 80, 0.08)', border: 'rgba(90, 88, 80, 0.2)' };
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${config.color}`}>
-      <Shield size={10} />
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '1px 6px', fontSize: 9, fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: '0.08em',
+      borderRadius: 10, border: `1px solid ${config.border}`,
+      background: config.bg, color: config.color,
+    }}>
+      <Shield size={9} />
       Lv.{strength} {config.label}
     </span>
   );

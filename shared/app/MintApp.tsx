@@ -39,6 +39,7 @@ import LeftPanel from '@shared/components/LeftPanel';
 import type { StampPreset } from '@shared/components/LeftPanel';
 import UploadButton from '@shared/components/UploadButton';
 import WIPCarousel from '@shared/components/WIPCarousel';
+import TopNav from '@shared/components/TopNav';
 import CertificateBack from '@shared/components/CertificateBack';
 import TransferModal from '@shared/components/TransferModal';
 import ChainVerifier from '@shared/components/ChainVerifier';
@@ -158,6 +159,7 @@ type DesktopComponents = {
   MusicCanvas?: React.ComponentType<any>;
   MusicPanel?: React.ComponentType<any>;
   DocumentHashPanel?: React.ComponentType<any>;
+  PatentInscriptionPanel?: React.ComponentType<any>;
 };
 
 type MintAppProps = {
@@ -221,6 +223,7 @@ export default function MintApp({
   const [isMinting, setIsMinting] = useState(false);
   const [showReceiptViewer, setShowReceiptViewer] = useState(false);
   const [showDocumentHash, setShowDocumentHash] = useState(false);
+  const [showPatentInscription, setShowPatentInscription] = useState(false);
   const [showWalletView, setShowWalletView] = useState(false);
   const [allReceipts, setAllReceipts] = useState<StampReceipt[]>([]);
 
@@ -1535,6 +1538,7 @@ export default function MintApp({
   const MusicCanvas = desktopComponents?.MusicCanvas || SharedMusicCanvas;
   const MusicPanel = desktopComponents?.MusicPanel || SharedMusicPanel;
   const DocumentHashPanel = desktopComponents?.DocumentHashPanel;
+  const PatentInscriptionPanel = desktopComponents?.PatentInscriptionPanel;
 
   return (
     <div className="app" onDrop={handleDrop} onDragOver={handleDragOver}>
@@ -1557,6 +1561,7 @@ export default function MintApp({
             onSelect={handleSelectWip}
             onNew={handleNewWip}
           />
+          <TopNav />
         </div>
         <div className="topbar-row-2">
           <ModeToggle mode={tokenisation.mode} onChange={tokenisation.setMode} />
@@ -1585,6 +1590,11 @@ export default function MintApp({
             <button className="secondary" onClick={() => setShowVault(true)}>
               Vault
             </button>
+            {PatentInscriptionPanel && (
+              <button className="secondary" onClick={() => setShowPatentInscription(true)}>
+                Bit Trust
+              </button>
+            )}
             <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
               {isExporting ? 'Printing\u2026' : 'Print'}
             </button>
@@ -2763,6 +2773,14 @@ export default function MintApp({
           walletProvider={walletMgr.walletState.provider === 'handcash' ? 'handcash' : 'local'}
           walletConnected={walletMgr.walletState.connected}
           onClose={() => setShowDocumentHash(false)}
+        />
+      )}
+
+      {showPatentInscription && PatentInscriptionPanel && (
+        <PatentInscriptionPanel
+          walletProvider={walletMgr.walletState.provider === 'handcash' ? 'handcash' : 'local'}
+          walletConnected={walletMgr.walletState.connected}
+          onClose={() => setShowPatentInscription(false)}
         />
       )}
 

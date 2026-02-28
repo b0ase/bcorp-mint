@@ -4,8 +4,24 @@ import { BrowserWindow } from 'electron';
 import { loadPrivateKey, loadMasterKey, hasMasterKey } from './keystore';
 import { deriveChildKey } from './wallet-derivation';
 import { getTreasuryAddress, MINT_FEE_SATS } from './treasury';
+import type { WalletProviderType } from './wallet-provider';
 
 const WHATSONCHAIN_API = 'https://api.whatsonchain.com/v1/bsv/main';
+
+/**
+ * Guard: BSV-21 token minting requires a local PrivateKey.
+ * BRC-100 wallets (MetaNet Desktop) manage UTXOs internally and cannot
+ * provide the raw PrivateKey that js-1sat-ord's deployBsv21Token() requires.
+ */
+export function assertLocalProvider(activeProvider: WalletProviderType): void {
+  if (activeProvider === 'metanet') {
+    throw new Error(
+      'BSV-21 token minting requires Local Wallet. ' +
+      'MetaNet Desktop uses BRC-100 which manages transactions internally. ' +
+      'Switch to Local Wallet to mint tokens.'
+    );
+  }
+}
 
 // Default 1x1 PNG icon (fallback)
 const MINIMAL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';

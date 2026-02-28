@@ -117,8 +117,16 @@ contextBridge.exposeInMainWorld('mint', {
   // Blockchain
   inscribeStamp: (payload: { path: string; hash: string; timestamp: string; parentHash?: string; pieceIndex?: number; totalPieces?: number }) =>
     ipcRenderer.invoke('inscribe-stamp', payload),
-  inscribeDocumentHash: (payload: { hashes: Array<{ file: string; sha256: string }>; provider: 'local' | 'handcash' }) =>
+  inscribeDocumentHash: (payload: { hashes: Array<{ file: string; sha256: string }>; provider: 'local' | 'handcash' | 'metanet' }) =>
     ipcRenderer.invoke('inscribe-document-hash', payload),
+  inscribeBitTrust: (payload: {
+    contentHash: string;
+    tier: number;
+    title: string;
+    filing?: string;
+    identityRef?: string;
+    provider: 'local' | 'handcash' | 'metanet';
+  }) => ipcRenderer.invoke('inscribe-bittrust', payload),
   mintStampToken: (payload: { path: string; hash: string; name: string; iconDataB64?: string; iconContentType?: string }) =>
     ipcRenderer.invoke('mint-stamp-token', payload),
   batchMintTokens: (pieces: Array<{ path: string; hash: string; name: string; iconDataB64?: string; iconContentType?: string }>) =>
