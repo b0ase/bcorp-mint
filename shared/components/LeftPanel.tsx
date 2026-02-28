@@ -532,7 +532,7 @@ export default function LeftPanel({
 
   const filteredImages = useMemo(
     () => images.filter((img) =>
-      !img.originMode || img.originMode === mode || img.tags?.includes(mode)
+      img.originMode === mode || img.tags?.includes(mode)
     ),
     [images, mode],
   );
