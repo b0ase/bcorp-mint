@@ -22,12 +22,16 @@ export async function resolveUserHandle(request: NextRequest): Promise<string | 
         }
     }
 
-    // 1. Try the handle cookie (fast path)
-    const handleCookie = request.cookies.get('handcash_handle')?.value;
+    // 1. Try the handle cookie (fast path — b0ase wallet conventions)
+    const handleCookie =
+        request.cookies.get('handcash_handle')?.value ??
+        request.cookies.get('b0ase_user_handle')?.value;
     if (handleCookie) return handleCookie;
 
     // 2. Fall back to auth token -> HandCash API lookup
-    const authToken = request.cookies.get('handcash_auth_token')?.value;
+    const authToken =
+        request.cookies.get('handcash_auth_token')?.value ??
+        request.cookies.get('b0ase_handcash_token')?.value;
     if (!authToken) return null;
 
     try {
