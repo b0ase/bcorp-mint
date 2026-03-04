@@ -12,3 +12,5 @@ website/.next/
 
 # Confidential patent filings — NEVER commit
 UKIPO-*
+.vercel
+.env*.local
