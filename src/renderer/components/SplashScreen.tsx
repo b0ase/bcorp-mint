@@ -8,7 +8,7 @@ export default function SplashScreen({ onEnter }: SplashScreenProps) {
   const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoSrc, setVideoSrc] = useState('/npgx-splash.mp4');
+  const [videoSrc, setVideoSrc] = useState('/video-currency.mp4');
 
   useEffect(() => {
     // In packaged app, resolve splash video from extraResources
@@ -55,7 +55,7 @@ export default function SplashScreen({ onEnter }: SplashScreenProps) {
       />
       <div className="splash-overlay" />
       <div className="splash-content">
-        <div className="splash-badge">THE</div>
+        <div className="splash-badge">THE BITCOIN CORPORATION</div>
         <h1 className="splash-title">Mint</h1>
         <div className="splash-tagline">Design. Print. Stamp. Mint.</div>
         <button className="splash-enter" onClick={handleEnter}>
