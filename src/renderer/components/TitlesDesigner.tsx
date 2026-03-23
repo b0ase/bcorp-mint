@@ -16,14 +16,14 @@ const MODELS = [
 
 // ── Title style presets ────────────────────────────────────────────
 const TITLE_STYLES = [
-  { id: 'cyberpunk', name: 'Cyberpunk', prompt: 'Cinematic title card, neon-lit cyberpunk Tokyo streets, glitch effects, holographic text floating in dark atmosphere, rain, reflections, ultra high quality' },
-  { id: 'dark-punk', name: 'Dark Punk', prompt: 'Dark punk rock title card, graffiti on concrete wall, spray paint dripping letters, leather and chains, smoky red backlight, gritty urban aesthetic' },
+  { id: 'prestige', name: 'Prestige', prompt: 'Cinematic title card, elegant financial institution, gold and black, banknote patterns, glitch effects, holographic text floating in dark atmosphere, rain, reflections, ultra high quality' },
+  { id: 'corporate', name: 'Corporate', prompt: 'Corporate title card, gold foil lettering on black marble, luxury financial aesthetic, premium feel' },
   { id: 'neon', name: 'Neon Glow', prompt: 'Neon sign title card, glowing pink and red neon tubes forming letters against black background, electric sparks, buzzing light, cinematic' },
   { id: 'kinetic', name: 'Kinetic Type', prompt: 'Kinetic typography title sequence, bold white text slamming into frame, motion blur, dynamic camera movement, black background, film grain' },
-  { id: 'anime', name: 'Anime', prompt: 'Anime opening title card, cel-shaded Japanese text, cherry blossoms, speed lines, dramatic lighting, vibrant colors, studio quality animation' },
+  { id: 'elegant', name: 'Elegant', prompt: 'Anime opening title card, cel-shaded Japanese text, cherry blossoms, speed lines, dramatic lighting, vibrant colors, studio quality animation' },
   { id: 'minimal', name: 'Minimal', prompt: 'Minimal elegant title card, clean white text fading in on pure black background, subtle lens flare, cinematic letterboxing, premium feel' },
   { id: 'fire', name: 'Fire', prompt: 'Title card emerging from flames, fire particles, burning edges, ember sparks floating, dark background, intense orange and red glow, cinematic' },
-  { id: 'glitch', name: 'Glitch Art', prompt: 'VHS glitch art title card, corrupted video signal, RGB shift, scan lines, distorted text, retro CRT monitor aesthetic, datamosh effects' },
+  { id: 'digital', name: 'Digital', prompt: 'VHS glitch art title card, corrupted video signal, RGB shift, scan lines, distorted text, retro CRT monitor aesthetic, datamosh effects' },
 ] as const;
 
 type GeneratedTitle = {
@@ -50,8 +50,8 @@ export default function TitlesDesigner({ logos, allImages }: Props) {
   const animRef = useRef<number>(0);
 
   // ── State ──────────────────────────────────────────────────────────
-  const [title, setTitle] = useState('UNDERGROUND EMPRESS');
-  const [subtitle, setSubtitle] = useState('Official Music Video');
+  const [title, setTitle] = useState('THE BITCOIN CORPORATION');
+  const [subtitle, setSubtitle] = useState('Proof of Value');
   const [selectedStyle, setSelectedStyle] = useState(TITLE_STYLES[0]);
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');

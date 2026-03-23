@@ -35,11 +35,11 @@ export default function TicketDesigner({ image, logos }: Props) {
   const [showLogo, setShowLogo] = useState(true);
 
   // Fields
-  const [eventName, setEventName] = useState('UNDERGROUND EMPRESS');
-  const [subtitle, setSubtitle] = useState('Live in Tokyo');
+  const [eventName, setEventName] = useState('THE BITCOIN CORPORATION');
+  const [subtitle, setSubtitle] = useState('Annual Conference 2026');
   const [date, setDate] = useState('2026-04-15');
   const [time, setTime] = useState('21:00');
-  const [venue, setVenue] = useState('Kabukicho Arena');
+  const [venue, setVenue] = useState('Convention Centre');
   const [tier, setTier] = useState('GENERAL ADMISSION');
   const [seat, setSeat] = useState('');
   const [price, setPrice] = useState('0.1 BSV');
