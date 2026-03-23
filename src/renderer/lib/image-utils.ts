@@ -33,7 +33,15 @@ export const loadVideoThumbnail = (
     video.preload = 'auto';
     video.muted = true;
     video.playsInline = true;
-    video.crossOrigin = 'anonymous';
+    // Do NOT set crossOrigin — mint-media:// protocol is local, and crossOrigin taints canvas.toDataURL()
+    // MUST be in the DOM for Electron's mint-media:// custom protocol to work
+    video.style.position = 'fixed';
+    video.style.top = '-9999px';
+    video.style.left = '-9999px';
+    video.style.width = '320px';
+    video.style.height = '240px';
+    video.style.pointerEvents = 'none';
+    document.body.appendChild(video);
 
     const timeout = setTimeout(() => {
       cleanup();
@@ -45,6 +53,7 @@ export const loadVideoThumbnail = (
       video.pause();
       video.removeAttribute('src');
       video.load();
+      video.remove();
     };
 
     video.onloadeddata = () => {

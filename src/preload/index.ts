@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('mint', {
+  loadNpgxMedia: () => ipcRenderer.invoke('load-npgx-media'),
+  getSplashVideo: () => ipcRenderer.invoke('get-splash-video'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openImages: () => ipcRenderer.invoke('open-images'),
   openLogo: () => ipcRenderer.invoke('open-logo'),
@@ -30,6 +32,7 @@ contextBridge.exposeInMainWorld('mint', {
 
   // Media extraction
   probeMedia: (filePath: string) => ipcRenderer.invoke('probe-media', filePath),
+  extractThumbnail: (filePath: string) => ipcRenderer.invoke('extract-thumbnail', filePath) as Promise<{ width: number; height: number; dataUrl: string }>,
   extractVideoFrames: (payload: {
     filePath: string;
     outputDir?: string;
@@ -69,64 +72,14 @@ contextBridge.exposeInMainWorld('mint', {
   updateStampReceipt: (id: string, patch: Record<string, unknown>) =>
     ipcRenderer.invoke('update-stamp-receipt', { id, patch }),
 
-  // Wallet (legacy HandCash)
+  // Wallet
   walletConnect: () => ipcRenderer.invoke('wallet-connect'),
   walletStatus: () => ipcRenderer.invoke('wallet-status'),
   walletDisconnect: () => ipcRenderer.invoke('wallet-disconnect'),
 
-  // BitSign auth (desktop → bitcoin-mint.com API)
-  bitsignGetAuth: () => ipcRenderer.invoke('bitsign-get-auth'),
-  bitsignLogin: () => ipcRenderer.invoke('bitsign-login'),
-  bitsignLogout: () => ipcRenderer.invoke('bitsign-logout'),
-
-  // Wallet manager
-  walletListProviders: () => ipcRenderer.invoke('wallet-list-providers'),
-  walletSwitchProvider: (type: string) => ipcRenderer.invoke('wallet-switch-provider', type),
-  walletGetStatus: () => ipcRenderer.invoke('wallet-get-status'),
-
-  // File tokenisation
-  scanFolderTokenise: (folderPath: string) => ipcRenderer.invoke('scan-folder-tokenise', folderPath),
-  tokeniseEstimate: (folderPath: string) => ipcRenderer.invoke('tokenise-estimate', folderPath),
-  tokeniseFolder: (payload: {
-    folderPath: string;
-    stampPath: string;
-    conditions?: Record<string, { condition: string; conditionData: string }>;
-  }) => ipcRenderer.invoke('tokenise-folder', payload),
-
-  // MetaNet
-  metanetEstimate: (folderPath: string) => ipcRenderer.invoke('metanet-estimate', folderPath),
-  metanetCreateTree: (payload: {
-    folderPath: string;
-    stampPath: string;
-    conditions?: Record<string, { condition: string; conditionData: string }>;
-  }) => ipcRenderer.invoke('metanet-create-tree', payload),
-  metanetCreateNode: (payload: {
-    parentTxid: string;
-    parentPath: string;
-    segment: string;
-    filePath?: string;
-    condition?: string;
-    conditionData?: string;
-  }) => ipcRenderer.invoke('metanet-create-node', payload),
-  onMetanetProgress: (callback: (data: { stage: string; completed: number; total: number; currentPath?: string }) => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, data: { stage: string; completed: number; total: number; currentPath?: string }) => callback(data);
-    ipcRenderer.on('metanet-progress', handler);
-    return () => ipcRenderer.removeListener('metanet-progress', handler);
-  },
-
   // Blockchain
   inscribeStamp: (payload: { path: string; hash: string; timestamp: string; parentHash?: string; pieceIndex?: number; totalPieces?: number }) =>
     ipcRenderer.invoke('inscribe-stamp', payload),
-  inscribeDocumentHash: (payload: { hashes: Array<{ file: string; sha256: string }>; provider: 'local' | 'handcash' | 'metanet' }) =>
-    ipcRenderer.invoke('inscribe-document-hash', payload),
-  inscribeBitTrust: (payload: {
-    contentHash: string;
-    tier: number;
-    title: string;
-    filing?: string;
-    identityRef?: string;
-    provider: 'local' | 'handcash' | 'metanet';
-  }) => ipcRenderer.invoke('inscribe-bittrust', payload),
   mintStampToken: (payload: { path: string; hash: string; name: string; iconDataB64?: string; iconContentType?: string }) =>
     ipcRenderer.invoke('mint-stamp-token', payload),
   batchMintTokens: (pieces: Array<{ path: string; hash: string; name: string; iconDataB64?: string; iconContentType?: string }>) =>
@@ -137,24 +90,10 @@ contextBridge.exposeInMainWorld('mint', {
     return () => ipcRenderer.removeListener('mint-progress', handler);
   },
 
-  // Keystore (legacy single key)
+  // Keystore
   keystoreHasKey: () => ipcRenderer.invoke('keystore-has-key'),
   keystoreSaveKey: (wif: string) => ipcRenderer.invoke('keystore-save-key', wif),
   keystoreDeleteKey: () => ipcRenderer.invoke('keystore-delete-key'),
-
-  // HD master key
-  keystoreHasMaster: () => ipcRenderer.invoke('keystore-has-master'),
-  keystoreSetupMaster: (importHex?: string) =>
-    ipcRenderer.invoke('keystore-setup-master', importHex ? { importHex } : undefined),
-  keystoreGetMasterInfo: () => ipcRenderer.invoke('keystore-get-master-info'),
-  keystoreDeriveAddress: (protocol: string, slug: string) =>
-    ipcRenderer.invoke('keystore-derive-address', { protocol, slug }),
-  keystoreExportBackup: (password: string) => ipcRenderer.invoke('keystore-export-backup', password),
-  keystoreImportBackup: (data: string, password: string) =>
-    ipcRenderer.invoke('keystore-import-backup', { data, password }),
-  keystoreBuildManifest: (children: Array<{ protocol: string; slug: string }>) =>
-    ipcRenderer.invoke('keystore-build-manifest', children),
-  keystoreDeleteMaster: () => ipcRenderer.invoke('keystore-delete-master'),
 
   // Mint documents
   listMintDocuments: () => ipcRenderer.invoke('list-mint-documents'),

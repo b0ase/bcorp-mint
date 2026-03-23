@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '@shared/lib/mint-defaults';
-import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '@shared/lib/types';
-import LayerList from '@shared/components/LayerList';
+import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '../lib/mint-defaults';
+import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '../lib/types';
+import LayerList from './LayerList';
 import PatternControls from './PatternControls';
 
 type Props = {
@@ -33,6 +33,8 @@ type Props = {
   animatePreview: boolean;
   onToggleAnimate: () => void;
   getThumbnailSrc: (id: string) => string | null;
+  selectedImage?: { url: string; name: string; mediaType: string } | null;
+  onAddImageFromUrl: (src: string, name: string) => void;
 };
 
 const LAYER_TYPES: { type: MintLayerConfig['type']; label: string; group: string }[] = [
@@ -70,7 +72,8 @@ export default function MintPanel({
   onUpdateTransform, onDuplicateLayer, onSelectLayer, onSetCanvasSize,
   onSetBackgroundColor, onSetDocMeta, onSetUvMode, onUndo, onRedo,
   onLoadDocument, onExportPng, onExportBatchPng, showGrid, onToggleGrid,
-  animatePreview, onToggleAnimate, getThumbnailSrc
+  animatePreview, onToggleAnimate, getThumbnailSrc,
+  selectedImage, onAddImageFromUrl
 }: Props) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -84,6 +87,197 @@ export default function MintPanel({
   const [batchCount, setBatchCount] = useState(10);
   const [batchStatus, setBatchStatus] = useState('');
   const [stampResult, setStampResult] = useState('');
+
+  // Fund & Mint state
+  const [mintMode, setMintMode] = useState<'burn' | 'lock' | 'hash'>('burn');
+  const [denomination, setDenomination] = useState(1);
+  const [lockUntil, setLockUntil] = useState('');
+  const [isBurning, setIsBurning] = useState(false);
+  const [burnTxid, setBurnTxid] = useState<string | null>(null);
+  const [burnError, setBurnError] = useState('');
+
+  const handleBurnAndMint = async () => {
+    setIsBurning(true);
+    setBurnError('');
+    try {
+      const hasKey = await window.mint.keystoreHasKey();
+      if (!hasKey && mintMode !== 'hash') {
+        setBurnError('No private key loaded. Connect wallet or import key first.');
+        setIsBurning(false);
+        return;
+      }
+
+      const modeLabel = mintMode === 'burn' ? 'BURN' : mintMode === 'lock' ? 'LOCK' : 'HASH';
+      const stampPath = `$MINT/${modeLabel}/${denomination}BSV`;
+      const timestamp = new Date().toISOString();
+      const hash = `${mintMode}-${denomination}-${Date.now()}`;
+
+      let txid: string;
+
+      if (mintMode === 'hash') {
+        // Hash To Mint — no BSV spent, just inscribe the hash
+        const dataUrl = onExportPng();
+        if (!dataUrl) throw new Error('Export failed');
+        const filePath = await window.mint.exportMintPng({ dataUrl, defaultName: `${denomination}bsv-note` });
+        if (!filePath) throw new Error('Save failed');
+        const fileHash = await window.mint.hashFile(filePath);
+        const result = await window.mint.inscribeStamp({
+          path: stampPath,
+          hash: fileHash.hash,
+          timestamp,
+        });
+        txid = result.txid;
+      } else {
+        // Burn or Lock — inscribe with value
+        const result = await window.mint.inscribeStamp({
+          path: stampPath,
+          hash: mintMode === 'lock' ? `lock-until:${lockUntil || 'indefinite'}|${hash}` : hash,
+          timestamp,
+        });
+        txid = result.txid;
+      }
+      setBurnTxid(txid);
+
+      const serialText = txid.slice(0, 12).toUpperCase();
+      const denomText = `${denomination} BSV`;
+      const verifyUrl = `https://whatsonchain.com/tx/${txid}`;
+
+      // Update doc name
+      onSetDocMeta({ name: `${denomText} Note — SN:${serialText}` });
+
+      // Auto-add QR code layer with TXID for verification
+      onAddLayer('qr-code');
+      // Auto-add serial number layer
+      onAddLayer('serial-number');
+      // Auto-add denomination text layer
+      onAddLayer('text');
+      // Auto-add issuer text layer
+      onAddLayer('text');
+
+      // Update the configs after a tick (layers need to be added first)
+      setTimeout(() => {
+        const layers = doc.layers;
+        // Find the newly added layers (they'll be at the end)
+        const qrLayer = [...layers].reverse().find(l => l.type === 'qr-code');
+        const serialLayer = [...layers].reverse().find(l => l.type === 'serial-number');
+        const textLayer = [...layers].reverse().find(l => l.type === 'text' && l.name === 'Text');
+
+        if (qrLayer) {
+          onUpdateConfig(qrLayer.id, { text: verifyUrl, size: 0.12, x: 0.88, y: 0.85, color: '#ffffff', backgroundColor: '#000000' });
+        }
+        if (serialLayer) {
+          onUpdateConfig(serialLayer.id, { prefix: 'SN', startNumber: parseInt(txid.slice(0, 8), 16) % 1000000, digits: 6, x: 0.12, y: 0.92, fontSize: 18 });
+        }
+        // Find both text layers (denomination and issuer)
+        const textLayers = [...layers].reverse().filter(l => l.type === 'text' && l.name === 'Text');
+        if (textLayers[0]) {
+          onUpdateConfig(textLayers[0].id, { text: denomText, fontSize: 72, fontWeight: 900, color: '#ffffff', letterSpacing: 12, x: 0.5, y: 0.15, align: 'center' });
+          onUpdateMeta(textLayers[0].id, { name: 'Denomination' });
+        }
+        if (textLayers[1]) {
+          // Get wallet handle for issuer
+          window.mint.walletStatus().then((ws) => {
+            const issuer = ws.connected && ws.handle ? ws.handle : 'Bitcoin Corporation';
+            onUpdateConfig(textLayers[1].id, { text: `Issued by ${issuer}`, fontSize: 14, fontWeight: 500, color: '#ffffff', letterSpacing: 4, x: 0.5, y: 0.97, align: 'center' });
+            onUpdateMeta(textLayers[1].id, { name: 'Issuer' });
+          }).catch(() => {
+            onUpdateConfig(textLayers[1].id, { text: 'Issued by Bitcoin Corporation', fontSize: 14, fontWeight: 500, color: '#ffffff', letterSpacing: 4, x: 0.5, y: 0.97, align: 'center' });
+            onUpdateMeta(textLayers[1].id, { name: 'Issuer' });
+          });
+        }
+      }, 100);
+
+    } catch (err) {
+      setBurnError(err instanceof Error ? err.message : 'Burn failed');
+    }
+    setIsBurning(false);
+  };
+
+  const handleExportNote = async (side: 'front' | 'back') => {
+    if (side === 'front') {
+      // Export current design as the front
+      const dataUrl = onExportPng();
+      if (dataUrl) {
+        await window.mint.saveFile(dataUrl, undefined, `${doc.name || 'note'}-front.png`);
+      }
+    } else {
+      // Generate back side with verification info
+      const canvas = document.createElement('canvas');
+      canvas.width = doc.width;
+      canvas.height = doc.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Background
+      ctx.fillStyle = doc.backgroundColor;
+      ctx.fillRect(0, 0, doc.width, doc.height);
+
+      // Subtle pattern
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i < doc.width; i += 20) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, doc.height); ctx.stroke();
+      }
+      for (let i = 0; i < doc.height; i += 20) {
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(doc.width, i); ctx.stroke();
+      }
+
+      const cx = doc.width / 2;
+      const cy = doc.height / 2;
+
+      // Title
+      ctx.font = '900 48px Impact, Arial Black, sans-serif';
+      ctx.fillStyle = '#ff0040';
+      ctx.textAlign = 'center';
+      ctx.fillText('BITCOIN CORPORATION', cx, doc.height * 0.08);
+
+      ctx.font = '300 18px Helvetica Neue, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillText('CERTIFICATE OF VALUE DESTRUCTION', cx, doc.height * 0.12);
+
+      // Denomination
+      ctx.font = `900 ${doc.width * 0.12}px Impact, Arial Black, sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`${denomination} BSV`, cx, doc.height * 0.3);
+
+      // TXID
+      ctx.font = '500 14px IBM Plex Mono, monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText(`TXID: ${burnTxid}`, cx, doc.height * 0.38);
+
+      // Serial
+      ctx.font = '700 24px IBM Plex Mono, monospace';
+      ctx.fillStyle = '#ff0040';
+      ctx.fillText(`SN: ${burnTxid!.slice(0, 12).toUpperCase()}`, cx, doc.height * 0.44);
+
+      // Legal text
+      ctx.font = '400 11px Helvetica Neue, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      const legal = [
+        'This note certifies the permanent, irrevocable destruction of the',
+        `denomination amount (${denomination} BSV) on the Bitcoin SV blockchain.`,
+        'The burn transaction is publicly verifiable via the QR code or TXID above.',
+        'This certificate was produced by the NPGX Mint — a tool of the Bitcoin Corporation.',
+        `Issued: ${new Date().toISOString().split('T')[0]}`,
+      ];
+      legal.forEach((line, i) => {
+        ctx.fillText(line, cx, doc.height * 0.8 + i * 16);
+      });
+
+      // Protocol marks
+      ctx.font = '700 12px Helvetica Neue, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,0,64,0.4)';
+      ctx.fillText('$401 · $402 · $403', cx, doc.height * 0.95);
+
+      // Verify URL
+      ctx.font = '500 13px IBM Plex Mono, monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillText(`Verify: whatsonchain.com/tx/${burnTxid!.slice(0, 20)}...`, cx, doc.height * 0.97);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      await window.mint.saveFile(dataUrl, undefined, `${doc.name || 'note'}-back.png`);
+    }
+  };
 
   const refreshSavedDocs = useCallback(async () => {
     const docs = await window.mint.listMintDocuments();
@@ -357,6 +551,172 @@ export default function MintPanel({
           {batchStatus && <div className="small" style={{ marginTop: 4 }}>{batchStatus}</div>}
         </div>
       )}
+
+      {/* Image Controls — always visible when an image layer exists */}
+      {(() => {
+        const imgLayer = doc.layers.find(l => l.type === 'image');
+        if (!imgLayer) return null;
+        const ic = imgLayer.config as { src: string; fit: string; x: number; y: number; scale: number };
+        return (
+          <div className="section">
+            <h3 style={{ color: 'var(--accent)' }}>Image</h3>
+            <div className="control-group">
+              <label className="control-row">
+                <span>Zoom</span>
+                <input type="range" min={0.2} max={4} step={0.05} value={ic.scale}
+                  onChange={(e) => onUpdateConfig(imgLayer.id, { scale: Number(e.target.value) })} />
+                <span className="small" style={{ minWidth: 36, textAlign: 'right' }}>{Math.round(ic.scale * 100)}%</span>
+              </label>
+              <label className="control-row">
+                <span>X</span>
+                <input type="range" min={-0.5} max={1.5} step={0.01} value={ic.x}
+                  onChange={(e) => onUpdateConfig(imgLayer.id, { x: Number(e.target.value) })} />
+                <span className="small" style={{ minWidth: 36, textAlign: 'right' }}>{Math.round(ic.x * 100)}%</span>
+              </label>
+              <label className="control-row">
+                <span>Y</span>
+                <input type="range" min={-0.5} max={1.5} step={0.01} value={ic.y}
+                  onChange={(e) => onUpdateConfig(imgLayer.id, { y: Number(e.target.value) })} />
+                <span className="small" style={{ minWidth: 36, textAlign: 'right' }}>{Math.round(ic.y * 100)}%</span>
+              </label>
+              <label className="control-row">
+                <span>Fit</span>
+                <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                  {(['cover', 'contain', 'fill'] as const).map(mode => (
+                    <button key={mode} className={ic.fit === mode ? 'active' : 'secondary'}
+                      onClick={() => onUpdateConfig(imgLayer.id, { fit: mode })}
+                      style={{ flex: 1, padding: '3px 0', fontSize: 10, fontWeight: 600 }}>
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </label>
+              <label className="control-row">
+                <span>Opacity</span>
+                <input type="range" min={0.1} max={1} step={0.05} value={imgLayer.opacity}
+                  onChange={(e) => onUpdateMeta(imgLayer.id, { opacity: Number(e.target.value) })} />
+                <span className="small" style={{ minWidth: 36, textAlign: 'right' }}>{Math.round(imgLayer.opacity * 100)}%</span>
+              </label>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Fund & Mint — Mode + Denomination + Action */}
+      <div className="section">
+        <h3 style={{ color: 'var(--accent)' }}>Fund &amp; Mint</h3>
+
+        {/* Mint mode selector */}
+        <div style={{ display: 'flex', gap: 2, marginBottom: 8, background: 'var(--panel-2)', borderRadius: 6, padding: 2 }}>
+          {([
+            { id: 'burn' as const, label: 'Burn', desc: 'Destroy BSV' },
+            { id: 'lock' as const, label: 'Lock', desc: 'Timelock BSV' },
+            { id: 'hash' as const, label: 'Hash', desc: 'Proof only' },
+          ]).map(m => (
+            <button key={m.id} onClick={() => setMintMode(m.id)}
+              title={m.desc}
+              style={{
+                flex: 1, padding: '5px 0', border: 'none', borderRadius: 4, cursor: 'pointer',
+                fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
+                background: mintMode === m.id ? (m.id === 'burn' ? 'var(--accent)' : m.id === 'lock' ? '#f7931a' : '#00e5ff') : 'transparent',
+                color: mintMode === m.id ? '#fff' : 'var(--muted)',
+              }}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="small" style={{ marginBottom: 8, lineHeight: 1.5 }}>
+          {mintMode === 'burn' && 'Permanently destroy BSV. Highest trust — value is irrevocably gone.'}
+          {mintMode === 'lock' && 'Lock BSV to a timelock. Redeemable after expiry — like a bond.'}
+          {mintMode === 'hash' && 'Hash the design on-chain. No BSV spent — proof of existence only.'}
+        </div>
+
+        {/* Lock date picker */}
+        {mintMode === 'lock' && (
+          <label className="control-row" style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 11 }}>Lock Until</span>
+            <input type="date" value={lockUntil} onChange={e => setLockUntil(e.target.value)}
+              style={{ flex: 1, background: 'var(--panel-2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, padding: '4px 8px', color: '#fff', fontSize: 11 }} />
+          </label>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 8 }}>
+          {[0.001, 0.01, 0.1, 1, 10, 100].map((amt) => (
+            <button
+              key={amt}
+              className={denomination === amt ? 'active' : 'secondary'}
+              onClick={() => {
+                setDenomination(amt);
+                setBurnTxid(null);
+                setBurnError('');
+                // Load denomination template, then re-insert current image
+                const templateIds: Record<number, string> = { 0.001: 'note-001', 0.01: 'note-01', 0.1: 'note-1', 1: 'note-1bsv', 10: 'note-10bsv', 100: 'note-100bsv' };
+                const tid = templateIds[amt];
+                if (tid) {
+                  const tpl = MINT_TEMPLATES.find(t => t.id === tid);
+                  if (tpl) {
+                    onLoadDocument(tpl.factory());
+                    // Re-add the selected image after template loads
+                    setTimeout(() => {
+                      const img = selectedImage;
+                      if (img && img.mediaType !== 'audio' && img.url) {
+                        onAddImageFromUrl(img.url, img.name);
+                      }
+                    }, 50);
+                  }
+                }
+              }}
+              style={{
+                padding: '6px 0', fontSize: 11, fontWeight: 700,
+                fontFamily: "'IBM Plex Mono', monospace",
+                background: denomination === amt ? 'var(--accent)' : undefined,
+                borderColor: denomination === amt ? 'var(--accent)' : undefined,
+              }}
+            >
+              {amt >= 1 ? `${amt} BSV` : `${amt} BSV`}
+            </button>
+          ))}
+        </div>
+        {burnTxid ? (
+          <div style={{ background: 'rgba(0,255,65,0.08)', border: '1px solid rgba(0,255,65,0.2)', borderRadius: 6, padding: 8, marginBottom: 6 }}>
+            <div className="small" style={{ color: '#00ff41', fontWeight: 700, marginBottom: 4 }}>
+              {mintMode === 'burn' ? 'BURNED & MINTED' : mintMode === 'lock' ? 'LOCKED & MINTED' : 'HASHED & MINTED'}
+            </div>
+            <div className="small" style={{ fontFamily: "'IBM Plex Mono', monospace", wordBreak: 'break-all' }}>
+              TXID: {burnTxid}
+            </div>
+            <div className="small" style={{ marginTop: 4 }}>
+              {mintMode === 'burn' ? 'Burned' : mintMode === 'lock' ? `Locked${lockUntil ? ` until ${lockUntil}` : ''}` : 'Hashed'}: {denomination} BSV &middot; Serial: {burnTxid.slice(0, 12).toUpperCase()}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleBurnAndMint}
+            disabled={isBurning}
+            style={{
+              width: '100%', padding: '8px 0',
+              background: isBurning ? 'var(--panel-2)' : mintMode === 'burn' ? 'linear-gradient(135deg, #ff0040, #cc0033)' : mintMode === 'lock' ? 'linear-gradient(135deg, #f7931a, #cc7700)' : 'linear-gradient(135deg, #00e5ff, #0099aa)',
+              border: 'none', borderRadius: 6, color: '#fff',
+              fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: 2, cursor: isBurning ? 'wait' : 'pointer',
+            }}
+          >
+            {isBurning ? 'Minting...' : mintMode === 'burn' ? `Burn ${denomination} BSV & Mint` : mintMode === 'lock' ? `Lock ${denomination} BSV & Mint` : `Hash & Mint`}
+          </button>
+        )}
+        {burnError && <div className="small" style={{ color: 'var(--danger)', marginTop: 4 }}>{burnError}</div>}
+
+        {burnTxid && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+            <button className="secondary" onClick={() => handleExportNote('front')} style={{ flex: 1, fontSize: 10 }}>
+              Export Front
+            </button>
+            <button className="secondary" onClick={() => handleExportNote('back')} style={{ flex: 1, fontSize: 10 }}>
+              Export Back
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Export + Stamp + Mint */}
       <div className="section">

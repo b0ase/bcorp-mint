@@ -4,23 +4,22 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey, hasMasterKey, saveMasterKey, loadMasterKey, deleteMasterKey, migrateLegacyKey, exportMasterKeyBackup, importMasterKeyBackup } from './keystore';
-import { inscribeStamp, inscribeDocumentHash, inscribeBitTrust } from './bsv';
-import { getRedirectUrl, getOAuthUrl, startOAuthFlow, getWalletState, getBitsignAuthState, loadPersistedAuth, disconnect as walletDisconnect } from './handcash';
-import { mintStampToken, batchMintTokens, assertLocalProvider } from './token-mint';
-import { generateMasterKey, deriveChildInfo, getMasterKeyInfo, buildManifest } from './wallet-derivation';
-import { WalletManager } from './wallet-manager';
-import type { WalletProviderType } from './wallet-provider';
-import { estimateTreeCost, buildMetaNetTree, createRootNode, createChildNode } from './metanet';
-import { scanFolder as scanFolderForTokenise, hashFolder, countNodes as countFsNodes } from './fs-tokenise';
-
-const walletManager = new WalletManager();
-import { probeMedia, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
+import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey } from './keystore';
+import { inscribeStamp } from './bsv';
+import { getRedirectUrl, getWalletState, disconnect as walletDisconnect } from './handcash';
+import { mintStampToken, batchMintTokens } from './token-mint';
+import { probeMedia, extractThumbnail, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isDev = !app.isPackaged;
+
+// Fix V8 CodeRange OOM crash in packaged builds on macOS
+// The 'no-sandbox' flag prevents the V8 CodeRange virtual memory reservation failure
+// that occurs when the app is code-signed with hardened runtime on macOS
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
 // Must be called BEFORE app.ready — allows renderer to load from mint-media:// URLs
 protocol.registerSchemesAsPrivileged([
@@ -71,7 +70,7 @@ function createWindow() {
   const preloadPath = path.join(__dirname, '../preload/index.cjs');
 
   const win = new BrowserWindow({
-    title: 'The Bitcoin Corporation Mint',
+    title: 'The Mint',
     width: 1280,
     height: 800,
     minWidth: 960,
@@ -92,15 +91,13 @@ function createWindow() {
     } else {
       win.loadURL('http://localhost:5173');
     }
+    win.webContents.openDevTools({ mode: 'bottom' });
   } else {
     win.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 }
 
-app.whenReady().then(async () => {
-  // Load any persisted HandCash auth (BitSign sessions survive restart)
-  await loadPersistedAuth();
-
+app.whenReady().then(() => {
   // Register custom protocol for streaming local media files (used for video playback)
   protocol.handle('mint-media', async (request) => {
     try {
@@ -133,6 +130,39 @@ app.on('window-all-closed', () => {
 registerCleanupOnQuit();
 
 // --------------- IPC handlers ---------------
+
+// Splash video path
+ipcMain.handle('get-splash-video', async () => {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'npgx-splash.mp4');
+  }
+  return ''; // dev mode uses vite public/ folder
+});
+
+// Auto-load bundled NPGX media
+ipcMain.handle('load-npgx-media', async () => {
+  const mediaDir = isDev
+    ? path.join(__dirname, '../../resources/npgx-media')
+    : path.join(process.resourcesPath, 'npgx-media');
+  try {
+    const dirs = ['videos', 'music'];
+    const files: string[] = [];
+    for (const sub of dirs) {
+      const dir = path.join(mediaDir, sub);
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.isFile() && SUPPORTED_EXT.has(path.extname(e.name).toLowerCase())) {
+            files.push(path.join(dir, e.name));
+          }
+        }
+      } catch { /* dir may not exist */ }
+    }
+    return files;
+  } catch {
+    return [];
+  }
+});
 
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
@@ -374,12 +404,10 @@ ipcMain.handle('update-stamp-receipt', async (_e, payload: { id: string; patch: 
 
 ipcMain.handle('wallet-connect', async () => {
   try {
-    // Start OAuth flow (sets up callback server) and open browser
-    const flowPromise = startOAuthFlow();
-    await shell.openExternal(getOAuthUrl());
-    // Wait until the callback arrives with the token
-    const result = await flowPromise;
-    return { connected: true, handle: result.handle, authToken: result.authToken, balance: null };
+    const url = await getRedirectUrl();
+    await shell.openExternal(url);
+    // Wait for callback (profile will be populated)
+    return getWalletState();
   } catch (err) {
     console.error('[wallet-connect]', err);
     return getWalletState();
@@ -389,29 +417,7 @@ ipcMain.handle('wallet-connect', async () => {
 ipcMain.handle('wallet-status', async () => getWalletState());
 
 ipcMain.handle('wallet-disconnect', async () => {
-  await walletDisconnect();
-});
-
-// --------------- BitSign auth handlers (desktop → bitcoin-mint.com API) ---------------
-
-ipcMain.handle('bitsign-get-auth', async () => {
-  return getBitsignAuthState();
-});
-
-ipcMain.handle('bitsign-login', async () => {
-  try {
-    const flowPromise = startOAuthFlow();
-    await shell.openExternal(getOAuthUrl());
-    const result = await flowPromise;
-    return { handle: result.handle, authToken: result.authToken };
-  } catch (err) {
-    console.error('[bitsign-login]', err);
-    return null;
-  }
-});
-
-ipcMain.handle('bitsign-logout', async () => {
-  await walletDisconnect();
+  walletDisconnect();
 });
 
 // --------------- Blockchain handlers ---------------
@@ -424,42 +430,7 @@ ipcMain.handle('inscribe-stamp', async (_e, payload: {
   pieceIndex?: number;
   totalPieces?: number;
 }) => {
-  // Route through active wallet provider if it supports createAction (BRC-100)
-  const active = walletManager.getActive();
-  return inscribeStamp({
-    ...payload,
-    provider: active.supportsCreateAction ? active : undefined,
-  });
-});
-
-ipcMain.handle('inscribe-document-hash', async (_e, payload: {
-  hashes: Array<{ file: string; sha256: string }>;
-  provider: 'local' | 'handcash' | 'metanet';
-}) => {
-  const activeType = walletManager.getActiveType();
-  const active = walletManager.getActive();
-  return inscribeDocumentHash({
-    ...payload,
-    provider: activeType === 'metanet' ? 'metanet' : payload.provider,
-    walletProvider: active.supportsCreateAction ? active : undefined,
-  });
-});
-
-ipcMain.handle('inscribe-bittrust', async (_e, payload: {
-  contentHash: string;
-  tier: number;
-  title: string;
-  filing?: string;
-  identityRef?: string;
-  provider: 'local' | 'handcash' | 'metanet';
-}) => {
-  const activeType = walletManager.getActiveType();
-  const active = walletManager.getActive();
-  return inscribeBitTrust({
-    ...payload,
-    provider: activeType === 'metanet' ? 'metanet' : payload.provider,
-    walletProvider: active.supportsCreateAction ? active : undefined,
-  });
+  return inscribeStamp(payload);
 });
 
 ipcMain.handle('mint-stamp-token', async (_e, payload: {
@@ -469,7 +440,6 @@ ipcMain.handle('mint-stamp-token', async (_e, payload: {
   iconDataB64?: string;
   iconContentType?: string;
 }) => {
-  assertLocalProvider(walletManager.getActiveType());
   return mintStampToken(payload);
 });
 
@@ -480,7 +450,6 @@ ipcMain.handle('batch-mint-tokens', async (_e, pieces: Array<{
   iconDataB64?: string;
   iconContentType?: string;
 }>) => {
-  assertLocalProvider(walletManager.getActiveType());
   return batchMintTokens(pieces);
 });
 
@@ -488,6 +457,10 @@ ipcMain.handle('batch-mint-tokens', async (_e, pieces: Array<{
 
 ipcMain.handle('probe-media', async (_e, filePath: string) => {
   return probeMedia(filePath);
+});
+
+ipcMain.handle('extract-thumbnail', async (_e, filePath: string) => {
+  return extractThumbnail(filePath);
 });
 
 ipcMain.handle('extract-video-frames', async (_e, payload: {
@@ -540,148 +513,6 @@ ipcMain.handle('cleanup-extraction', async (_e, dir: string) => {
 ipcMain.handle('keystore-has-key', async () => hasPrivateKey());
 ipcMain.handle('keystore-save-key', async (_e, wif: string) => savePrivateKey(wif));
 ipcMain.handle('keystore-delete-key', async () => deletePrivateKey());
-
-// --------------- Master key / HD wallet handlers ---------------
-
-ipcMain.handle('keystore-has-master', async () => hasMasterKey());
-
-ipcMain.handle('keystore-setup-master', async (_e, payload?: { importHex?: string }) => {
-  if (payload?.importHex) {
-    await saveMasterKey(payload.importHex);
-  } else {
-    // Try migration first, then generate new
-    const migrated = await migrateLegacyKey();
-    if (!migrated) {
-      const hex = generateMasterKey();
-      await saveMasterKey(hex);
-    }
-  }
-  const masterHex = await loadMasterKey();
-  return getMasterKeyInfo(masterHex);
-});
-
-ipcMain.handle('keystore-get-master-info', async () => {
-  if (!(await hasMasterKey())) return null;
-  const masterHex = await loadMasterKey();
-  return getMasterKeyInfo(masterHex);
-});
-
-ipcMain.handle('keystore-derive-address', async (_e, payload: { protocol: string; slug: string }) => {
-  const masterHex = await loadMasterKey();
-  return deriveChildInfo(masterHex, payload.protocol, payload.slug);
-});
-
-ipcMain.handle('keystore-export-backup', async (_e, password: string) => {
-  return exportMasterKeyBackup(password);
-});
-
-ipcMain.handle('keystore-import-backup', async (_e, payload: { data: string; password: string }) => {
-  const hex = importMasterKeyBackup(payload.data, payload.password);
-  await saveMasterKey(hex);
-  return getMasterKeyInfo(hex);
-});
-
-ipcMain.handle('keystore-build-manifest', async (_e, children: Array<{ protocol: string; slug: string }>) => {
-  const masterHex = await loadMasterKey();
-  return buildManifest(masterHex, children);
-});
-
-ipcMain.handle('keystore-delete-master', async () => {
-  await deleteMasterKey();
-});
-
-// --------------- Wallet manager handlers ---------------
-
-ipcMain.handle('wallet-list-providers', async () => {
-  return walletManager.detectAvailableProviders();
-});
-
-ipcMain.handle('wallet-switch-provider', async (_e, type: WalletProviderType) => {
-  return walletManager.switchProvider(type);
-});
-
-ipcMain.handle('wallet-get-status', async () => {
-  return walletManager.getStatus();
-});
-
-// --------------- MetaNet handlers ---------------
-
-ipcMain.handle('metanet-estimate', async (_e, folderPath: string) => {
-  return estimateTreeCost(folderPath);
-});
-
-ipcMain.handle('metanet-create-tree', async (_e, payload: {
-  folderPath: string;
-  stampPath: string;
-  conditions?: Record<string, { condition: string; conditionData: string }>;
-}) => {
-  const masterHex = await loadMasterKey();
-  const conditionsMap = payload.conditions
-    ? new Map(Object.entries(payload.conditions))
-    : undefined;
-  return buildMetaNetTree(masterHex, payload.folderPath, payload.stampPath, conditionsMap);
-});
-
-// --------------- File tokenisation handlers ---------------
-
-ipcMain.handle('scan-folder-tokenise', async (_e, folderPath: string) => {
-  // No SUPPORTED_EXT filter — accepts ALL file types for tokenisation
-  return scanFolderForTokenise(folderPath);
-});
-
-ipcMain.handle('tokenise-estimate', async (_e, folderPath: string) => {
-  const root = await scanFolderForTokenise(folderPath);
-  const nodeCount = countFsNodes(root);
-  return { nodes: nodeCount, estimatedSats: nodeCount * 500 };
-});
-
-ipcMain.handle('tokenise-folder', async (_e, payload: {
-  folderPath: string;
-  stampPath: string;
-  conditions?: Record<string, { condition: string; conditionData: string }>;
-}) => {
-  // Hash all files first, then create MetaNet tree
-  const root = await scanFolderForTokenise(payload.folderPath);
-  const hashed = await hashFolder(root);
-  // MetaNet tree creation is handled by the metanet-create-tree handler
-  const masterHex = await loadMasterKey();
-  const conditionsMap = payload.conditions
-    ? new Map(Object.entries(payload.conditions))
-    : undefined;
-  return buildMetaNetTree(masterHex, payload.folderPath, payload.stampPath, conditionsMap);
-});
-
-ipcMain.handle('metanet-create-node', async (_e, payload: {
-  parentTxid: string;
-  parentPath: string;
-  segment: string;
-  filePath?: string;
-  condition?: string;
-  conditionData?: string;
-}) => {
-  const masterHex = await loadMasterKey();
-  const parentNode = {
-    txid: payload.parentTxid,
-    path: payload.parentPath,
-    segment: '',
-    isDirectory: true,
-    publicKey: '',
-    address: '',
-    parentTxid: '',
-    contentHash: null,
-    contentType: null,
-    condition: '',
-    conditionData: '',
-  };
-  return createChildNode(
-    masterHex,
-    parentNode,
-    payload.segment,
-    payload.filePath ? { filePath: payload.filePath } : undefined,
-    payload.condition || '',
-    payload.conditionData || '',
-  );
-});
 
 // --------------- Mint document handlers ---------------
 
@@ -883,7 +714,7 @@ function buildWanWorkflow(imageName: string, frames: number, fps: number, modelN
     },
     '2': {
       class_type: 'CLIPLoader',
-      inputs: { clip_name: 'umt5_xxl_fp8_e4m3fn_scaled.safetensors', type: 'wan' }
+      inputs: { clip_name: 'umt5_xxl_fp16.safetensors', type: 'wan' }
     },
     '3': {
       class_type: 'CLIPVisionLoader',
@@ -1026,7 +857,7 @@ function sendAnimateProgress(stage: string, percent: number, elapsed: number, de
 
 // Queue a prompt and wait for it to complete, return output info
 async function comfyQueueAndWait(workflow: Record<string, unknown>): Promise<{ images: string[]; videos: string[] }> {
-  const clientId = 'bcorp-mint-' + Date.now();
+  const clientId = 'npgx-mint-' + Date.now();
   const startTime = Date.now();
 
   sendAnimateProgress('Queuing prompt...', 5, 0);

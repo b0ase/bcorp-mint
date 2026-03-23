@@ -1,9 +1,11 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow } from 'electron';
+
+// ffmpeg-static is only available in dev (excluded from asar in packaged builds)
+let ffmpegPath: string | null = null;
+try { ffmpegPath = (await import('ffmpeg-static')).default; } catch { /* packaged — use extraResources */ }
 
 type ProbeResult = {
   duration: number;
@@ -23,29 +25,15 @@ type ExtractOptions = {
   quality?: 'low' | 'medium' | 'high'; // jpeg 60%, jpeg 85%, png
 };
 
-// Lazy-resolved dev path
-let _devFfmpegPath: string | null = null;
-
 function getFfmpegPath(): string {
   // In packaged app, ffmpeg is in extraResources
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'ffmpeg');
+    const resourcePath = path.join(process.resourcesPath, 'ffmpeg');
+    return resourcePath;
   }
-  // In development, resolve ffmpeg binary from node_modules directly
-  // (avoids require('ffmpeg-static') which ESM linker chokes on in asar)
-  if (_devFfmpegPath === null) {
-    const thisDir = path.dirname(fileURLToPath(import.meta.url));
-    // Walk up from out/main/ to project root
-    const root = path.resolve(thisDir, '..', '..');
-    const candidate = path.join(root, 'node_modules', 'ffmpeg-static', 'ffmpeg');
-    if (existsSync(candidate)) {
-      _devFfmpegPath = candidate;
-    } else {
-      throw new Error('ffmpeg-static binary not found at ' + candidate + '. Run: pnpm install');
-    }
-  }
-  if (!_devFfmpegPath) throw new Error('ffmpeg-static binary not found');
-  return _devFfmpegPath;
+  // In development, use ffmpeg-static from node_modules
+  if (!ffmpegPath) throw new Error('ffmpeg-static binary not found');
+  return ffmpegPath;
 }
 
 function ffprobe(filePath: string): Promise<string> {
@@ -58,6 +46,52 @@ function ffprobe(filePath: string): Promise<string> {
     execFile(ffmpeg, ['-i', filePath, '-f', 'null', '-'], { timeout: 10000 }, (err, stdout, stderr) => {
       // ffmpeg -i always exits with error, but stderr has the info
       resolve(stderr || stdout || '');
+    });
+  });
+}
+
+// Fast thumbnail extraction via ffmpeg — grabs one frame without loading entire file
+export async function extractThumbnail(filePath: string): Promise<{ width: number; height: number; dataUrl: string }> {
+  const ffmpeg = getFfmpegPath();
+  const tmpDir = app.getPath('temp');
+  const tmpFile = path.join(tmpDir, `thumb-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
+
+  return new Promise((resolve, reject) => {
+    execFile(ffmpeg, [
+      '-ss', '0.5',           // seek to 0.5s (fast, no full decode)
+      '-i', filePath,
+      '-vframes', '1',        // one frame only
+      '-q:v', '6',            // jpeg quality (2=best, 31=worst, 6=good enough for thumb)
+      '-vf', 'scale=640:-2',  // max 640px wide, keep aspect
+      '-y', tmpFile
+    ], { timeout: 10000 }, async (err) => {
+      if (err) {
+        // Try without -ss (some formats don't support seeking)
+        execFile(ffmpeg, [
+          '-i', filePath,
+          '-vframes', '1',
+          '-q:v', '6',
+          '-vf', 'scale=640:-2',
+          '-y', tmpFile
+        ], { timeout: 15000 }, async (err2) => {
+          if (err2) return reject(new Error('Failed to extract thumbnail'));
+          try {
+            const buf = await fs.readFile(tmpFile);
+            const dataUrl = `data:image/jpeg;base64,${buf.toString('base64')}`;
+            // Get dimensions from the jpeg
+            // Quick parse: assume 640xH from scale filter
+            await fs.unlink(tmpFile).catch(() => {});
+            resolve({ width: 640, height: 360, dataUrl });
+          } catch (e) { reject(e); }
+        });
+        return;
+      }
+      try {
+        const buf = await fs.readFile(tmpFile);
+        const dataUrl = `data:image/jpeg;base64,${buf.toString('base64')}`;
+        await fs.unlink(tmpFile).catch(() => {});
+        resolve({ width: 640, height: 360, dataUrl });
+      } catch (e) { reject(e); }
     });
   });
 }

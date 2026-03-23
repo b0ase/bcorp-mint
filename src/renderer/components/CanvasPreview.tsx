@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { ImageSettings, LogoAsset, Spread } from '@shared/lib/types';
+import type { ImageSettings, LogoAsset, Spread, TextOverlay } from '../lib/types';
 import { loadImage } from '../lib/image-utils';
-import { computeContainFit, drawBorderStamp, drawFrame, drawLogo, drawVignette, drawWatermark, getLogoMetrics, type Fit } from '@shared/lib/render';
+import { computeContainFit, drawBorderStamp, drawFrame, drawLogo, drawTextOverlays, drawVignette, drawWatermark, getLogoMetrics, hitTestTextOverlay, type Fit } from '../lib/render';
 
 const CANVAS_BG = '#0a0a0a';
 const GUTTER = 0;
@@ -20,16 +20,19 @@ type CanvasPreviewProps = {
   selectedId: string | null;
   logos: LogoAsset[];
   pageNumber?: number;
+  selectedTextId?: string | null;
   onLogoPosChange?: (pos: { x: number; y: number }) => void;
   onSelectImage?: (id: string) => void;
+  onTextOverlayPosChange?: (overlayId: string, pos: { x: number; y: number }) => void;
+  onSelectTextOverlay?: (id: string | null) => void;
   wrapperClassName?: string;
 };
 
-export default function CanvasPreview({ spread, selectedId, logos, pageNumber, onLogoPosChange, onSelectImage, wrapperClassName }: CanvasPreviewProps) {
+export default function CanvasPreview({ spread, selectedId, logos, pageNumber, selectedTextId, onLogoPosChange, onSelectImage, onTextOverlayPosChange, onSelectTextOverlay, wrapperClassName }: CanvasPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pagesRef = useRef<PageSlot[]>([]);
-  const dragRef = useRef<{ pageId: string; offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<{ pageId: string; offsetX: number; offsetY: number; type: 'logo' | 'text'; textId?: string } | null>(null);
 
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -57,12 +60,15 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
       if (logo) urlsToLoad.push({ key: `logo-${item.id}`, src: logo.src });
     }
 
+    console.log('[canvas] loading images:', urlsToLoad.map(u => `${u.key}: ${u.src.slice(0, 60)}`));
     Promise.all(
       urlsToLoad.map(async ({ key, src }) => {
         try {
           const el = await loadImage(src);
+          console.log('[canvas] loaded', key, el.naturalWidth, 'x', el.naturalHeight);
           return [key, el] as [string, HTMLImageElement];
-        } catch {
+        } catch (err) {
+          console.error('[canvas] FAILED to load', key, src.slice(0, 80), err);
           return null;
         }
       })
@@ -121,9 +127,11 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
     const isPair = spreadItems.length === 2;
     const gutterTotal = isPair ? GUTTER : 0;
 
+    console.log('[canvas] drawing spread, items:', spreadItems.length, 'loadedImages:', loadedImages.size, 'keys:', [...loadedImages.keys()]);
     for (let i = 0; i < spreadItems.length; i++) {
       const item = spreadItems[i];
       const img = loadedImages.get(`img-${item.id}`);
+      console.log('[canvas] item', i, item.id, 'img:', !!img, 'url:', item.url?.slice(0, 80));
       if (!img) continue;
 
       const logo = loadedImages.get(`logo-${item.id}`) || null;
@@ -197,6 +205,17 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
         );
       }
 
+      // Text overlays
+      if (settings.textOverlays && settings.textOverlays.length > 0) {
+        const imgW = img.naturalWidth || img.width;
+        const imgH = img.naturalHeight || img.height;
+        drawTextOverlays(
+          ctx, settings.textOverlays, imgW, imgH,
+          dx, dy, fit.scale,
+          id === selectedId ? selectedTextId : null
+        );
+      }
+
       if (logo) {
         const shiftedFit: Fit = { ...fit, offsetX: dx, offsetY: dy };
         const logoRender = drawLogo(ctx, img, logo, settings, shiftedFit);
@@ -238,7 +257,7 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
       ctx.fillText(String(pageNumber), size.width / 2, size.height - 6);
       ctx.restore();
     }
-  }, [loadedImages, size, spreadItems, selectedId, pageNumber]);
+  }, [loadedImages, size, spreadItems, selectedId, selectedTextId, pageNumber]);
 
   // --- Pointer interaction ---
 
@@ -272,13 +291,42 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
       onSelectImage(page.id);
     }
 
-    // Check if clicking on the logo for drag
-    if (!page.logo || !onLogoPosChange || page.id !== selectedId) return;
-
     const imgW = page.img.naturalWidth || page.img.width;
     const imgH = page.img.naturalHeight || page.img.height;
     const dx = page.offsetX + page.fit.offsetX;
     const dy = page.fit.offsetY;
+
+    // Check if clicking on a text overlay first (higher priority)
+    if (page.id === selectedId && page.settings.textOverlays?.length > 0) {
+      const hitId = hitTestTextOverlay(
+        page.settings.textOverlays,
+        imgW, imgH, dx, dy, page.fit.scale,
+        point.x, point.y, page.settings.textOverlays[0]?.fontSize ?? 48
+      );
+      if (hitId) {
+        if (onSelectTextOverlay) onSelectTextOverlay(hitId);
+        const overlay = page.settings.textOverlays.find((o) => o.id === hitId);
+        if (overlay && onTextOverlayPosChange) {
+          const overlayCx = dx + overlay.x * imgW * page.fit.scale;
+          const overlayCy = dy + overlay.y * imgH * page.fit.scale;
+          dragRef.current = {
+            pageId: page.id,
+            offsetX: point.x - overlayCx,
+            offsetY: point.y - overlayCy,
+            type: 'text',
+            textId: hitId
+          };
+          (event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);
+        }
+        return;
+      } else {
+        if (onSelectTextOverlay) onSelectTextOverlay(null);
+      }
+    }
+
+    // Check if clicking on the logo for drag
+    if (!page.logo || !onLogoPosChange || page.id !== selectedId) return;
+
     const imageX = (point.x - dx) / page.fit.scale;
     const imageY = (point.y - dy) / page.fit.scale;
 
@@ -294,7 +342,8 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
     dragRef.current = {
       pageId: page.id,
       offsetX: imageX - metrics.centerX,
-      offsetY: imageY - metrics.centerY
+      offsetY: imageY - metrics.centerY,
+      type: 'logo'
     };
 
     (event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);
@@ -302,31 +351,46 @@ export default function CanvasPreview({ spread, selectedId, logos, pageNumber, o
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current;
-    if (!drag || !onLogoPosChange) return;
+    if (!drag) return;
 
     const point = getCanvasPoint(event);
     if (!point) return;
 
     const page = pagesRef.current.find((p) => p.id === drag.pageId);
-    if (!page || !page.logo) return;
+    if (!page) return;
 
     const imgW = page.img.naturalWidth || page.img.width;
     const imgH = page.img.naturalHeight || page.img.height;
     const dx = page.offsetX + page.fit.offsetX;
     const dy = page.fit.offsetY;
-    const imageX = (point.x - dx) / page.fit.scale;
-    const imageY = (point.y - dy) / page.fit.scale;
 
-    const metrics = getLogoMetrics(imgW, imgH, page.logo.width, page.logo.height, page.settings);
-    const halfW = metrics.width / 2;
-    const halfH = metrics.height / 2;
+    if (drag.type === 'text' && drag.textId && onTextOverlayPosChange) {
+      const newCx = point.x - drag.offsetX;
+      const newCy = point.y - drag.offsetY;
+      const normX = (newCx - dx) / (imgW * page.fit.scale);
+      const normY = (newCy - dy) / (imgH * page.fit.scale);
+      onTextOverlayPosChange(drag.textId, {
+        x: Math.max(0, Math.min(1, normX)),
+        y: Math.max(0, Math.min(1, normY))
+      });
+      return;
+    }
 
-    let centerX = imageX - drag.offsetX;
-    let centerY = imageY - drag.offsetY;
-    centerX = Math.max(halfW, Math.min(imgW - halfW, centerX));
-    centerY = Math.max(halfH, Math.min(imgH - halfH, centerY));
+    if (drag.type === 'logo' && page.logo && onLogoPosChange) {
+      const imageX = (point.x - dx) / page.fit.scale;
+      const imageY = (point.y - dy) / page.fit.scale;
 
-    onLogoPosChange({ x: centerX / imgW, y: centerY / imgH });
+      const metrics = getLogoMetrics(imgW, imgH, page.logo.width, page.logo.height, page.settings);
+      const halfW = metrics.width / 2;
+      const halfH = metrics.height / 2;
+
+      let centerX = imageX - drag.offsetX;
+      let centerY = imageY - drag.offsetY;
+      centerX = Math.max(halfW, Math.min(imgW - halfW, centerX));
+      centerY = Math.max(halfH, Math.min(imgH - halfH, centerY));
+
+      onLogoPosChange({ x: centerX / imgW, y: centerY / imgH });
+    }
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {

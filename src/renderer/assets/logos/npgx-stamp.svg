@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff0040"/>
+      <stop offset="100%" stop-color="#cc0033"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer ring -->
+  <circle cx="300" cy="300" r="270" fill="none" stroke="url(#ring)" stroke-width="16"/>
+  <!-- Inner ring -->
+  <circle cx="300" cy="300" r="230" fill="none" stroke="#ff0040" stroke-width="3" opacity="0.5"/>
+  <!-- Top arc text -->
+  <path id="topArc" d="M 80,300 A 220,220 0 0,1 520,300" fill="none"/>
+  <text font-family="'Helvetica Neue', 'Arial Black', sans-serif" font-size="28" font-weight="700" letter-spacing="12" fill="#ff0040">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">NINJA PUNK GIRLS</textPath>
+  </text>
+  <!-- Bottom arc text -->
+  <path id="botArc" d="M 520,300 A 220,220 0 0,1 80,300" fill="none"/>
+  <text font-family="'Helvetica Neue', 'Arial Black', sans-serif" font-size="22" font-weight="700" letter-spacing="8" fill="#ff3366">
+    <textPath href="#botArc" startOffset="50%" text-anchor="middle">CERTIFIED ORIGINAL</textPath>
+  </text>
+  <!-- Center text -->
+  <text x="300" y="310" text-anchor="middle" dominant-baseline="middle" font-family="'Helvetica Neue', 'Arial Black', Impact, sans-serif" font-size="160" font-weight="900" letter-spacing="14" fill="#ff0040">NPGX</text>
+  <!-- Decorative dots -->
+  <circle cx="145" cy="300" r="6" fill="#ff0040"/>
+  <circle cx="455" cy="300" r="6" fill="#ff0040"/>
+</svg>

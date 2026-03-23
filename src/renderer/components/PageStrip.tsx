@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ImageItem, Spread } from '@shared/lib/types';
+import type { ImageItem, Spread } from '../lib/types';
 
 type AnimateProgress = {
   stage: string;
@@ -34,90 +34,92 @@ export default function PageStrip({ spreads, allImages, activeIndex, enabledIds,
   const notInIssue = enabledIds ? allImages.filter((img) => !enabledIds.has(img.id)) : [];
 
   return (
-    <div className="page-strip">
-      {spreads.map((spread, i) => {
-        const images =
-          spread.type === 'portrait-pair'
-            ? [spread.left, spread.right]
-            : [spread.image];
+    <div className="page-strip-outer">
+      <div className="page-strip-thumbs">
+        {spreads.map((spread, i) => {
+          const images =
+            spread.type === 'portrait-pair'
+              ? [spread.left, spread.right]
+              : [spread.image];
 
-        const anyInIssue = !enabledIds || images.some((img) => enabledIds.has(img.id));
+          const anyInIssue = !enabledIds || images.some((img) => enabledIds.has(img.id));
 
-        return (
-          <div
-            key={i}
-            className={`page-thumb ${i === activeIndex ? 'active' : ''} ${enabledIds && !anyInIssue ? 'disabled' : ''}`}
-            onClick={() => onPageClick(i)}
-          >
-            <div className="page-thumb-images">
-              {images.map((img) => (
-                <img key={img.id} src={img.url} alt={img.name} />
-              ))}
+          return (
+            <div
+              key={i}
+              className={`page-thumb ${i === activeIndex ? 'active' : ''} ${enabledIds && !anyInIssue ? 'disabled' : ''}`}
+              onClick={() => onPageClick(i)}
+            >
+              <div className="page-thumb-images">
+                {images.map((img) => (
+                  <img key={img.id} src={img.url} alt={img.name} />
+                ))}
+              </div>
+              <span className="page-thumb-label">
+                {enabledIds && anyInIssue ? `\u2713 ${i + 1}` : i + 1}
+              </span>
             </div>
-            <span className="page-thumb-label">
-              {enabledIds && anyInIssue ? `\u2713 ${i + 1}` : i + 1}
+          );
+        })}
+
+        {notInIssue.length > 0 && notInIssue.length < allImages.length && (
+          <>
+            <div className="page-strip-divider" />
+            <span className="page-thumb-label" style={{ alignSelf: 'center', padding: '0 4px' }}>
+              {notInIssue.length} not in issue
+            </span>
+          </>
+        )}
+      </div>
+
+      <div className="page-strip-controls">
+        {isAnimating && animateProgress && (
+          <div className="animate-progress">
+            <div className="animate-progress-bar">
+              <div
+                className="animate-progress-fill"
+                style={{ width: `${animateProgress.percent}%` }}
+              />
+            </div>
+            <span className="animate-progress-text">
+              {animateProgress.stage}
+              {' '}
+              {formatElapsed(animateProgress.elapsed)}
+              {animateProgress.detail ? ` \u00b7 ${animateProgress.detail}` : ''}
             </span>
           </div>
-        );
-      })}
+        )}
 
-      {notInIssue.length > 0 && notInIssue.length < allImages.length && (
-        <>
-          <div className="page-strip-divider" />
-          <span className="page-thumb-label" style={{ alignSelf: 'center', padding: '0 4px' }}>
-            {notInIssue.length} not in issue
-          </span>
-        </>
-      )}
+        {comfyConnected && comfyModels.length > 0 && (
+          <select
+            className="model-select"
+            value={selectedModel ?? ''}
+            onChange={(e) => onModelChange(e.target.value)}
+            title="Select AI model"
+          >
+            {comfyModels.map((m) => (
+              <option key={m} value={m}>{m.replace(/\.(safetensors|ckpt|pt)$/, '')}</option>
+            ))}
+          </select>
+        )}
 
-      <div className="page-strip-spacer" />
-
-      {isAnimating && animateProgress && (
-        <div className="animate-progress">
-          <div className="animate-progress-bar">
-            <div
-              className="animate-progress-fill"
-              style={{ width: `${animateProgress.percent}%` }}
-            />
-          </div>
-          <span className="animate-progress-text">
-            {animateProgress.stage}
-            {' '}
-            {formatElapsed(animateProgress.elapsed)}
-            {animateProgress.detail ? ` \u00b7 ${animateProgress.detail}` : ''}
-          </span>
-        </div>
-      )}
-
-      {comfyConnected && comfyModels.length > 0 && (
-        <select
-          className="model-select"
-          value={selectedModel ?? ''}
-          onChange={(e) => onModelChange(e.target.value)}
-          title="Select AI model"
+        <button
+          className={`animate-btn ${comfyConnected ? 'connected' : ''}`}
+          disabled={!comfyConnected || isAnimating || !selectedModel}
+          onClick={onAnimate}
+          title={
+            !comfyConnected
+              ? 'Start ComfyUI on localhost:8188 to enable'
+              : !selectedModel
+                ? 'No video models found in ComfyUI'
+                : isAnimating
+                  ? 'Generating video...'
+                  : 'Animate selected image with ComfyUI'
+          }
         >
-          {comfyModels.map((m) => (
-            <option key={m} value={m}>{m.replace(/\.(safetensors|ckpt|pt)$/, '')}</option>
-          ))}
-        </select>
-      )}
-
-      <button
-        className={`animate-btn ${comfyConnected ? 'connected' : ''}`}
-        disabled={!comfyConnected || isAnimating || !selectedModel}
-        onClick={onAnimate}
-        title={
-          !comfyConnected
-            ? 'Start ComfyUI on localhost:8188 to enable'
-            : !selectedModel
-              ? 'No video models found in ComfyUI'
-              : isAnimating
-                ? 'Generating video...'
-                : 'Animate selected image with ComfyUI'
-        }
-      >
-        {isAnimating ? 'Animating\u2026' : comfyConnected ? 'Animate' : 'Animate (no ComfyUI)'}
-      </button>
+          {isAnimating ? 'Animating\u2026' : comfyConnected ? 'Animate' : 'Animate (no ComfyUI)'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -8,11 +8,18 @@ export default function SplashScreen({ onEnter }: SplashScreenProps) {
   const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoSrc, setVideoSrc] = useState('/npgx-splash.mp4');
 
   useEffect(() => {
-    // Try to play video on mount
-    videoRef.current?.play().catch(() => {});
+    // In packaged app, resolve splash video from extraResources
+    window.mint?.getSplashVideo?.().then((path: string) => {
+      if (path) setVideoSrc(`mint-media://media?path=${encodeURIComponent(path)}`);
+    }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    videoRef.current?.play().catch(() => {});
+  }, [videoSrc]);
 
   const handleEnter = () => {
     setFading(true);
@@ -40,7 +47,7 @@ export default function SplashScreen({ onEnter }: SplashScreenProps) {
       <video
         ref={videoRef}
         className="splash-video"
-        src="/video-rosette.mp4"
+        src={videoSrc}
         muted
         loop
         playsInline
@@ -48,7 +55,7 @@ export default function SplashScreen({ onEnter }: SplashScreenProps) {
       />
       <div className="splash-overlay" />
       <div className="splash-content">
-        <div className="splash-badge">The Bitcoin Corporation</div>
+        <div className="splash-badge">THE</div>
         <h1 className="splash-title">Mint</h1>
         <div className="splash-tagline">Design. Print. Stamp. Mint.</div>
         <button className="splash-enter" onClick={handleEnter}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AppMode } from '@shared/lib/types';
+import type { AppMode } from '../lib/types';
 
 type Props = {
   mode: AppMode;
@@ -7,10 +7,15 @@ type Props = {
 };
 
 const MODES: { value: AppMode; label: string }[] = [
+  { value: 'watch', label: 'Watch' },
+  { value: 'mix', label: 'Mix' },
   { value: 'stamp', label: 'Stamp' },
-  { value: 'currency', label: 'Currency' },
-  { value: 'tokenise', label: 'Tokenise' },
-  { value: 'music', label: 'Music' }
+  { value: 'cover', label: 'Cover' },
+  { value: 'titles', label: 'Titles' },
+  { value: 'export', label: 'Export' },
+  { value: 'mint', label: 'Mint' },
+  { value: 'ticket', label: 'Ticket' },
+  { value: 'tokenise', label: 'Tokenise' }
 ];
 
 export default function ModeToggle({ mode, onChange }: Props) {

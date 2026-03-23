@@ -1,6 +1,6 @@
 import React from 'react';
-import { FONT_OPTIONS } from '@shared/lib/logos';
-import type { MintLayer } from '@shared/lib/types';
+import { FONT_OPTIONS } from '../lib/logos';
+import type { MintLayer } from '../lib/types';
 
 type Props = {
   layer: MintLayer;
@@ -487,7 +487,33 @@ const CONTROLS: Record<string, React.FC<Props>> = {
   crosshatch: CrosshatchControls,
   stipple: StippleControls,
   'watermark-pattern': WatermarkPatternControls,
-  hologram: HologramControls
+  hologram: HologramControls,
+  image: function ImageControls({ layer, onConfigChange }: ControlProps) {
+    const c = layer.config as { src: string; fit: string; x: number; y: number; scale: number };
+    return (
+      <>
+        <div className="small" style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent)' }}>Image Position</div>
+        <SliderRow label="X Position" value={c.x} min={-0.5} max={1.5} step={0.01} onChange={(v) => onConfigChange({ x: v })} />
+        <SliderRow label="Y Position" value={c.y} min={-0.5} max={1.5} step={0.01} onChange={(v) => onConfigChange({ y: v })} />
+        <SliderRow label="Scale" value={c.scale} min={0.1} max={5} step={0.05} onChange={(v) => onConfigChange({ scale: v })} />
+        <div className="small" style={{ fontWeight: 600, marginBottom: 4, marginTop: 8, color: 'var(--accent)' }}>Fit Mode</div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['cover', 'contain', 'fill'] as const).map(mode => (
+            <button key={mode} onClick={() => onConfigChange({ fit: mode })} style={{
+              flex: 1, padding: '4px 0', border: '1px solid', borderRadius: 4, cursor: 'pointer',
+              fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+              background: c.fit === mode ? 'var(--accent)' : 'var(--panel-2)',
+              borderColor: c.fit === mode ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+              color: '#fff',
+            }}>{mode}</button>
+          ))}
+        </div>
+        <div className="small" style={{ marginTop: 6, color: 'var(--muted)' }}>
+          Drag image on canvas to reposition. Use scroll wheel to zoom canvas.
+        </div>
+      </>
+    );
+  }
 };
 
 export default function PatternControls({ layer, onConfigChange }: Props) {
