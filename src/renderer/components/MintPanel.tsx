@@ -227,7 +227,7 @@ export default function MintPanel({
 
       // Title
       ctx.font = '900 48px Impact, Arial Black, sans-serif';
-      ctx.fillStyle = '#ff0040';
+      ctx.fillStyle = '#c9a84c';
       ctx.textAlign = 'center';
       ctx.fillText('BITCOIN CORPORATION', cx, doc.height * 0.08);
 
@@ -247,7 +247,7 @@ export default function MintPanel({
 
       // Serial
       ctx.font = '700 24px IBM Plex Mono, monospace';
-      ctx.fillStyle = '#ff0040';
+      ctx.fillStyle = '#c9a84c';
       ctx.fillText(`SN: ${burnTxid!.slice(0, 12).toUpperCase()}`, cx, doc.height * 0.44);
 
       // Legal text
@@ -257,7 +257,7 @@ export default function MintPanel({
         'This note certifies the permanent, irrevocable destruction of the',
         `denomination amount (${denomination} BSV) on the Bitcoin SV blockchain.`,
         'The burn transaction is publicly verifiable via the QR code or TXID above.',
-        'This certificate was produced by the NPGX Mint — a tool of the Bitcoin Corporation.',
+        'This certificate was produced by the The Mint — a tool of the Bitcoin Corporation.',
         `Issued: ${new Date().toISOString().split('T')[0]}`,
       ];
       legal.forEach((line, i) => {
@@ -695,7 +695,7 @@ export default function MintPanel({
             disabled={isBurning}
             style={{
               width: '100%', padding: '8px 0',
-              background: isBurning ? 'var(--panel-2)' : mintMode === 'burn' ? 'linear-gradient(135deg, #ff0040, #cc0033)' : mintMode === 'lock' ? 'linear-gradient(135deg, #f7931a, #cc7700)' : 'linear-gradient(135deg, #00e5ff, #0099aa)',
+              background: isBurning ? 'var(--panel-2)' : mintMode === 'burn' ? 'linear-gradient(135deg, #c9a84c, #8a7234)' : mintMode === 'lock' ? 'linear-gradient(135deg, #f7931a, #cc7700)' : 'linear-gradient(135deg, #00e5ff, #0099aa)',
               border: 'none', borderRadius: 6, color: '#fff',
               fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
               letterSpacing: 2, cursor: isBurning ? 'wait' : 'pointer',

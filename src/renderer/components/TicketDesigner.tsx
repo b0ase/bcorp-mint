@@ -14,7 +14,7 @@ interface TicketTemplate {
 }
 
 const TEMPLATES: TicketTemplate[] = [
-  { id: 'concert', name: 'Concert', width: 1000, height: 400, bgColor: '#0a0a0a', accent: '#ff0040', style: 'concert' },
+  { id: 'concert', name: 'Concert', width: 1000, height: 400, bgColor: '#0a0a0a', accent: '#c9a84c', style: 'concert' },
   { id: 'vip', name: 'VIP Pass', width: 500, height: 800, bgColor: '#0a0a0a', accent: '#ffd700', style: 'vip' },
   { id: 'festival', name: 'Festival', width: 1000, height: 400, bgColor: '#1a0020', accent: '#ff00ff', style: 'festival' },
   { id: 'membership', name: 'Membership', width: 850, height: 540, bgColor: '#0a0a0a', accent: '#00e5ff', style: 'membership' },

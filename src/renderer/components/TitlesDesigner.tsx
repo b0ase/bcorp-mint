@@ -84,7 +84,7 @@ export default function TitlesDesigner({ logos, allImages }: Props) {
 
   // ── Build prompt ───────────────────────────────────────────────────
   const buildPrompt = () => {
-    const titleText = title.trim() || 'NPGX';
+    const titleText = title.trim() || 'THE MINT';
     const subText = subtitle.trim();
     return `${selectedStyle.prompt}. The title text reads "${titleText}"${subText ? `, subtitle "${subText}"` : ''}. Bold, high contrast, cinematic motion graphics, 5 seconds, professional title sequence.`;
   };
@@ -100,7 +100,7 @@ export default function TitlesDesigner({ logos, allImages }: Props) {
 
     const newTitle: GeneratedTitle = {
       id, jobId: '', status: 'generating',
-      title: title.trim() || 'NPGX', subtitle: subtitle.trim(),
+      title: title.trim() || 'THE MINT', subtitle: subtitle.trim(),
       style: selectedStyle.name, model: selectedModel.name, prompt,
     };
     setGenerated(prev => [newTitle, ...prev]);
@@ -236,18 +236,18 @@ export default function TitlesDesigner({ logos, allImages }: Props) {
       } else {
         // Static preview — draw title text
         ctx.font = `900 ${cw * 0.08}px Impact, Arial Black, sans-serif`;
-        ctx.fillStyle = '#ff0040';
+        ctx.fillStyle = '#c9a84c';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.shadowBlur = 12;
-        const lines = (title || 'NPGX').toUpperCase().split('\n');
+        const lines = (title || 'THE MINT').toUpperCase().split('\n');
         const lh = cw * 0.1;
         const startY = ch / 2 - (lines.length - 1) * lh / 2;
         for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], cw / 2, startY + i * lh);
         if (subtitle) {
           ctx.font = `400 ${cw * 0.025}px Helvetica Neue, Arial, sans-serif`;
-          ctx.fillStyle = '#ff3366';
+          ctx.fillStyle = '#e6c665';
           ctx.shadowBlur = 6;
           ctx.fillText(subtitle.toUpperCase(), cw / 2, ch * 0.85);
         }
@@ -271,7 +271,7 @@ export default function TitlesDesigner({ logos, allImages }: Props) {
     return () => { running = false; cancelAnimationFrame(animRef.current); };
   }, [orientation, title, subtitle, showLogo, logoImg, previewUrl, loadedPreviewPath]);
 
-  const statusColor = (s: string) => s === 'done' ? '#00ff41' : s === 'pending' || s === 'generating' ? '#ffd700' : '#ff0040';
+  const statusColor = (s: string) => s === 'done' ? '#00ff41' : s === 'pending' || s === 'generating' ? '#ffd700' : '#c9a84c';
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 8, padding: 8, overflow: 'hidden' }}>

@@ -36,18 +36,18 @@ interface CoverTemplate {
 const TEMPLATES: CoverTemplate[] = [
   // ── Magazine Templates ──
   {
-    id: 'mag-npgx',
-    name: 'NPGX Magazine',
+    id: 'mag-corp',
+    name: 'Magazine',
     category: 'magazine',
     width: 1200,
     height: 1600,
     bgColor: '#000000',
     overlay: { color: '#000', opacity: 0.3, gradient: 'linear' },
     fields: [
-      { key: 'masthead', label: 'Masthead', default: 'NINJA PUNK GIRLS', font: 'Impact, Arial Black, sans-serif', size: 72, weight: 900, color: '#ff0040', letterSpacing: 6, x: 0.5, y: 0.06, align: 'center', transform: 'uppercase', shadow: true },
+      { key: 'masthead', label: 'Masthead', default: 'THE BITCOIN CORPORATION', font: 'Impact, Arial Black, sans-serif', size: 72, weight: 900, color: '#c9a84c', letterSpacing: 6, x: 0.5, y: 0.06, align: 'center', transform: 'uppercase', shadow: true },
       { key: 'issue', label: 'Issue', default: 'ISSUE 01', font: 'Helvetica Neue, Arial, sans-serif', size: 18, weight: 600, color: '#ffffff', letterSpacing: 8, x: 0.5, y: 0.11, align: 'center', transform: 'uppercase', opacity: 0.7 },
       { key: 'headline', label: 'Headline', default: 'UNDERGROUND\nEMPRESS', font: 'Impact, Arial Black, sans-serif', size: 96, weight: 900, color: '#ffffff', letterSpacing: 4, x: 0.08, y: 0.78, align: 'left', transform: 'uppercase', shadow: true },
-      { key: 'subhead', label: 'Subhead', default: 'Exclusive photoshoot & interview', font: 'Helvetica Neue, Arial, sans-serif', size: 22, weight: 400, color: '#ff3366', letterSpacing: 2, x: 0.08, y: 0.92, align: 'left' },
+      { key: 'subhead', label: 'Subhead', default: 'Exclusive photoshoot & interview', font: 'Helvetica Neue, Arial, sans-serif', size: 22, weight: 400, color: '#e6c665', letterSpacing: 2, x: 0.08, y: 0.92, align: 'left' },
       { key: 'tagline', label: 'Tagline', default: 'THE STREET NINJA FEMALE', font: 'Helvetica Neue, Arial, sans-serif', size: 14, weight: 500, color: '#ffffff', letterSpacing: 6, x: 0.5, y: 0.97, align: 'center', transform: 'uppercase', opacity: 0.5 },
     ]
   },
@@ -60,7 +60,7 @@ const TEMPLATES: CoverTemplate[] = [
     bgColor: '#000000',
     overlay: { color: '#000', opacity: 0.25, gradient: 'linear' },
     fields: [
-      { key: 'masthead', label: 'Masthead', default: 'NPGX', font: 'Helvetica Neue, Arial, sans-serif', size: 120, weight: 900, color: '#ffffff', letterSpacing: 20, x: 0.5, y: 0.08, align: 'center', transform: 'uppercase', opacity: 0.9 },
+      { key: 'masthead', label: 'Masthead', default: 'THE MINT', font: 'Helvetica Neue, Arial, sans-serif', size: 120, weight: 900, color: '#ffffff', letterSpacing: 20, x: 0.5, y: 0.08, align: 'center', transform: 'uppercase', opacity: 0.9 },
       { key: 'headline', label: 'Headline', default: 'RAZOR\nKISSES', font: 'Georgia, Times New Roman, serif', size: 80, weight: 700, color: '#ffffff', letterSpacing: 2, x: 0.08, y: 0.75, align: 'left', shadow: true },
       { key: 'subhead', label: 'Subhead', default: 'Tokyo Gutter Punk — Album One', font: 'Helvetica Neue, Arial, sans-serif', size: 20, weight: 400, color: '#cccccc', letterSpacing: 3, x: 0.08, y: 0.9, align: 'left' },
       { key: 'issue', label: 'Issue', default: 'VOL. 1 — 2026', font: 'Helvetica Neue, Arial, sans-serif', size: 14, weight: 500, color: '#888888', letterSpacing: 6, x: 0.92, y: 0.97, align: 'right', transform: 'uppercase' },
@@ -73,11 +73,11 @@ const TEMPLATES: CoverTemplate[] = [
     width: 1200,
     height: 1600,
     bgColor: '#0a0a0a',
-    overlay: { color: '#ff0040', opacity: 0.08 },
+    overlay: { color: '#c9a84c', opacity: 0.08 },
     fields: [
-      { key: 'masthead', label: 'Masthead', default: 'NPGX', font: 'Impact, Arial Black, sans-serif', size: 180, weight: 900, color: '#ff0040', letterSpacing: 30, x: 0.5, y: 0.12, align: 'center', transform: 'uppercase', shadow: true, opacity: 0.85 },
+      { key: 'masthead', label: 'Masthead', default: 'THE MINT', font: 'Impact, Arial Black, sans-serif', size: 180, weight: 900, color: '#c9a84c', letterSpacing: 30, x: 0.5, y: 0.12, align: 'center', transform: 'uppercase', shadow: true, opacity: 0.85 },
       { key: 'headline', label: 'Headline', default: 'LUNA\nCYBERBLADE', font: 'Impact, Arial Black, sans-serif', size: 110, weight: 900, color: '#ffffff', letterSpacing: 6, x: 0.5, y: 0.82, align: 'center', transform: 'uppercase', shadow: true },
-      { key: 'tagline', label: 'Tagline', default: 'The future is now', font: 'Helvetica Neue, Arial, sans-serif', size: 18, weight: 400, color: '#ff3366', letterSpacing: 8, x: 0.5, y: 0.95, align: 'center', transform: 'uppercase' },
+      { key: 'tagline', label: 'Tagline', default: 'The future is now', font: 'Helvetica Neue, Arial, sans-serif', size: 18, weight: 400, color: '#e6c665', letterSpacing: 8, x: 0.5, y: 0.95, align: 'center', transform: 'uppercase' },
     ]
   },
   // ── Album Templates ──
@@ -90,7 +90,7 @@ const TEMPLATES: CoverTemplate[] = [
     bgColor: '#000000',
     overlay: { color: '#000', opacity: 0.2 },
     fields: [
-      { key: 'artist', label: 'Artist', default: 'NPGX', font: 'Impact, Arial Black, sans-serif', size: 48, weight: 900, color: '#ff0040', letterSpacing: 12, x: 0.5, y: 0.08, align: 'center', transform: 'uppercase', shadow: true },
+      { key: 'artist', label: 'Artist', default: 'THE MINT', font: 'Impact, Arial Black, sans-serif', size: 48, weight: 900, color: '#c9a84c', letterSpacing: 12, x: 0.5, y: 0.08, align: 'center', transform: 'uppercase', shadow: true },
       { key: 'title', label: 'Title', default: 'TOKYO\nGUTTER\nPUNK', font: 'Impact, Arial Black, sans-serif', size: 120, weight: 900, color: '#ffffff', letterSpacing: 6, x: 0.5, y: 0.5, align: 'center', transform: 'uppercase', shadow: true },
       { key: 'subtitle', label: 'Subtitle', default: 'Album One', font: 'Helvetica Neue, Arial, sans-serif', size: 20, weight: 400, color: '#888888', letterSpacing: 6, x: 0.5, y: 0.92, align: 'center', transform: 'uppercase' },
     ]
@@ -103,7 +103,7 @@ const TEMPLATES: CoverTemplate[] = [
     height: 1400,
     bgColor: '#0a0a0a',
     fields: [
-      { key: 'artist', label: 'Artist', default: 'NPGX', font: 'Helvetica Neue, Arial, sans-serif', size: 24, weight: 300, color: '#ffffff', letterSpacing: 10, x: 0.5, y: 0.06, align: 'center', transform: 'uppercase', opacity: 0.6 },
+      { key: 'artist', label: 'Artist', default: 'THE MINT', font: 'Helvetica Neue, Arial, sans-serif', size: 24, weight: 300, color: '#ffffff', letterSpacing: 10, x: 0.5, y: 0.06, align: 'center', transform: 'uppercase', opacity: 0.6 },
       { key: 'title', label: 'Title', default: 'NEON BLOOD RIOT', font: 'Helvetica Neue, Arial, sans-serif', size: 36, weight: 700, color: '#ffffff', letterSpacing: 4, x: 0.5, y: 0.94, align: 'center', transform: 'uppercase' },
     ]
   },
@@ -114,11 +114,11 @@ const TEMPLATES: CoverTemplate[] = [
     width: 1400,
     height: 1400,
     bgColor: '#000000',
-    overlay: { color: '#ff0040', opacity: 0.1, gradient: 'radial' },
+    overlay: { color: '#c9a84c', opacity: 0.1, gradient: 'radial' },
     fields: [
-      { key: 'artist', label: 'Artist', default: 'NPGX', font: 'Impact, Arial Black, sans-serif', size: 36, weight: 900, color: '#ff0040', letterSpacing: 8, x: 0.08, y: 0.06, align: 'left', transform: 'uppercase' },
+      { key: 'artist', label: 'Artist', default: 'THE MINT', font: 'Impact, Arial Black, sans-serif', size: 36, weight: 900, color: '#c9a84c', letterSpacing: 8, x: 0.08, y: 0.06, align: 'left', transform: 'uppercase' },
       { key: 'title', label: 'Title', default: 'KABUKICHO\nWOLF', font: 'Impact, Arial Black, sans-serif', size: 100, weight: 900, color: '#ffffff', letterSpacing: 4, x: 0.08, y: 0.85, align: 'left', transform: 'uppercase', shadow: true },
-      { key: 'featuring', label: 'Featuring', default: 'ft. Luna Cyberblade', font: 'Helvetica Neue, Arial, sans-serif', size: 18, weight: 400, color: '#ff3366', letterSpacing: 2, x: 0.08, y: 0.95, align: 'left' },
+      { key: 'featuring', label: 'Featuring', default: 'ft. Luna Cyberblade', font: 'Helvetica Neue, Arial, sans-serif', size: 18, weight: 400, color: '#e6c665', letterSpacing: 2, x: 0.08, y: 0.95, align: 'left' },
     ]
   },
   // ── Video Templates (landscape 1920x1080) ──
@@ -131,9 +131,9 @@ const TEMPLATES: CoverTemplate[] = [
     bgColor: '#000000',
     overlay: { color: '#000', opacity: 0.35, gradient: 'linear' },
     fields: [
-      { key: 'brand', label: 'Brand', default: 'NPGX', font: 'Impact, Arial Black, sans-serif', size: 36, weight: 900, color: '#ff0040', letterSpacing: 12, x: 0.05, y: 0.06, align: 'left', transform: 'uppercase' },
+      { key: 'brand', label: 'Brand', default: 'THE MINT', font: 'Impact, Arial Black, sans-serif', size: 36, weight: 900, color: '#c9a84c', letterSpacing: 12, x: 0.05, y: 0.06, align: 'left', transform: 'uppercase' },
       { key: 'title', label: 'Title', default: 'UNDERGROUND\nEMPRESS', font: 'Impact, Arial Black, sans-serif', size: 110, weight: 900, color: '#ffffff', letterSpacing: 4, x: 0.05, y: 0.75, align: 'left', transform: 'uppercase', shadow: true },
-      { key: 'subtitle', label: 'Subtitle', default: 'Official Music Video', font: 'Helvetica Neue, Arial, sans-serif', size: 24, weight: 400, color: '#ff3366', letterSpacing: 4, x: 0.05, y: 0.92, align: 'left', transform: 'uppercase' },
+      { key: 'subtitle', label: 'Subtitle', default: 'Official Music Video', font: 'Helvetica Neue, Arial, sans-serif', size: 24, weight: 400, color: '#e6c665', letterSpacing: 4, x: 0.05, y: 0.92, align: 'left', transform: 'uppercase' },
     ]
   },
   {
@@ -143,11 +143,11 @@ const TEMPLATES: CoverTemplate[] = [
     width: 1920,
     height: 1080,
     bgColor: '#0a0a0a',
-    overlay: { color: '#ff0040', opacity: 0.06 },
+    overlay: { color: '#c9a84c', opacity: 0.06 },
     fields: [
       { key: 'title', label: 'Title', default: 'RAZOR KISSES', font: 'Impact, Arial Black, sans-serif', size: 140, weight: 900, color: '#ffffff', letterSpacing: 6, x: 0.5, y: 0.5, align: 'center', transform: 'uppercase', shadow: true },
-      { key: 'brand', label: 'Brand', default: 'NINJA PUNK GIRLS', font: 'Helvetica Neue, Arial, sans-serif', size: 20, weight: 600, color: '#ff0040', letterSpacing: 10, x: 0.5, y: 0.08, align: 'center', transform: 'uppercase' },
-      { key: 'cta', label: 'CTA', default: 'WATCH NOW', font: 'Impact, Arial Black, sans-serif', size: 28, weight: 900, color: '#ff0040', letterSpacing: 8, x: 0.5, y: 0.92, align: 'center', transform: 'uppercase' },
+      { key: 'brand', label: 'Brand', default: 'THE BITCOIN CORPORATION', font: 'Helvetica Neue, Arial, sans-serif', size: 20, weight: 600, color: '#c9a84c', letterSpacing: 10, x: 0.5, y: 0.08, align: 'center', transform: 'uppercase' },
+      { key: 'cta', label: 'CTA', default: 'WATCH NOW', font: 'Impact, Arial Black, sans-serif', size: 28, weight: 900, color: '#c9a84c', letterSpacing: 8, x: 0.5, y: 0.92, align: 'center', transform: 'uppercase' },
     ]
   },
   {

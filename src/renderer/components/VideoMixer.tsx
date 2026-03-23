@@ -52,7 +52,7 @@ interface TrackLyrics { cues: LyricCue[] }
 
 interface MixerState {
   canvasOrientation: 'portrait' | 'landscape';
-  core: { glitch: boolean; glitchIntensity: number; strobe: boolean; strobeChance: number; rgbShift: boolean; rgbShiftAmount: number; reverse: boolean; npgxFilter: boolean; npgxStrength: number; speed: number };
+  core: { glitch: boolean; glitchIntensity: number; strobe: boolean; strobeChance: number; rgbShift: boolean; rgbShiftAmount: number; reverse: boolean; mintFilter: boolean; mintStrength: number; speed: number };
   superFx: { ultraGlitch: boolean; ultraGlitchIntensity: number; realityBreak: boolean; realityBreakIntensity: number; dimensionShift: boolean; dimensionShiftMix: number; kaleidoscope: boolean; kaleidoSegments: number };
   filters: Record<string, boolean>;
   transition: 'none' | 'fade' | 'slide' | 'zoom';
@@ -82,7 +82,7 @@ type Action =
 
 const INIT: MixerState = {
   canvasOrientation: 'landscape',
-  core: { glitch: false, glitchIntensity: 15, strobe: false, strobeChance: 0.015, rgbShift: false, rgbShiftAmount: 5, reverse: false, npgxFilter: true, npgxStrength: 0.35, speed: 0.7 },
+  core: { glitch: false, glitchIntensity: 15, strobe: false, strobeChance: 0.015, rgbShift: false, rgbShiftAmount: 5, reverse: false, mintFilter: true, mintStrength: 0.35, speed: 0.7 },
   superFx: { ultraGlitch: false, ultraGlitchIntensity: 10, realityBreak: false, realityBreakIntensity: 15, dimensionShift: false, dimensionShiftMix: 15, kaleidoscope: false, kaleidoSegments: 6 },
   filters: { sepia: false, vintage: false, washedOut: false, drama: false, cool: false, warm: false, noir: false, vibrant: false, faded: false },
   transition: 'none', textLayers: [], videoFit: 'cinematic', chaosMode: true, beatSync: true, beatSensitivity: 0.4,
@@ -292,7 +292,7 @@ function EffectsPanel({ state, dispatch }: { state: MixerState; dispatch: React.
   const c = state.core;
   return (
     <Panel title="Effects">
-      {([['glitch', 'Glitch', 'glitchIntensity', 100], ['strobe', 'Strobe', 'strobeChance', 1], ['rgbShift', 'RGB Shift', 'rgbShiftAmount', 30], ['npgxFilter', 'Crimson Filter', 'npgxStrength', 1]] as const).map(([key, label, slider, max]) => (
+      {([['glitch', 'Glitch', 'glitchIntensity', 100], ['strobe', 'Strobe', 'strobeChance', 1], ['rgbShift', 'RGB Shift', 'rgbShiftAmount', 30], ['mintFilter', 'Gold Filter', 'mintStrength', 1]] as const).map(([key, label, slider, max]) => (
         <div key={key} className="mx-fx-item">
           <div className="mx-fx-header"><span className="mx-fx-name">{label}</span><Toggle enabled={c[key] as boolean} onToggle={() => dispatch({ type: 'SET_CORE', key, value: !c[key] })} /></div>
           {c[key] && <div className="mx-fx-body"><Slider label="Amount" value={c[slider] as number} min={0} max={max} step={max <= 1 ? 0.05 : 1} onChange={v => dispatch({ type: 'SET_CORE', key: slider, value: v })} /></div>}
@@ -769,8 +769,8 @@ export default function VideoMixer({ mediaItems, logos }: Props) {
       if (filterParts.length > 0) { ctx.filter = filterParts.join(' '); ctx.drawImage(canvas, 0, 0); ctx.filter = 'none'; }
 
       // ── Crimson filter ────────────────────────────────────────────
-      if (s.core.npgxFilter) {
-        const str = s.core.npgxStrength;
+      if (s.core.mintFilter) {
+        const str = s.core.mintStrength;
         ctx.globalCompositeOperation = 'multiply';
         ctx.fillStyle = `rgb(255, ${Math.round(255 - str * 40)}, ${Math.round(255 - str * 80)})`;
         ctx.fillRect(0, 0, cw, ch);
@@ -932,7 +932,7 @@ export default function VideoMixer({ mediaItems, logos }: Props) {
       recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `npgx-mix-${Date.now()}.webm`; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mint-mix-${Date.now()}.webm`; a.click();
       };
       recorder.start(1000);
       recorderRef.current = recorder;

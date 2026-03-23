@@ -121,7 +121,7 @@ export default function WebMExporter({ videos, selectedVideo, onSelectVideo }: P
         ctx.fillRect((c.x + c.w) * vw, c.y * vh, vw - (c.x + c.w) * vw, c.h * vh);
 
         // Crop border
-        ctx.strokeStyle = '#ff0040';
+        ctx.strokeStyle = '#c9a84c';
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 4]);
         ctx.strokeRect(c.x * vw, c.y * vh, c.w * vw, c.h * vh);
