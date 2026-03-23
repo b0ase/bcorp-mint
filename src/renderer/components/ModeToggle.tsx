@@ -7,12 +7,8 @@ type Props = {
 };
 
 const MODES: { value: AppMode; label: string }[] = [
-  { value: 'watch', label: 'Watch' },
-  { value: 'mix', label: 'Mix' },
   { value: 'stamp', label: 'Stamp' },
   { value: 'cover', label: 'Cover' },
-  { value: 'titles', label: 'Titles' },
-  { value: 'export', label: 'Export' },
   { value: 'mint', label: 'Mint' },
   { value: 'ticket', label: 'Ticket' },
   { value: 'tokenise', label: 'Tokenise' }
