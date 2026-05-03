@@ -166,7 +166,20 @@ export interface MintPlatform {
   exportMintBatch?(payload: { folder: string; dataUrls: { name: string; dataUrl: string }[] }): Promise<void>;
 
   // --- MetaNet (desktop-only) ---
-  inscribeDocumentHash?(payload: { hashes: Array<{ file: string; sha256: string }>; provider: 'local' | 'handcash' }): Promise<void>;
+  inscribeDocumentHash?(payload: {
+    hashes: Array<{ file: string; sha256: string }>;
+    provider: 'local' | 'handcash' | 'metanet';
+    derivation?: { protocol: string; slug: string };
+  }): Promise<{ txid: string }>;
+  inscribeBitTrust?(payload: {
+    contentHash: string;
+    tier: number;
+    title: string;
+    filing?: string;
+    identityRef?: string;
+    provider: 'local' | 'handcash' | 'metanet';
+    derivation?: { protocol: string; slug: string };
+  }): Promise<{ txid: string }>;
 
   // --- Platform info ---
   isDesktop: boolean;

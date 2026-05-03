@@ -10,7 +10,8 @@ const MODES: { value: AppMode; label: string }[] = [
   { value: 'stamp', label: 'Stamp' },
   { value: 'mint', label: 'Mint' },
   { value: 'ticket', label: 'Ticket' },
-  { value: 'tokenise', label: 'Tokenise' }
+  { value: 'tokenise', label: 'Tokenise' },
+  { value: 'btms', label: 'BTMS' }
 ];
 
 export default function ModeToggle({ mode, onChange }: Props) {

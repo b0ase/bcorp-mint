@@ -141,7 +141,7 @@ export default function VideoPlayer({ videos, logos, currentVideo, onSelectVideo
           }
           if (s.stampVisual?.borderStampEnabled && s.stampVisual.borderStampText && s.frameEnabled) {
             const thickness = s.frameThickness * Math.min(vw, vh);
-            drawBorderStamp(ctx, 0, 0, vw, vh, thickness, s.stampVisual.borderStampText, s.stampVisual.borderStampColor || '#ffffff', s.stampVisual.borderStampSize || 8);
+            drawBorderStamp(ctx, 0, 0, vw, vh, thickness, s.stampVisual.borderStampText);
           }
         }
       }

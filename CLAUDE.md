@@ -41,7 +41,9 @@ This principle applies to all current and future Mint variants. Any feature that
 | Framework | Electron 30+ (electron-vite) |
 | Renderer | React 18, TypeScript |
 | Blockchain | BSV-20/21 via `@bsv/sdk` + `js-1sat-ord` |
-| Wallet | HandCash OAuth (ephemeral) |
+| Tokens (BTMS) | `@bsv/btms` (PushDrop, overlay-indexed) |
+| Wallet | HandCash OAuth (ephemeral), MetaNet Desktop BRC-100 (BTMS mode) |
+| KYC | Veriff → BRC-KYC-Certificate (BSM-signed, local-only) |
 | AI Animation | ComfyUI (local, SVD + Wan 2.1 workflows) |
 | Media Processing | ffmpeg-static (frame extraction, audio segmentation, waveform) |
 | Package Manager | pnpm |
@@ -144,6 +146,51 @@ All extraction happens in `app.getPath('temp')/mint-{randomId}/`. Temp dirs are 
 - `app.on('before-quit')` (registered in `registerCleanupOnQuit()`)
 
 No extracted data persists beyond the session.
+
+## BTMS Mode (Stocks, Bonds, Tokens, Currency)
+
+The Mint has a fourth mode: **BTMS** — issuance and management of overlay-indexed tokens via `@bsv/btms`. This sits alongside Stamp / Mint / Tokenise and exposes the full BTMS workflow: issue, send, receive, accept, burn, list assets.
+
+### Wallet requirement
+
+BTMS uses BRC-100. The Mint already ships a `MetaNetWallet` provider in `src/main/providers/metanet-wallet.ts` that talks to MetaNet Desktop on `http://127.0.0.1:3321`. BTMS mode reuses the same `WalletClient`, so if MetaNet Desktop is running and authenticated, BTMS just works.
+
+### Asset taxonomy
+
+BTMS metadata carries an `asset_class`:
+
+| Class | Gated by KYC | Purpose |
+|-------|-------------|---------|
+| `token` | no | General-purpose fungible |
+| `currency` | no | Denominated unit of account |
+| `stock` | **yes** | Equity security — requires BRC-KYC-Certificate |
+| `bond` | **yes** | Debt security — requires BRC-KYC-Certificate |
+
+The gate is enforced in `src/main/index.ts` on the `btms-issue` IPC handler: any issuance with `asset_class` in `{stock, bond}` must include a valid `kyc_certificate` + `kyc_certificate_signature` in its metadata, and the signature is verified against the certificate's `issuerPublicKey` before the transaction is built.
+
+### Trade-off on privacy
+
+BTMS operations are overlay-indexed — outbound calls go to the BTMS Topic Manager + Lookup Service + MessageBox host. That's a departure from the strict local-only posture of Stamp and Tokenise modes. Users who need strict privacy should stay in those modes; BTMS is the right tool when third parties need to verify issuance and ownership.
+
+## KYC (Veriff + BRC-KYC-Certificate)
+
+Pattern ported from bMovies (`bmovies/api/kyc-start.ts`, `kyc-webhook.ts`, `src/kyc/certificate.ts`). Adapted for Electron + privacy:
+
+- **No database.** Session and certificate stored as JSON in `userData/kyc/` with mode `0o600`.
+- **No webhook server.** Electron polls `GET /v1/sessions/{id}/decision` from the main process. No PII transits this machine — Veriff keeps all personal data.
+- **Certificate = BSM-signed JSON.** Same schema as bMovies (`BRC-KYC-Certificate` v1.0), but issued under `protocolID: [1, 'bcorp-mint-kyc']` with issuer `"The Bitcoin Corporation Mint"`.
+- **Deterministic signing key.** Derived from `KYC_CERT_SIGNING_SECRET` (env) or `userData/kyc/signer.secret` (auto-generated on first run). Same secret → same issuer public key → downstream verifiers can cache it.
+- **Publicly verifiable.** `window.mint.kycVerifyCert({certificate, signature})` runs the same BSM verification as bMovies' `/api/kyc/verify-cert` — any third party can verify a Mint-issued certificate with only the cert JSON + DER signature.
+
+### Flow
+
+1. User enters subject address + optional email in the KYC tab → `window.mint.kycStart()`.
+2. Main process creates a Veriff session, writes `session.json`, opens the hosted URL in the system browser.
+3. User completes ID + biometric check on Veriff.
+4. User returns to Mint, clicks "Check decision" → `window.mint.kycPoll()`.
+5. Main process polls Veriff until `approved|declined|expired`.
+6. On `approved`, main process BSM-signs a `BRC-KYC-Certificate` and writes `certificate.json`.
+7. Issuing `stock` or `bond` in BTMS mode automatically attaches `certificate.json` to the issuance metadata.
 
 ## Variant Configuration
 

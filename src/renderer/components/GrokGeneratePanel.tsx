@@ -165,7 +165,7 @@ export default function GrokGeneratePanel({ onAddImageFromUrl, scope = 'banknote
         onChange={(e) => setPrompt(e.target.value)}
         placeholder={`Describe the ${scope}... e.g. "100 NPG note, gold reserve, art-deco filigree, queen portrait"`}
         rows={3}
-        style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+        style={{ ...inputStyle, resize: 'both', fontFamily: 'inherit', minHeight: 60, maxWidth: '100%' }}
         disabled={busy}
       />
 

@@ -1,13 +1,9 @@
 import type { MintPlatform, FileHandle, PlatformFeature, MasterKeyInfo, DerivedChild, WalletManifest } from '@shared/lib/platform';
 import type { StampReceipt, WalletState, WalletProviderType } from '@shared/lib/types';
 
-declare global {
-  interface Window {
-    mint: Record<string, (...args: unknown[]) => unknown>;
-  }
-}
-
-const m = () => window.mint;
+// window.mint is declared in src/renderer/global.d.ts — don't re-declare here.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const m = () => window.mint as any;
 
 function pathHandle(filePath: string, name?: string): FileHandle {
   return { type: 'path', path: filePath, name: name || filePath.split(/[\\/]/).pop() || filePath };
@@ -176,7 +172,8 @@ export const electronPlatform: MintPlatform = {
     return m().probeMedia(filePath) as Promise<{ duration: number; fps?: number; sampleRate?: number; channels?: number }>;
   },
   async extractVideoFrames(payload) {
-    return m().extractVideoFrames(payload) as Promise<Array<{ path: string; width: number; height: number; timestamp: number }>>;
+    const result = await m().extractVideoFrames(payload) as { frames: Array<{ path: string; index: number; timestamp: number }>; outputDir: string };
+    return result.frames.map((f) => ({ path: f.path, width: 0, height: 0, timestamp: f.timestamp }));
   },
   async extractAudioSegment(payload) {
     await m().extractAudioSegment(payload);
@@ -212,9 +209,9 @@ export const electronPlatform: MintPlatform = {
     await m().exportMintBatch(payload);
   },
   async inscribeDocumentHash(payload) {
-    await m().inscribeDocumentHash(payload);
+    return m().inscribeDocumentHash(payload) as Promise<{ txid: string }>;
   },
   async inscribeBitTrust(payload) {
-    return m().inscribeBitTrust(payload);
+    return m().inscribeBitTrust(payload) as Promise<{ txid: string }>;
   },
 };

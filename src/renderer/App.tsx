@@ -11,6 +11,7 @@ import PageStrip from './components/PageStrip';
 import SplashScreen from './components/SplashScreen';
 import TextOverlayPanel from './components/TextOverlayPanel';
 import TokenisePanel from './components/TokenisePanel';
+import BtmsPanel from './components/BtmsPanel';
 import CoverDesigner from './components/CoverDesigner';
 import TicketDesigner from './components/TicketDesigner';
 import TitlesDesigner from './components/TitlesDesigner';
@@ -1121,7 +1122,7 @@ export default function App() {
     <div className="app" onDrop={handleDrop} onDragOver={handleDragOver}>
       <header className="topbar">
         <div className="topbar-left">
-          <h1 className="brand-title">The <span class="brand-accent">Mint</span></h1>
+          <h1 className="brand-title">The <span className="brand-accent">Mint</span></h1>
           <button className="wallet-status" onClick={handleWalletConnect} title={walletState.handle || 'Connect wallet'}>
             <span className={`wallet-dot ${walletState.connected ? 'connected' : ''}`} />
             {walletState.connected ? walletState.handle || 'Connected' : 'Connect Wallet'}
@@ -1191,6 +1192,10 @@ export default function App() {
         <TitlesDesigner logos={logos} allImages={images} />
       ) : tokenisation.mode === 'cover' ? (
         <CoverDesigner image={selectedImage || null} allImages={images} logos={logos} onSelectImage={id => setSelectedId(id)} />
+      ) : tokenisation.mode === 'btms' ? (
+        <div className="btms-mode-wrapper">
+          <BtmsPanel />
+        </div>
       ) : (
       <div className="main">
         <aside className="panel left-panel">
