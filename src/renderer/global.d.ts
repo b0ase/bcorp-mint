@@ -2,6 +2,22 @@ import type { StampReceipt, WalletState } from './lib/types';
 
 export {};
 
+// File-system node returned by the main process tokenise scanner.
+// Recursive so children carry the same shape — the previous IPC type
+// declared `children: unknown[]` which broke renderer-side narrowing.
+type FsNodeIPC = {
+  name: string;
+  path: string;
+  relativePath: string;
+  isDirectory: boolean;
+  size: number;
+  hash: string | null;
+  mimeType: string | null;
+  children: FsNodeIPC[];
+  metanetTxid: string | null;
+  tokenId: string | null;
+};
+
 declare global {
   interface Window {
     mint: {
@@ -202,18 +218,7 @@ declare global {
       }) => Promise<{ txid: string }>;
 
       // Tokenise / MetaNet tree
-      scanFolderTokenise: (folderPath: string) => Promise<{
-        name: string;
-        path: string;
-        relativePath: string;
-        isDirectory: boolean;
-        size: number;
-        hash: string | null;
-        mimeType: string | null;
-        children: unknown[];
-        metanetTxid: string | null;
-        tokenId: string | null;
-      }>;
+      scanFolderTokenise: (folderPath: string) => Promise<FsNodeIPC>;
       tokeniseEstimate: (folderPath: string) => Promise<{ nodes: number; estimatedSats: number }>;
       tokeniseFolder: (payload: {
         folderPath: string;

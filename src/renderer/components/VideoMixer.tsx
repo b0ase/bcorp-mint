@@ -32,7 +32,7 @@ function spawnParticle(text: string, style: TextParticle['style'], cw: number, c
   const speed = 2 + Math.random() * 4 + beatPulse * 5;
   const angle = Math.random() * Math.PI * 2;
   const maxLife = isShout ? 18 + Math.floor(Math.random() * 15) : 10 + Math.floor(Math.random() * 12);
-  const color = isJa ? '#DC143C' : isShout ? sectionColor : style === 'gang' ? '#F97316' : isWhisper ? '#94A3B8' : Math.random() < 0.6 ? '#FFFFFF' : sectionColor;
+  const color = isJa ? '#DC143C' : style === 'gang' ? '#F97316' : isShout ? sectionColor : isWhisper ? '#94A3B8' : Math.random() < 0.6 ? '#FFFFFF' : sectionColor;
   return {
     text, font, x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
     size: baseSize, rotation, vr: (Math.random() - 0.5) * 0.05,

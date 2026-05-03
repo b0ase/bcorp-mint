@@ -32,6 +32,8 @@ type FsNode = {
   hash: string | null;
   mimeType: string | null;
   children: FsNode[];
+  metanetTxid: string | null;
+  tokenId: string | null;
 };
 
 function fsNodeToUI(

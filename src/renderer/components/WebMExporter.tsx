@@ -176,7 +176,7 @@ export default function WebMExporter({ videos, selectedVideo, onSelectVideo }: P
       } else if (draggingCrop === 'tr') {
         setCrop({ ...c, y: Math.max(0, c.y + dy), w: Math.max(0.1, Math.min(1 - c.x, c.w + dx)), h: Math.max(0.1, c.h - dy) });
       } else if (draggingCrop === 'bl') {
-        setCrop({ x: Math.max(0, c.x + dx), ...c, w: Math.max(0.1, c.w - dx), h: Math.max(0.1, Math.min(1 - c.y, c.h + dy)) });
+        setCrop({ ...c, x: Math.max(0, c.x + dx), w: Math.max(0.1, c.w - dx), h: Math.max(0.1, Math.min(1 - c.y, c.h + dy)) });
       }
     };
     const onUp = () => setDraggingCrop(null);

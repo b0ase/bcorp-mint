@@ -114,7 +114,7 @@ export type TokenisationPiece = {
   status: 'pending' | 'hashing' | 'hashed' | 'stamping' | 'stamped' | 'minting' | 'minted' | 'error';
 };
 
-export type AppMode = 'stamp' | 'mint' | 'tokenise' | 'watch' | 'mix' | 'cover' | 'titles' | 'export' | 'ticket';
+export type AppMode = 'stamp' | 'mint' | 'tokenise' | 'watch' | 'mix' | 'cover' | 'titles' | 'export' | 'ticket' | 'btms';
 
 // --- Watch (Video Player) types ---
 
@@ -225,7 +225,7 @@ export type FineLineConfig = {
 };
 
 export type BorderConfig = {
-  style: 'classic' | 'ornate' | 'geometric' | 'art-deco';
+  style: 'classic' | 'ornate' | 'geometric' | 'art-deco' | 'simple';
   thickness: number;
   color: string;
   cornerStyle: 'square' | 'rounded' | 'ornament';

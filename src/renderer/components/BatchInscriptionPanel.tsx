@@ -9,7 +9,7 @@ type Props = {
 
 export default function BatchInscriptionPanel({ nodes, inscribing, onStartInscription }: Props) {
   const [estimate, setEstimate] = useState<{ nodes: number; estimatedSats: number } | null>(null);
-  const [progress, setProgress] = useState<{ stage: string; completed: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ stage: string; completed: number; total: number; currentPath?: string } | null>(null);
 
   useEffect(() => {
     const cleanup = window.mint.onMetanetProgress((data) => {

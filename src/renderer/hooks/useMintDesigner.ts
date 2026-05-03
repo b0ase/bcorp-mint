@@ -272,9 +272,12 @@ export function useMintDesigner() {
     pushUndo(doc);
     setDoc((prev) => ({
       ...prev,
+      // configPatch is intentionally loose — any layer-config field is patchable.
+      // Cast preserves the layer union; the runtime shape stays correct because
+      // `...l.config` retains the original config type.
       layers: prev.layers.map((l) =>
-        l.id === id ? { ...l, config: { ...l.config, ...configPatch } } : l
-      )
+        l.id === id ? ({ ...l, config: { ...l.config, ...configPatch } } as typeof l) : l
+      ),
     }));
     scheduleRegenerate(id);
   }, [doc, pushUndo, scheduleRegenerate]);
@@ -443,14 +446,20 @@ export function useMintDesigner() {
     pushUndo(doc);
     svgCache.current.clear();
     imageCache.current.clear();
-    // Ensure new document fields have defaults for backward compat
+    // Ensure new document fields have defaults for backward compat.
+    // Apply spread first, then `??` per-field so user values win without
+    // tripping TS2783 "specified more than once" warnings.
     const normalized: MintDocument = {
-      name: '', description: '', circleMask: false,
-      rimPattern: { enabled: false, teeth: 120, depth: 6, color: '#daa520' },
       ...newDoc,
+      name: newDoc.name ?? '',
+      description: newDoc.description ?? '',
+      circleMask: newDoc.circleMask ?? false,
+      rimPattern: newDoc.rimPattern ?? { enabled: false, teeth: 120, depth: 6, color: '#daa520' },
       layers: newDoc.layers.map((l) => ({
-        uvOnly: false, transform: defaultTransform(), ...l
-      }))
+        ...l,
+        uvOnly: l.uvOnly ?? false,
+        transform: l.transform ?? defaultTransform(),
+      })),
     };
     setDoc(normalized);
     setSelectedLayerId(null);

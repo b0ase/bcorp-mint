@@ -52,8 +52,8 @@ export default function TitlesDesigner({ logos, allImages }: Props) {
   // ── State ──────────────────────────────────────────────────────────
   const [title, setTitle] = useState('THE BITCOIN CORPORATION');
   const [subtitle, setSubtitle] = useState('Proof of Value');
-  const [selectedStyle, setSelectedStyle] = useState(TITLE_STYLES[0]);
-  const [selectedModel, setSelectedModel] = useState(MODELS[0]);
+  const [selectedStyle, setSelectedStyle] = useState<typeof TITLE_STYLES[number]>(TITLE_STYLES[0]);
+  const [selectedModel, setSelectedModel] = useState<typeof MODELS[number]>(MODELS[0]);
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [apiKey, setApiKey] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
