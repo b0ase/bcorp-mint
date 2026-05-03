@@ -9,6 +9,10 @@ contextBridge.exposeInMainWorld('mint', {
   chooseExportFolder: () => ipcRenderer.invoke('choose-export-folder'),
   saveFile: (dataUrl: string, defaultDir?: string, defaultName?: string) =>
     ipcRenderer.invoke('save-file', { dataUrl, defaultDir, defaultName }),
+  fetchAsDataUrl: (url: string) =>
+    ipcRenderer.invoke('fetch-as-data-url', url) as Promise<{ dataUrl: string; mime: string }>,
+  inscribeOrdinal: (payload: { dataB64: string; contentType: string; map?: Record<string, string>; destinationAddress?: string }) =>
+    ipcRenderer.invoke('inscribe-ordinal', payload) as Promise<{ txid: string; ordinalId: string }>,
   writeFile: (dataUrl: string, folder: string, fileName: string) =>
     ipcRenderer.invoke('write-file', { dataUrl, folder, fileName }),
   fileUrl: (filePath: string) => ipcRenderer.invoke('file-url', filePath),
@@ -90,10 +94,67 @@ contextBridge.exposeInMainWorld('mint', {
     return () => ipcRenderer.removeListener('mint-progress', handler);
   },
 
-  // Keystore
+  // Keystore (legacy single-key + HD master)
   keystoreHasKey: () => ipcRenderer.invoke('keystore-has-key'),
   keystoreSaveKey: (wif: string) => ipcRenderer.invoke('keystore-save-key', wif),
   keystoreDeleteKey: () => ipcRenderer.invoke('keystore-delete-key'),
+  keystoreHasMaster: () => ipcRenderer.invoke('keystore-has-master'),
+  keystoreSetupMaster: (importHex?: string) =>
+    ipcRenderer.invoke('keystore-setup-master', importHex),
+  keystoreGetMasterInfo: () => ipcRenderer.invoke('keystore-get-master-info'),
+  keystoreDeriveAddress: (protocol: string, slug: string) =>
+    ipcRenderer.invoke('keystore-derive-address', protocol, slug),
+  keystoreExportBackup: (password: string) =>
+    ipcRenderer.invoke('keystore-export-backup', password),
+  keystoreImportBackup: (data: string, password: string) =>
+    ipcRenderer.invoke('keystore-import-backup', data, password),
+  keystoreBuildManifest: (derivations: Array<{ protocol: string; slug: string }>) =>
+    ipcRenderer.invoke('keystore-build-manifest', derivations),
+  keystoreDeleteMaster: () => ipcRenderer.invoke('keystore-delete-master'),
+
+  // Wallet manager (provider selection)
+  walletListProviders: () => ipcRenderer.invoke('wallet-list-providers'),
+  walletSwitchProvider: (type: string) =>
+    ipcRenderer.invoke('wallet-switch-provider', type),
+
+  // Inscription helpers
+  inscribeDocumentHash: (payload: {
+    hashes: Array<{ file: string; sha256: string }>;
+    provider: 'local' | 'handcash' | 'metanet';
+    derivation?: { protocol: string; slug: string };
+  }) => ipcRenderer.invoke('inscribe-document-hash', payload),
+  inscribeBitTrust: (payload: {
+    contentHash: string;
+    tier: number;
+    title: string;
+    filing?: string;
+    identityRef?: string;
+    provider: 'local' | 'handcash' | 'metanet';
+    derivation?: { protocol: string; slug: string };
+  }) => ipcRenderer.invoke('inscribe-bit-trust', payload),
+
+  // Tokenise / MetaNet tree
+  scanFolderTokenise: (folderPath: string) =>
+    ipcRenderer.invoke('scan-folder-tokenise', folderPath),
+  tokeniseEstimate: (folderPath: string) =>
+    ipcRenderer.invoke('tokenise-estimate', folderPath),
+  tokeniseFolder: (payload: {
+    folderPath: string;
+    stampPath: string;
+    conditions?: Record<string, { condition: string; conditionData: string }>;
+  }) => ipcRenderer.invoke('tokenise-folder', payload),
+  onMetanetProgress: (callback: (data: {
+    stage: string;
+    completed: number;
+    total: number;
+    currentPath?: string;
+  }) => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: {
+      stage: string; completed: number; total: number; currentPath?: string;
+    }) => callback(data);
+    ipcRenderer.on('metanet-progress', handler);
+    return () => ipcRenderer.removeListener('metanet-progress', handler);
+  },
 
   // Mint documents
   listMintDocuments: () => ipcRenderer.invoke('list-mint-documents'),
@@ -105,5 +166,28 @@ contextBridge.exposeInMainWorld('mint', {
   exportMintSvg: (payload: { svgContent: string; defaultName?: string }) =>
     ipcRenderer.invoke('export-mint-svg', payload),
   exportMintBatch: (payload: { folder: string; dataUrls: { name: string; dataUrl: string }[] }) =>
-    ipcRenderer.invoke('export-mint-batch', payload)
+    ipcRenderer.invoke('export-mint-batch', payload),
+
+  // --- BTMS (Basic Token Management System) ---
+  btmsStatus: () => ipcRenderer.invoke('btms-status'),
+  btmsIssue: (payload: { amount: number; metadata?: Record<string, unknown> }) =>
+    ipcRenderer.invoke('btms-issue', payload),
+  btmsListAssets: () => ipcRenderer.invoke('btms-list-assets'),
+  btmsGetBalance: (assetId: string) => ipcRenderer.invoke('btms-get-balance', assetId),
+  btmsSend: (payload: { assetId: string; recipient: string; amount: number }) =>
+    ipcRenderer.invoke('btms-send', payload),
+  btmsListIncoming: () => ipcRenderer.invoke('btms-list-incoming'),
+  btmsAccept: (payment: unknown) => ipcRenderer.invoke('btms-accept', payment),
+  btmsBurn: (payload: { assetId: string; amount?: number }) =>
+    ipcRenderer.invoke('btms-burn', payload),
+
+  // --- KYC (Veriff + BRC-KYC-Certificate) ---
+  kycStart: (payload: { subjectAddress: string; email?: string }) =>
+    ipcRenderer.invoke('kyc-start', payload),
+  kycSession: () => ipcRenderer.invoke('kyc-session'),
+  kycCertificate: () => ipcRenderer.invoke('kyc-certificate'),
+  kycPoll: (sessionId: string) => ipcRenderer.invoke('kyc-poll', sessionId),
+  kycVerifyCert: (payload: { certificate: string; signature: string }) =>
+    ipcRenderer.invoke('kyc-verify-cert', payload),
+  kycReset: () => ipcRenderer.invoke('kyc-reset')
 });

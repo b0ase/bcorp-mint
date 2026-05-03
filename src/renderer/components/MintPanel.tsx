@@ -90,7 +90,7 @@ export default function MintPanel({
   const [stampResult, setStampResult] = useState('');
 
   // Fund & Mint state
-  const [mintMode, setMintMode] = useState<'burn' | 'lock' | 'hash'>('burn');
+  const [mintMode, setMintMode] = useState<'burn' | 'lock' | 'hash' | 'ordinal'>('burn');
   const [denomination, setDenomination] = useState(1);
   const [lockUntil, setLockUntil] = useState('');
   const [isBurning, setIsBurning] = useState(false);
@@ -115,7 +115,24 @@ export default function MintPanel({
 
       let txid: string;
 
-      if (mintMode === 'hash') {
+      if (mintMode === 'ordinal') {
+        // Ordinal mode — banknote image lives on chain in the inscription envelope.
+        // No BSV burn / lock. The note IS the inscription.
+        const dataUrl = onExportPng();
+        if (!dataUrl) throw new Error('Export failed');
+        const b64 = dataUrl.replace(/^data:[^;]+;base64,/, '');
+        const result = await window.mint.inscribeOrdinal({
+          dataB64: b64,
+          contentType: 'image/png',
+          map: {
+            app: 'bcorp-mint',
+            type: 'banknote',
+            denomination: `${denomination} BSV`,
+            mintedAt: timestamp
+          }
+        });
+        txid = result.txid;
+      } else if (mintMode === 'hash') {
         // Hash To Mint — no BSV spent, just inscribe the hash
         const dataUrl = onExportPng();
         if (!dataUrl) throw new Error('Export failed');
@@ -616,6 +633,7 @@ export default function MintPanel({
             { id: 'burn' as const, label: 'Burn', desc: 'Destroy BSV' },
             { id: 'lock' as const, label: 'Lock', desc: 'Timelock BSV' },
             { id: 'hash' as const, label: 'Hash', desc: 'Proof only' },
+            { id: 'ordinal' as const, label: 'Ordinal', desc: 'Image on chain' },
           ]).map(m => (
             <button key={m.id} onClick={() => setMintMode(m.id)}
               title={m.desc}
@@ -634,6 +652,7 @@ export default function MintPanel({
           {mintMode === 'burn' && 'Permanently destroy BSV. Highest trust — value is irrevocably gone.'}
           {mintMode === 'lock' && 'Lock BSV to a timelock. Redeemable after expiry — like a bond.'}
           {mintMode === 'hash' && 'Hash the design on-chain. No BSV spent — proof of existence only.'}
+          {mintMode === 'ordinal' && 'Inscribe the banknote image as a 1Sat ordinal. The note IS the NFT — image lives on chain in the inscription envelope.'}
         </div>
 
         {/* Lock date picker */}

@@ -6,9 +6,30 @@ import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey } from './keystore';
 import { inscribeStamp } from './bsv';
+import { inscribeOrdinal, type InscribeOrdinalPayload } from './ordinal-inscribe';
 import { getRedirectUrl, getWalletState, disconnect as walletDisconnect } from './handcash';
 import { mintStampToken, batchMintTokens } from './token-mint';
 import { probeMedia, extractThumbnail, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
+import {
+  btmsStatus, btmsIssue, btmsListAssets, btmsGetBalance, btmsSend,
+  btmsListIncoming, btmsAccept, btmsBurn, isSecurities,
+  type MintAssetMetadata
+} from './btms';
+import {
+  startSession as kycStart, getStoredSession, getStoredCertificate,
+  pollDecisionAndIssue, verifyCertificatePair, resetKyc
+} from './kyc';
+import {
+  hasMasterKey, saveMasterKey, loadMasterKey, deleteMasterKey,
+  exportMasterKeyBackup, importMasterKeyBackup
+} from './keystore';
+import {
+  generateMasterKey, deriveChildInfo, getMasterKeyInfo, buildManifest
+} from './wallet-derivation';
+import { WalletManager } from './wallet-manager';
+import { inscribeDocumentHash, inscribeBitTrust } from './bsv';
+import { scanFolder } from './fs-tokenise';
+import { buildMetaNetTree, estimateTreeCost } from './metanet';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -207,6 +228,23 @@ ipcMain.handle('choose-export-folder', async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
+});
+
+// Download a remote URL → base64 data URL via main process (no canvas-taint at composite time).
+ipcMain.handle('fetch-as-data-url', async (_e, url: string): Promise<{ dataUrl: string; mime: string }> => {
+  if (!/^https?:\/\//i.test(url)) throw new Error('fetch-as-data-url: only http(s) URLs supported');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch-as-data-url ${res.status}: ${res.statusText}`);
+  const mime = res.headers.get('content-type') ?? 'image/png';
+  const ab = await res.arrayBuffer();
+  const dataUrl = `data:${mime};base64,${Buffer.from(ab).toString('base64')}`;
+  return { dataUrl, mime };
+});
+
+// True 1Sat ordinal inscription — file content lives on chain in the
+// inscription envelope. Used by 'Mint Ordinal' on banknote designs.
+ipcMain.handle('inscribe-ordinal', async (_e, payload: InscribeOrdinalPayload) => {
+  return inscribeOrdinal(payload);
 });
 
 ipcMain.handle('save-file', async (_e, payload: { dataUrl: string; defaultDir?: string; defaultName?: string }) => {
@@ -513,6 +551,117 @@ ipcMain.handle('cleanup-extraction', async (_e, dir: string) => {
 ipcMain.handle('keystore-has-key', async () => hasPrivateKey());
 ipcMain.handle('keystore-save-key', async (_e, wif: string) => savePrivateKey(wif));
 ipcMain.handle('keystore-delete-key', async () => deletePrivateKey());
+
+// --------------- HD master key handlers ---------------
+
+ipcMain.handle('keystore-has-master', async () => hasMasterKey());
+
+ipcMain.handle('keystore-setup-master', async (_e, importHex?: string) => {
+  const hex = importHex?.trim() || generateMasterKey();
+  await saveMasterKey(hex);
+  return getMasterKeyInfo(hex);
+});
+
+ipcMain.handle('keystore-get-master-info', async () => {
+  const hex = await loadMasterKey();
+  return getMasterKeyInfo(hex);
+});
+
+ipcMain.handle('keystore-derive-address', async (_e, protocol: string, slug: string) => {
+  const hex = await loadMasterKey();
+  return deriveChildInfo(hex, protocol, slug);
+});
+
+ipcMain.handle('keystore-export-backup', async (_e, password: string) => {
+  return exportMasterKeyBackup(password);
+});
+
+ipcMain.handle('keystore-import-backup', async (_e, data: string, password: string) => {
+  const hex = importMasterKeyBackup(data, password);
+  await saveMasterKey(hex);
+  return getMasterKeyInfo(hex);
+});
+
+ipcMain.handle('keystore-build-manifest', async (_e, derivations: Array<{ protocol: string; slug: string }>) => {
+  const hex = await loadMasterKey();
+  return buildManifest(hex, derivations);
+});
+
+ipcMain.handle('keystore-delete-master', async () => deleteMasterKey());
+
+// --------------- Wallet manager handlers ---------------
+
+const walletManager = new WalletManager();
+
+ipcMain.handle('wallet-list-providers', async () => walletManager.detectAvailableProviders());
+
+ipcMain.handle('wallet-switch-provider', async (_e, type: string) => {
+  const validTypes: ReadonlyArray<string> = ['local', 'handcash', 'metanet'];
+  if (!validTypes.includes(type)) {
+    throw new Error(`Unknown wallet provider: ${type}`);
+  }
+  return walletManager.switchProvider(type as 'local' | 'handcash' | 'metanet');
+});
+
+// --------------- Inscription helpers ---------------
+
+ipcMain.handle('inscribe-document-hash', async (_e, payload: {
+  hashes: Array<{ file: string; sha256: string }>;
+  provider: 'local' | 'handcash' | 'metanet';
+  derivation?: { protocol: string; slug: string };
+}) => {
+  const walletProvider = walletManager.getProvider(payload.provider);
+  return inscribeDocumentHash({
+    hashes: payload.hashes,
+    provider: payload.provider,
+    walletProvider,
+    derivation: payload.derivation
+  });
+});
+
+ipcMain.handle('inscribe-bit-trust', async (_e, payload: {
+  contentHash: string;
+  tier: number;
+  title: string;
+  filing?: string;
+  identityRef?: string;
+  provider: 'local' | 'handcash' | 'metanet';
+  derivation?: { protocol: string; slug: string };
+}) => {
+  const walletProvider = walletManager.getProvider(payload.provider);
+  return inscribeBitTrust({
+    contentHash: payload.contentHash,
+    tier: payload.tier,
+    title: payload.title,
+    filing: payload.filing,
+    identityRef: payload.identityRef,
+    provider: payload.provider,
+    walletProvider,
+    derivation: payload.derivation
+  });
+});
+
+// --------------- Tokenise / MetaNet tree handlers ---------------
+
+ipcMain.handle('scan-folder-tokenise', async (_e, folderPath: string) => {
+  return scanFolder(folderPath);
+});
+
+ipcMain.handle('tokenise-estimate', async (_e, folderPath: string) => {
+  return estimateTreeCost(folderPath);
+});
+
+ipcMain.handle('tokenise-folder', async (_e, payload: {
+  folderPath: string;
+  stampPath: string;
+  conditions?: Record<string, { condition: string; conditionData: string }>;
+}) => {
+  const masterHex = await loadMasterKey();
+  const conditionMap = payload.conditions
+    ? new Map(Object.entries(payload.conditions))
+    : undefined;
+  return buildMetaNetTree(masterHex, payload.folderPath, payload.stampPath, conditionMap);
+});
 
 // --------------- Mint document handlers ---------------
 
@@ -945,6 +1094,65 @@ async function comfyQueueAndWait(workflow: Record<string, unknown>): Promise<{ i
 }
 
 // Main animate handler: upload image → queue workflow → wait → save result
+// --------------- BTMS (Basic Token Management System) ---------------
+
+ipcMain.handle('btms-status', async () => btmsStatus());
+
+ipcMain.handle('btms-issue', async (_e, payload: {
+  amount: number;
+  metadata?: MintAssetMetadata;
+}) => {
+  // Securities gate: require a verified KYC certificate attached for stock/bond
+  if (isSecurities(payload.metadata?.asset_class)) {
+    const hasCert = !!(payload.metadata?.kyc_certificate && payload.metadata?.kyc_certificate_signature);
+    if (!hasCert) {
+      throw new Error(
+        'Stock and bond issuance require a verified BRC-KYC-Certificate. ' +
+        'Complete KYC in the KYC panel, then retry.'
+      );
+    }
+    // Verify the attached certificate is genuinely signed
+    const v = verifyCertificatePair(
+      payload.metadata!.kyc_certificate!,
+      payload.metadata!.kyc_certificate_signature!
+    );
+    if (!v.valid) {
+      throw new Error(`Attached KYC certificate is invalid: ${v.error || 'unknown'}`);
+    }
+  }
+  return btmsIssue(payload);
+});
+
+ipcMain.handle('btms-list-assets', async () => btmsListAssets());
+ipcMain.handle('btms-get-balance', async (_e, assetId: string) => btmsGetBalance(assetId));
+ipcMain.handle('btms-send', async (_e, payload: { assetId: string; recipient: string; amount: number }) =>
+  btmsSend(payload));
+ipcMain.handle('btms-list-incoming', async () => btmsListIncoming());
+// Payment objects can be large (carry BEEF). Renderer round-trips the full payment.
+ipcMain.handle('btms-accept', async (_e, payment: Parameters<typeof btmsAccept>[0]) => btmsAccept(payment));
+ipcMain.handle('btms-burn', async (_e, payload: { assetId: string; amount?: number }) =>
+  btmsBurn(payload));
+
+// --------------- KYC (Veriff + BRC-KYC-Certificate) ---------------
+
+ipcMain.handle('kyc-start', async (_e, payload: { subjectAddress: string; email?: string }) =>
+  kycStart(payload));
+
+ipcMain.handle('kyc-session', async () => getStoredSession());
+ipcMain.handle('kyc-certificate', async () => getStoredCertificate());
+
+ipcMain.handle('kyc-poll', async (_e, sessionId: string) => pollDecisionAndIssue(sessionId));
+
+ipcMain.handle('kyc-verify-cert', async (_e, payload: { certificate: string; signature: string }) =>
+  verifyCertificatePair(payload.certificate, payload.signature));
+
+ipcMain.handle('kyc-reset', async () => {
+  await resetKyc();
+  return true;
+});
+
+// --------------- ComfyUI animate (restored below) ---------------
+
 ipcMain.handle('comfyui-animate', async (_e, payload: {
   imagePath: string;
   outputDir: string;
