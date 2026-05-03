@@ -7,6 +7,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hasPrivateKey, savePrivateKey, loadPrivateKey, deletePrivateKey } from './keystore';
 import { inscribeStamp } from './bsv';
 import { inscribeOrdinal, type InscribeOrdinalPayload } from './ordinal-inscribe';
+import {
+  createListing,
+  cancelListing,
+  purchaseListing,
+  myListings,
+  type CreateListingPayload,
+  type CancelListingPayload,
+  type PurchaseListingPayload
+} from './ordinal-market';
 import { getRedirectUrl, getWalletState, disconnect as walletDisconnect } from './handcash';
 import { mintStampToken, batchMintTokens } from './token-mint';
 import { probeMedia, extractThumbnail, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
@@ -245,6 +254,21 @@ ipcMain.handle('fetch-as-data-url', async (_e, url: string): Promise<{ dataUrl: 
 // inscription envelope. Used by 'Mint Ordinal' on banknote designs.
 ipcMain.handle('inscribe-ordinal', async (_e, payload: InscribeOrdinalPayload) => {
   return inscribeOrdinal(payload);
+});
+
+// Marketplace operations — list, cancel, buy banknote ordinals
+// (and any other 1Sat ordinal you've inscribed via the Ordinal mint mode).
+ipcMain.handle('market-create-listing', async (_e, payload: CreateListingPayload) => {
+  return createListing(payload);
+});
+ipcMain.handle('market-cancel-listing', async (_e, payload: CancelListingPayload) => {
+  return cancelListing(payload);
+});
+ipcMain.handle('market-purchase-listing', async (_e, payload: PurchaseListingPayload) => {
+  return purchaseListing(payload);
+});
+ipcMain.handle('market-my-listings', async () => {
+  return myListings();
 });
 
 ipcMain.handle('save-file', async (_e, payload: { dataUrl: string; defaultDir?: string; defaultName?: string }) => {

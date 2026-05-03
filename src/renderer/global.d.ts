@@ -19,6 +19,31 @@ declare global {
         map?: Record<string, string>;
         destinationAddress?: string;
       }) => Promise<{ txid: string; ordinalId: string }>;
+
+      // Marketplace ops — 1sat market protocol via js-1sat-ord
+      marketCreateListing: (payload: {
+        ordinalTxid: string;
+        ordinalVout: number;
+        priceSats: number;
+        payAddress?: string;
+      }) => Promise<{ listingTxid: string; listingVout: number; priceSats: number }>;
+      marketCancelListing: (payload: {
+        listingTxid: string;
+        listingVout: number;
+      }) => Promise<{ txid: string }>;
+      marketPurchaseListing: (payload: {
+        listingTxid: string;
+        listingVout: number;
+      }) => Promise<{ txid: string; ordinalId: string }>;
+      marketMyListings: () => Promise<Array<{
+        listingTxid: string;
+        listingVout: number;
+        ordinalTxid: string;
+        ordinalVout: number;
+        priceSats: number;
+        createdAt?: string;
+        title?: string;
+      }>>;
       writeFile: (dataUrl: string, folder: string, fileName: string) => Promise<string>;
       fileUrl: (filePath: string) => Promise<string>;
       basename: (filePath: string) => Promise<string>;

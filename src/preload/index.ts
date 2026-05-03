@@ -13,6 +13,24 @@ contextBridge.exposeInMainWorld('mint', {
     ipcRenderer.invoke('fetch-as-data-url', url) as Promise<{ dataUrl: string; mime: string }>,
   inscribeOrdinal: (payload: { dataB64: string; contentType: string; map?: Record<string, string>; destinationAddress?: string }) =>
     ipcRenderer.invoke('inscribe-ordinal', payload) as Promise<{ txid: string; ordinalId: string }>,
+
+  // Marketplace ops
+  marketCreateListing: (payload: { ordinalTxid: string; ordinalVout: number; priceSats: number; payAddress?: string }) =>
+    ipcRenderer.invoke('market-create-listing', payload) as Promise<{ listingTxid: string; listingVout: number; priceSats: number }>,
+  marketCancelListing: (payload: { listingTxid: string; listingVout: number }) =>
+    ipcRenderer.invoke('market-cancel-listing', payload) as Promise<{ txid: string }>,
+  marketPurchaseListing: (payload: { listingTxid: string; listingVout: number }) =>
+    ipcRenderer.invoke('market-purchase-listing', payload) as Promise<{ txid: string; ordinalId: string }>,
+  marketMyListings: () =>
+    ipcRenderer.invoke('market-my-listings') as Promise<Array<{
+      listingTxid: string;
+      listingVout: number;
+      ordinalTxid: string;
+      ordinalVout: number;
+      priceSats: number;
+      createdAt?: string;
+      title?: string;
+    }>>,
   writeFile: (dataUrl: string, folder: string, fileName: string) =>
     ipcRenderer.invoke('write-file', { dataUrl, folder, fileName }),
   fileUrl: (filePath: string) => ipcRenderer.invoke('file-url', filePath),

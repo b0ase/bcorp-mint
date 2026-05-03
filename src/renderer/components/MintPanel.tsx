@@ -4,6 +4,7 @@ import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayer
 import LayerList from './LayerList';
 import PatternControls from './PatternControls';
 import GrokGeneratePanel from './GrokGeneratePanel';
+import MarketPanel from './MarketPanel';
 
 type Props = {
   doc: MintDocument;
@@ -895,6 +896,7 @@ export default function MintPanel({
           </div>
         </div>
       )}
+      <MarketPanel />
     </aside>
   );
 }
