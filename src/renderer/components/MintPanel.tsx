@@ -3,6 +3,7 @@ import { COLOR_SCHEMES, MINT_TEMPLATES, type ColorScheme } from '../lib/mint-def
 import type { MintBlendMode, MintDocument, MintLayer, MintLayerConfig, MintLayerTransform } from '../lib/types';
 import LayerList from './LayerList';
 import PatternControls from './PatternControls';
+import GrokGeneratePanel from './GrokGeneratePanel';
 
 type Props = {
   doc: MintDocument;
@@ -455,6 +456,9 @@ export default function MintPanel({
   return (
     <aside className="panel right-panel mint-panel">
       <h2>Currency Designer</h2>
+
+      {/* AI Generate (Grok / BSVAPI / AtlasCloud) — adds output as a layer */}
+      <GrokGeneratePanel onAddImageFromUrl={onAddImageFromUrl} scope="banknote" />
 
       {/* Document Name */}
       <input

@@ -39,7 +39,9 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "icon": "resources/icon.icns",
@@ -54,12 +56,23 @@
       "icon": "resources/icon.icns",
       "iconSize": 128,
       "contents": [
-        { "x": 380, "y": 240, "type": "link", "path": "/Applications" },
-        { "x": 130, "y": 240, "type": "file" }
+        {
+          "x": 380,
+          "y": 240,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 130,
+          "y": 240,
+          "type": "file"
+        }
       ]
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "resources/icon.png"
     },
     "nsis": {
@@ -69,7 +82,9 @@
       "uninstallerIcon": "resources/icon.ico"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "icon": "resources/icon.png",
       "category": "Graphics"
     },
@@ -78,6 +93,9 @@
     "publish": null
   },
   "dependencies": {
+    "@b0ase/creator-tool-core": "link:../creator-tool-core",
+    "@bsv/btms": "^1.0.1",
+    "@bsv/message-box-client": "^2.0.7",
     "@bsv/sdk": "^2.0.3",
     "ffmpeg-static": "^5.3.0",
     "js-1sat-ord": "^0.1.91",
@@ -91,10 +109,12 @@
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "bufferutil": "^4.1.0",
     "electron": "^30.1.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^2.2.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "utf-8-validate": "^6.0.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
