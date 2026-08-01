@@ -26,12 +26,30 @@ export const supabaseAdmin = createClient(
     }
 );
 
-import { encrypt } from '@/lib/encryption';
 
 /**
- * Maps a HandCash handle to a persistent unified user record
+ * Maps a HandCash handle to a persistent unified user record.
+ *
+ * `authToken` IS DELIBERATELY IGNORED. It used to be encrypted into
+ * `unified_users.encrypted_auth_token` on every sign-in. That column was written here and
+ * read NOWHERE — checked across the whole b0ase portfolio, every occurrence in every
+ * project is an `.update()`, never a `.select()`. It bought nothing and cost a great deal:
+ *
+ *   - A HandCash auth token can SIGN and SPEND as the user. Storing them made the shared
+ *     database a wallet-draining kit rather than a list of accounts.
+ *   - The "encrypted" part was decorative. lib/encryption.ts keyed off
+ *     API_KEY_ENCRYPTION_SECRET and FELL BACK TO SUPABASE_SERVICE_ROLE_KEY — so whoever
+ *     held the credential needed to read the ciphertext also held the key that opened it.
+ *     (Its final fallback was a hardcoded literal in the source.)
+ *
+ * Nothing is lost: sessions authenticate from the httpOnly handcash_auth_token cookie, and
+ * a fresh token arrives from the OAuth callback on every sign-in. The parameter is kept in
+ * the signature so existing callers stay valid.
+ *
+ * Ported from bit-sign d6ce808. See bit-sign/docs/DESIGN-privacy-and-key-custody.md §6.2.
  */
 export async function mapHandCashUser(profile: { handle: string, displayName?: string, avatarUrl?: string }, authToken?: string) {
+    void authToken;
     // 1. Check if HandCash identity already exists
     const { data: identity, error: identityError } = await supabaseAdmin
         .from('user_identities')
@@ -62,14 +80,6 @@ export async function mapHandCashUser(profile: { handle: string, displayName?: s
             console.error('[Supabase] Error updating unified user:', userError);
         }
 
-        // Store encrypted auth token on unified_users if provided
-        if (authToken) {
-            const encryptedToken = encrypt(authToken);
-            await supabaseAdmin
-                .from('unified_users')
-                .update({ encrypted_auth_token: encryptedToken })
-                .eq('id', identity.unified_user_id);
-        }
 
         return user;
     }
@@ -103,14 +113,6 @@ export async function mapHandCashUser(profile: { handle: string, displayName?: s
         console.error('[Supabase] Error linking HandCash identity:', linkError);
     }
 
-    // Store encrypted auth token on unified_users if provided
-    if (authToken) {
-        const encryptedToken = encrypt(authToken);
-        await supabaseAdmin
-            .from('unified_users')
-            .update({ encrypted_auth_token: encryptedToken })
-            .eq('id', newUser.id);
-    }
 
     return newUser;
 }
