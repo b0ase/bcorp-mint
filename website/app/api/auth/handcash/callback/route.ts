@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
             console.error(`[Auth] Auto-mint failed for ${publicProfile.handle}:`, mintErr);
         }
 
-        const returnTo = request.cookies.get('auth_return_to')?.value || '/vault';
+        const returnTo = request.cookies.get('auth_return_to')?.value || '/mint';
         const response = NextResponse.redirect(new URL(returnTo, appUrl));
         const domain = getCookieDomain();
 

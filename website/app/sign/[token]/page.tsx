@@ -62,7 +62,6 @@ export default function SignPage({ params }: { params: Promise<{ token: string }
 
   useEffect(() => {
     if (token) resolveToken();
-    fetchRegisteredSignature();
   }, [token]);
 
   const resolveToken = async () => {
@@ -84,17 +83,8 @@ export default function SignPage({ params }: { params: Promise<{ token: string }
     }
   };
 
-  const fetchRegisteredSignature = async () => {
-    try {
-      const res = await fetch('/api/bitsign/registered-signature');
-      const data = await res.json();
-      if (data.registered) {
-        setRegisteredSig({ svg: data.svg, txid: data.txid, id: data.id });
-      }
-    } catch {
-      // No registered signature -- that's fine
-    }
-  };
+  // Registered signatures live in bit-sign.online; the local fork of that API
+  // was removed, so registeredSig stays null here.
 
   // Sign with the pre-registered signature (skips drawing canvas)
   const handleSignWithRegistered = () => {

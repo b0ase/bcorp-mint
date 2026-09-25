@@ -5,7 +5,7 @@ const SIGNING_FEE_USD = 0.01;
 const BITSIGN_HANDLE = process.env.BITSIGN_HANDLE || 'bitcoinmint';
 
 /**
- * POST /api/bitsign/handcash-verify
+ * POST /api/envelopes/handcash-verify
  * Verifies the user's HandCash identity by signing a message server-side.
  * When envelope_id is provided, also charges $0.01 signing fee from signer's wallet.
  * Uses the httpOnly handcash_auth_token cookie.

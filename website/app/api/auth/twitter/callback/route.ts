@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase';
 import { createStrand } from '@/lib/identity-strands';
+import { resolveHandleFromAuthToken } from '@/lib/auth';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://bitcoin-mint.com';
 
@@ -56,7 +57,8 @@ export async function GET(request: NextRequest) {
 
         // 3. Get HandCash handle from cookie
         const cookieStore = await cookies();
-        const handle = cookieStore.get('handcash_handle')?.value;
+        // Verified server-side via HandCash; the plain handcash_handle cookie is forgeable.
+        const handle = await resolveHandleFromAuthToken(cookieStore.get('handcash_auth_token')?.value);
 
         if (!handle) {
             return NextResponse.redirect(`${APP_URL}/user/account?error=not_authenticated`);

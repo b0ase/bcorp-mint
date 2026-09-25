@@ -1,13 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useCallback } from 'react';
-import VaultPage from '@shared/app/VaultPage';
-
+// The signature vault was a stale fork of bit-sign. It now lives at bit-sign.online.
 export default function Page() {
-  const pdfToImage = useCallback(async (arrayBuffer: ArrayBuffer) => {
-    const { pdfToImage } = await import('@/lib/pdf-to-image');
-    return pdfToImage(arrayBuffer);
-  }, []);
-
-  return <VaultPage pdfToImageFn={pdfToImage} />;
+  redirect('https://bit-sign.online');
 }

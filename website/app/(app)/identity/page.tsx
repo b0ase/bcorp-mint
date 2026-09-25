@@ -1,7 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import IdentityPage from '@shared/app/IdentityPage';
-
+// Identity verification happens in bChat (bit-sign.online).
 export default function Page() {
-  return <IdentityPage />;
+  redirect('https://bit-sign.online');
 }
