@@ -21,13 +21,10 @@ import { mintStampToken, batchMintTokens } from './token-mint';
 import { probeMedia, extractThumbnail, extractVideoFrames, extractAudioSegment, getAudioPeaks, generateWaveformImage, cleanupTempDir, registerCleanupOnQuit } from './media-extract';
 import {
   btmsStatus, btmsIssue, btmsListAssets, btmsGetBalance, btmsSend,
-  btmsListIncoming, btmsAccept, btmsBurn, isSecurities,
+  btmsListIncoming, btmsAccept, btmsBurn,
   type MintAssetMetadata
 } from './btms';
-import {
-  startSession as kycStart, getStoredSession, getStoredCertificate,
-  pollDecisionAndIssue, verifyCertificatePair, resetKyc
-} from './kyc';
+import { openBitSignVerification, resetKyc } from './kyc';
 import {
   hasMasterKey, saveMasterKey, loadMasterKey, deleteMasterKey,
   exportMasterKeyBackup, importMasterKeyBackup
@@ -1122,30 +1119,12 @@ async function comfyQueueAndWait(workflow: Record<string, unknown>): Promise<{ i
 
 ipcMain.handle('btms-status', async () => btmsStatus());
 
+// Securities (stock/bond) issuance is refused inside btmsIssue itself —
+// the main-process gate — regardless of what the renderer sends.
 ipcMain.handle('btms-issue', async (_e, payload: {
   amount: number;
   metadata?: MintAssetMetadata;
-}) => {
-  // Securities gate: require a verified KYC certificate attached for stock/bond
-  if (isSecurities(payload.metadata?.asset_class)) {
-    const hasCert = !!(payload.metadata?.kyc_certificate && payload.metadata?.kyc_certificate_signature);
-    if (!hasCert) {
-      throw new Error(
-        'Stock and bond issuance require a verified BRC-KYC-Certificate. ' +
-        'Complete KYC in the KYC panel, then retry.'
-      );
-    }
-    // Verify the attached certificate is genuinely signed
-    const v = verifyCertificatePair(
-      payload.metadata!.kyc_certificate!,
-      payload.metadata!.kyc_certificate_signature!
-    );
-    if (!v.valid) {
-      throw new Error(`Attached KYC certificate is invalid: ${v.error || 'unknown'}`);
-    }
-  }
-  return btmsIssue(payload);
-});
+}) => btmsIssue(payload));
 
 ipcMain.handle('btms-list-assets', async () => btmsListAssets());
 ipcMain.handle('btms-get-balance', async (_e, assetId: string) => btmsGetBalance(assetId));
@@ -1157,18 +1136,12 @@ ipcMain.handle('btms-accept', async (_e, payment: Parameters<typeof btmsAccept>[
 ipcMain.handle('btms-burn', async (_e, payload: { assetId: string; amount?: number }) =>
   btmsBurn(payload));
 
-// --------------- KYC (Veriff + BRC-KYC-Certificate) ---------------
+// --------------- KYC ---------------
+// Local KYC certificate issuance is paused: the desktop app no longer calls
+// Veriff or self-signs certificates. Identity verification happens in bChat
+// (bit-sign.online), which runs Veriff server-side under a real cert issuer.
 
-ipcMain.handle('kyc-start', async (_e, payload: { subjectAddress: string; email?: string }) =>
-  kycStart(payload));
-
-ipcMain.handle('kyc-session', async () => getStoredSession());
-ipcMain.handle('kyc-certificate', async () => getStoredCertificate());
-
-ipcMain.handle('kyc-poll', async (_e, sessionId: string) => pollDecisionAndIssue(sessionId));
-
-ipcMain.handle('kyc-verify-cert', async (_e, payload: { certificate: string; signature: string }) =>
-  verifyCertificatePair(payload.certificate, payload.signature));
+ipcMain.handle('kyc-open-bitsign', async () => openBitSignVerification());
 
 ipcMain.handle('kyc-reset', async () => {
   await resetKyc();

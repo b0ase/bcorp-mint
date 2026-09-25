@@ -199,13 +199,7 @@ contextBridge.exposeInMainWorld('mint', {
   btmsBurn: (payload: { assetId: string; amount?: number }) =>
     ipcRenderer.invoke('btms-burn', payload),
 
-  // --- KYC (Veriff + BRC-KYC-Certificate) ---
-  kycStart: (payload: { subjectAddress: string; email?: string }) =>
-    ipcRenderer.invoke('kyc-start', payload),
-  kycSession: () => ipcRenderer.invoke('kyc-session'),
-  kycCertificate: () => ipcRenderer.invoke('kyc-certificate'),
-  kycPoll: (sessionId: string) => ipcRenderer.invoke('kyc-poll', sessionId),
-  kycVerifyCert: (payload: { certificate: string; signature: string }) =>
-    ipcRenderer.invoke('kyc-verify-cert', payload),
+  // --- KYC (moved to bit-sign.online; no local issuance) ---
+  kycOpenBitSign: () => ipcRenderer.invoke('kyc-open-bitsign'),
   kycReset: () => ipcRenderer.invoke('kyc-reset')
 });

@@ -1,4 +1,7 @@
 ---
+
+> **STATUS (2026-09-25): superseded.** Stock/bond issuance is paused pending legal review (enforced in `src/main/btms.ts`), and local KYC certificate issuance / in-app Veriff calls have been removed. Identity verification happens in bChat (bit-sign.online). The design below is historical.
+
 title: "BTMS + Veriff KYC Integration"
 subtitle: "Bitcoin Mint — session summary, 2026-04-19"
 ---

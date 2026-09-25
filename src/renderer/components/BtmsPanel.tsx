@@ -24,11 +24,15 @@ const TAB_LABEL: Record<Tab, string> = {
 
 const TAB_ORDER: Tab[] = ['home', 'issue', 'send', 'receive', 'burn', 'kyc'];
 
-const ASSET_CLASSES: { value: AssetClass; label: string; gated: boolean }[] = [
-  { value: 'token', label: 'Token', gated: false },
-  { value: 'currency', label: 'Currency', gated: false },
-  { value: 'stock', label: 'Stock', gated: true },
-  { value: 'bond', label: 'Bond', gated: true },
+// Must match SECURITIES_PAUSED_MESSAGE in src/main/btms.ts. The main process
+// enforces the pause; this is just the UI reflection of it.
+const SECURITIES_PAUSED_MESSAGE = 'Issuing securities is paused pending legal review';
+
+const ASSET_CLASSES: { value: AssetClass; label: string; unavailable: boolean }[] = [
+  { value: 'token', label: 'Token', unavailable: false },
+  { value: 'currency', label: 'Currency', unavailable: false },
+  { value: 'stock', label: 'Stock', unavailable: true },
+  { value: 'bond', label: 'Bond', unavailable: true },
 ];
 
 function shorten(s: string, head = 8, tail = 6): string {
@@ -47,7 +51,6 @@ export default function BtmsPanel() {
   const [assets, setAssets] = useState<BtmsAsset[]>([]);
   const [incoming, setIncoming] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hasCert, setHasCert] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     const s = await window.mint.btmsStatus();
@@ -58,14 +61,12 @@ export default function BtmsPanel() {
   const refreshAssets = useCallback(async () => {
     try {
       setLoading(true);
-      const [a, i, c] = await Promise.all([
+      const [a, i] = await Promise.all([
         window.mint.btmsListAssets(),
         window.mint.btmsListIncoming(),
-        window.mint.kycCertificate(),
       ]);
       setAssets(a);
       setIncoming(i);
-      setHasCert(!!c);
     } catch (err) {
       console.error('[btms] refresh failed', err);
     } finally {
@@ -94,7 +95,6 @@ export default function BtmsPanel() {
           >
             {TAB_LABEL[t]}
             {t === 'receive' && incoming.length > 0 ? ` (${incoming.length})` : ''}
-            {t === 'kyc' && hasCert ? ' ✓' : ''}
           </button>
         ))}
       </div>
@@ -104,10 +104,7 @@ export default function BtmsPanel() {
           <VaultView assets={assets} loading={loading} onRefresh={refreshAssets} />
         )}
         {tab === 'issue' && (
-          <IssueView
-            hasCert={hasCert}
-            onIssued={refreshAssets}
-          />
+          <IssueView onIssued={refreshAssets} />
         )}
         {tab === 'send' && (
           <SendView assets={assets} onSent={refreshAssets} />
@@ -119,10 +116,7 @@ export default function BtmsPanel() {
           <BurnView assets={assets} onBurned={refreshAssets} />
         )}
         {tab === 'kyc' && (
-          <KycPanel
-            defaultSubject={status?.identityKey ?? null}
-            onCertChange={() => { refreshAssets(); }}
-          />
+          <KycPanel />
         )}
       </div>
     </div>
@@ -203,10 +197,8 @@ function VaultView({
 }
 
 function IssueView({
-  hasCert,
   onIssued,
 }: {
-  hasCert: boolean;
   onIssued: () => void;
 }) {
   const [name, setName] = useState('');
@@ -219,12 +211,15 @@ function IssueView({
   const [error, setError] = useState<string | null>(null);
 
   const classInfo = ASSET_CLASSES.find((c) => c.value === assetClass)!;
-  const requiresKyc = classInfo.gated;
-  const gated = requiresKyc && !hasCert;
+  const gated = classInfo.unavailable;
 
   async function handleIssue() {
     setError(null);
     setResult(null);
+    if (gated) {
+      setError(SECURITIES_PAUSED_MESSAGE);
+      return;
+    }
     if (!name.trim()) {
       setError('Asset name is required');
       return;
@@ -241,16 +236,6 @@ function IssueView({
         iconURL: iconURL.trim() || undefined,
         asset_class: assetClass,
       };
-
-      if (requiresKyc) {
-        const stored = await window.mint.kycCertificate();
-        if (!stored) {
-          setError('No BRC-KYC-Certificate on this device. Complete KYC first.');
-          return;
-        }
-        metadata.kyc_certificate = JSON.stringify(stored.certificate);
-        metadata.kyc_certificate_signature = stored.signature;
-      }
 
       const res = await window.mint.btmsIssue({ amount, metadata });
       if (!res.success) {
@@ -278,9 +263,12 @@ function IssueView({
               type="button"
               className={`btms-class-btn ${assetClass === c.value ? 'active' : ''}`}
               onClick={() => setAssetClass(c.value)}
+              title={c.unavailable ? SECURITIES_PAUSED_MESSAGE : undefined}
+              aria-disabled={c.unavailable}
+              style={c.unavailable ? { opacity: 0.5 } : undefined}
             >
               <span className="btms-class-label">{c.label}</span>
-              {c.gated && <span className="btms-class-gated">requires KYC</span>}
+              {c.unavailable && <span className="btms-class-gated">unavailable</span>}
             </button>
           ))}
         </div>
@@ -315,7 +303,7 @@ function IssueView({
 
       {gated && (
         <div className="btms-warn-block">
-          <b>{classInfo.label} issuance is gated.</b> Stocks and bonds require a verified BRC-KYC-Certificate attached to the issuance metadata. Switch to the KYC tab to complete verification.
+          <b>{classInfo.label} issuance is unavailable.</b> {SECURITIES_PAUSED_MESSAGE}.
         </div>
       )}
 

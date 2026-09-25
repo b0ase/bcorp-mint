@@ -9,9 +9,9 @@
  * Asset taxonomy (Mint-specific extension):
  *   BTMS asset metadata carries an `asset_class` field:
  *     'stock' | 'bond' | 'token' | 'currency'
- *   Stocks and bonds are securities — the renderer gates issuance of
- *   those behind a verified BRC-KYC-Certificate. Tokens and currency
- *   are unrestricted.
+ *   Stocks and bonds are securities. Issuing them is PAUSED pending
+ *   legal review — enforced here in the main process (btmsIssue), not
+ *   just in the renderer. Tokens and currency are unrestricted.
  *
  * Privacy note: BTMS operations are overlay-indexed (Topic Manager +
  * Lookup Service). Unlike ComfyUI + stamp inscriptions, BTMS traffic
@@ -76,16 +76,36 @@ export type AssetClass = 'stock' | 'bond' | 'token' | 'currency';
 
 export interface MintAssetMetadata extends BTMSAssetMetadata {
   asset_class?: AssetClass;
-  /** Optional BRC-KYC-Certificate JSON (stringified) attached to issuance */
-  kyc_certificate?: string;
-  /** DER-hex signature of the certificate (for verification) */
-  kyc_certificate_signature?: string;
 }
 
 const SECURITIES_CLASSES: ReadonlySet<AssetClass> = new Set(['stock', 'bond']);
 
 export function isSecurities(assetClass?: string): boolean {
-  return !!assetClass && SECURITIES_CLASSES.has(assetClass as AssetClass);
+  return !!assetClass && SECURITIES_CLASSES.has(assetClass.trim().toLowerCase() as AssetClass);
+}
+
+export const SECURITIES_PAUSED_MESSAGE = 'Issuing securities is paused pending legal review';
+
+const ALLOWED_ISSUE_CLASSES: ReadonlySet<string> = new Set(['token', 'currency']);
+
+/**
+ * Main-process issuance gate. The renderer is untrusted: whatever it sends,
+ * stock/bond (securities) issuance is refused, and any asset_class other
+ * than token/currency (or none) is rejected.
+ */
+function assertIssuanceAllowed(metadata?: MintAssetMetadata): void {
+  const raw = (metadata as { asset_class?: unknown } | undefined)?.asset_class;
+  if (raw === undefined || raw === null) return;
+  if (typeof raw !== 'string') {
+    throw new Error('Invalid asset_class');
+  }
+  const cls = raw.trim().toLowerCase();
+  if (SECURITIES_CLASSES.has(cls as AssetClass)) {
+    throw new Error(SECURITIES_PAUSED_MESSAGE);
+  }
+  if (!ALLOWED_ISSUE_CLASSES.has(cls)) {
+    throw new Error(`Unsupported asset_class: ${cls}`);
+  }
 }
 
 // --- Operations ---
@@ -127,6 +147,7 @@ export async function btmsIssue(input: {
   amount: number;
   metadata?: MintAssetMetadata;
 }): Promise<IssueResult> {
+  assertIssuanceAllowed(input?.metadata);
   await ensureAuthenticated();
   const btms = getBtms();
   return btms.issue(input.amount, input.metadata);

@@ -260,8 +260,6 @@ declare global {
           description?: string;
           iconURL?: string;
           asset_class?: 'stock' | 'bond' | 'token' | 'currency';
-          kyc_certificate?: string;
-          kyc_certificate_signature?: string;
           [key: string]: unknown;
         };
       }) => Promise<{
@@ -301,55 +299,8 @@ declare global {
         error?: string;
       }>;
 
-      // --- KYC ---
-      kycStart: (payload: { subjectAddress: string; email?: string }) => Promise<{
-        veriffSessionId: string;
-        sessionUrl: string;
-        subjectAddress: string;
-        vendorData: string;
-        status: string;
-        createdAt: string;
-        updatedAt: string;
-      }>;
-      kycSession: () => Promise<{
-        veriffSessionId: string;
-        sessionUrl: string;
-        subjectAddress: string;
-        status: string;
-      } | null>;
-      kycCertificate: () => Promise<{
-        certificate: {
-          type: 'BRC-KYC-Certificate';
-          version: '1.0';
-          issuer: string;
-          issuerPublicKey: string;
-          issuerAddress: string;
-          subject: string;
-          kycProvider: string;
-          kycLevel: string;
-          status: 'verified';
-          verifiedAt: string;
-          protocolID: [number, string];
-          keyID: string;
-          issuedAt: string;
-        };
-        signature: string;
-        publicKey: string;
-        savedAt: string;
-      } | null>;
-      kycPoll: (sessionId: string) => Promise<{
-        status: string;
-        certificate?: {
-          certificate: Record<string, unknown>;
-          signature: string;
-          publicKey: string;
-        };
-      }>;
-      kycVerifyCert: (payload: { certificate: string; signature: string }) => Promise<{
-        valid: boolean;
-        certificate?: Record<string, unknown>;
-        error?: string;
-      }>;
+      // --- KYC (moved to bit-sign.online; no local issuance) ---
+      kycOpenBitSign: () => Promise<boolean>;
       kycReset: () => Promise<boolean>;
     };
   }
