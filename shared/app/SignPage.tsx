@@ -136,7 +136,7 @@ export default function SignPage() {
   };
 
   return (
-    <div className="main" style={{ gridTemplateColumns: '260px 1fr 320px' }}>
+    <div className="main page-grid page-grid--sign">
       {/* Left panel — Actions + Stats */}
       <div className="panel">
         <h2>Documents</h2>

@@ -109,7 +109,7 @@ export default function HashPage() {
   };
 
   return (
-    <div className="main" style={{ gridTemplateColumns: '1fr 2fr 1fr' }}>
+    <div className="main page-grid page-grid--hash">
       {/* Left panel — Info */}
       <div className="panel">
         <h2>SHA-256 Hash</h2>

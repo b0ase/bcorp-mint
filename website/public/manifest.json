@@ -1,21 +1,59 @@
 {
+  "id": "/mint",
   "name": "Bitcoin Mint",
-  "short_name": "Mint",
-  "start_url": "/vault",
+  "short_name": "bMint",
+  "description": "Design, stamp and mint tokens, currency and media on Bitcoin SV. Hash files and inscribe the proof on-chain.",
+  "start_url": "/mint",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
-  "description": "Design, Sign & Seal on Bitcoin. Currency designer, document signing, and identity vault.",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#030303",
+  "theme_color": "#030303",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["finance", "productivity", "utilities"],
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mint",
+      "short_name": "Mint",
+      "description": "Design and mint currency and tokens",
+      "url": "/mint",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Hash a file",
+      "short_name": "Hash",
+      "description": "SHA-256 a file and inscribe the proof",
+      "url": "/hash",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Sign",
+      "short_name": "Sign",
+      "description": "Sign documents",
+      "url": "/sign",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

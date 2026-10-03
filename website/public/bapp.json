@@ -1,0 +1,17 @@
+{
+  "bapp": "0.1",
+  "name": "bMint",
+  "short_name": "bMint",
+  "description": "Design, stamp and mint tokens, currency and media on-chain.",
+  "icon": "/icon-512.png",
+  "start_url": "/mint",
+  "category": "money",
+  "permissions": ["identity", "sign", "pay", "tokens"],
+  "price": { "model": "free" },
+  "developer": {
+    "name": "The Bitcoin Corporation Ltd",
+    "identityKey": "020000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "source": "https://github.com/b0ase/bcorp-mint",
+  "signature": "00000000000000000000000000000000"
+}

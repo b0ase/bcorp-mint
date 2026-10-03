@@ -1,0 +1,80 @@
+/* Shared Mint styles for every section (mint, hash, sign). Imported from the
+   (app) layout so /hash and /sign get them on a direct load too, not only after
+   visiting /mint. */
+@import '../../../shared/styles/mint-app.css';
+
+/* ---- Website-specific overrides ---- */
+
+/* The app frame (layout.tsx) gives the page a definite height. The Mint fills it
+   exactly: no page scroll, the panels scroll internally. */
+.app-frame-main:has(> .app) {
+  overflow: hidden;
+}
+
+.app {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* Section bar. mint-app.css styles every <button> as a gold pill (unlayered, so it
+   beats Tailwind's utilities); these buttons are plain tab targets instead. */
+.bottom-nav {
+  background: rgba(3, 3, 3, 0.92);
+  border-top: 1px solid rgba(201, 168, 76, 0.12);
+}
+
+.bottom-nav .bottom-nav-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  min-width: 64px;
+  min-height: 48px;
+  color: #6f6c62;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.bottom-nav .bottom-nav-btn:hover:not(:disabled) {
+  color: #a9a69c;
+  transform: none;
+  box-shadow: none;
+}
+
+.bottom-nav .bottom-nav-btn.is-active {
+  color: #e6c665;
+  background: rgba(201, 168, 76, 0.08);
+}
+
+/* Hash and Sign: three columns on desktop, one scrolling column on phones. */
+.page-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.page-grid--hash {
+  grid-template-columns: 1fr 2fr 1fr;
+}
+
+.page-grid--sign {
+  grid-template-columns: 260px 1fr 320px;
+}
+
+@media (max-width: 900px) {
+  .page-grid--hash,
+  .page-grid--sign {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+  }
+
+  .page-grid .panel {
+    min-height: 0;
+    overflow: visible;
+    animation: none;
+  }
+}

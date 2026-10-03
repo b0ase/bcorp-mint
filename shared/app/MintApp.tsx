@@ -52,6 +52,8 @@ import CloudVaultBrowser from '@shared/components/CloudVaultBrowser';
 import { usePortfolio } from '@shared/hooks/usePortfolio';
 import type { OwnedAsset, AttestationProof } from '@shared/lib/types';
 import { useQREditor } from '@shared/hooks/useQREditor';
+import { isMobileViewport, useViewport } from '@shared/hooks/useViewport';
+import { connectBWallet, shortIdentityKey, useBWallet } from '@shared/lib/bwallet';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -184,6 +186,30 @@ export default function MintApp({
   const platform = usePlatform();
 
   // -----------------------------------------------------------------------
+  // Host / viewport (mobile-first layout, bWallet bApp hosting)
+  // -----------------------------------------------------------------------
+
+  const { isMobile } = useViewport();
+  const bwallet = useBWallet();
+  // On phones the workspace is one column: canvas on top, then one pane at a time.
+  const [mobilePane, setMobilePane] = useState<'library' | 'controls'>('controls');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // bWallet identity (BRC-100 identity key). Session only, never persisted.
+  const [bwIdentity, setBwIdentity] = useState<string | null>(null);
+  const [bwConnecting, setBwConnecting] = useState(false);
+  const handleConnectBWallet = async () => {
+    setBwConnecting(true);
+    try {
+      const { identityKey } = await connectBWallet();
+      setBwIdentity(identityKey);
+    } catch (err) {
+      console.warn('[bWallet] connect failed:', err);
+    } finally {
+      setBwConnecting(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Core state
   // -----------------------------------------------------------------------
 
@@ -265,12 +291,18 @@ export default function MintApp({
   const [showCloudSave, setShowCloudSave] = useState(false);
   const [showCloudBrowser, setShowCloudBrowser] = useState(false);
 
-  const [showSplash, setShowSplash] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return !localStorage.getItem('mint-splash-seen');
+  // Decided after mount so the server and first client render agree (no hydration
+  // mismatch). Phones go straight to the tool: the video splash is a tap barrier
+  // on a small screen.
+  const [showSplash, setShowSplash] = useState(false);
+  useEffect(() => {
+    if (isMobileViewport()) return;
+    try {
+      if (!localStorage.getItem('mint-splash-seen')) setShowSplash(true);
+    } catch {
+      /* storage unavailable: skip the splash */
     }
-    return true;
-  });
+  }, []);
 
   // Music Editor state — use desktop hook if provided, otherwise shared
   const sharedMusic = useSharedMusicEditor();
@@ -1540,28 +1572,97 @@ export default function MintApp({
   const DocumentHashPanel = desktopComponents?.DocumentHashPanel;
   const PatentInscriptionPanel = desktopComponents?.PatentInscriptionPanel;
 
+  // Secondary actions. Inline in the desktop topbar; behind a "More" sheet on phones.
+  const secondaryActions = (
+    <>
+      {showDownloadButton && !bwallet.inWallet && (
+        <a
+          href="https://github.com/b0ase/bcorp-mint/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="secondary"
+          style={{ textDecoration: 'none' }}
+        >
+          Download Desktop
+        </a>
+      )}
+      <button className="secondary" onClick={() => { setShowPortfolio(true); setMobileMenuOpen(false); }}>
+        Portfolio{portfolio.summary.total > 0 ? ` (${portfolio.summary.total})` : ''}
+      </button>
+      <button className="secondary" onClick={() => { setShowVault(true); setMobileMenuOpen(false); }}>
+        Vault
+      </button>
+      {PatentInscriptionPanel && (
+        <button className="secondary" onClick={() => { setShowPatentInscription(true); setMobileMenuOpen(false); }}>
+          Bit Trust
+        </button>
+      )}
+      <button onClick={() => { setMobileMenuOpen(false); void handlePrint(); }} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
+        {isExporting ? 'Printing\u2026' : 'Print'}
+      </button>
+    </>
+  );
+
+  const walletChip = bwallet.inWallet ? (
+    // Inside bWallet the wallet is the host: identity comes from the BRC-100 provider,
+    // no passwords, no provider picker (bApp standard, section 3).
+    <button
+      className="wallet-status"
+      onClick={bwIdentity ? undefined : handleConnectBWallet}
+      disabled={bwConnecting}
+      title={bwIdentity ?? 'Connect your bWallet identity'}
+    >
+      <span className={`wallet-dot ${bwIdentity ? 'connected' : ''}`} />
+      <span className="wallet-info">
+        {bwConnecting ? 'Connecting\u2026' : bwIdentity ? shortIdentityKey(bwIdentity) : 'Connect bWallet'}
+      </span>
+    </button>
+  ) : (
+    <WalletSelector
+      walletState={walletMgr.walletState}
+      onSwitchProvider={walletMgr.switchProvider}
+      onConnect={walletMgr.connect}
+      onDisconnect={walletMgr.disconnect}
+      onOpenWalletView={() => setShowWalletView(true)}
+    />
+  );
+
+  const appClassName = [
+    'app',
+    isMobile ? `app--mobile pane-${mobilePane}` : '',
+    bwallet.inWallet ? 'in-wallet' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className="app" onDrop={handleDrop} onDragOver={handleDragOver}>
+    <div className={appClassName} onDrop={handleDrop} onDragOver={handleDragOver}>
       <header className="topbar topbar-two-row">
         <div className="topbar-row-1">
           <div className="topbar-left">
-            <h1 className="brand-title">The Bitcoin Corporation <span className="brand-accent">Mint</span></h1>
-            <WalletSelector
-              walletState={walletMgr.walletState}
-              onSwitchProvider={walletMgr.switchProvider}
-              onConnect={walletMgr.connect}
-              onDisconnect={walletMgr.disconnect}
-              onOpenWalletView={() => setShowWalletView(true)}
-            />
+            <h1 className="brand-title"><span className="brand-prefix">The Bitcoin Corporation </span><span className="brand-accent">Mint</span></h1>
+            {walletChip}
           </div>
-          <WIPCarousel
-            items={wipItems}
-            currentMode={tokenisation.mode}
-            activeItemId={activeWipId}
-            onSelect={handleSelectWip}
-            onNew={handleNewWip}
-          />
-          <TopNav />
+          {!isMobile && (
+            <WIPCarousel
+              items={wipItems}
+              currentMode={tokenisation.mode}
+              activeItemId={activeWipId}
+              onSelect={handleSelectWip}
+              onNew={handleNewWip}
+            />
+          )}
+          {/* Section nav: desktop only. On phones the web shell's bottom bar does this,
+              and inside bWallet the wallet owns navigation (bApp standard, section 2). */}
+          {!isMobile && !bwallet.inWallet && <TopNav />}
+          {isMobile && (
+            <button
+              className="ghost mobile-more-btn"
+              aria-label="More actions"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((o) => !o)}
+            >
+              &#x22EF;
+            </button>
+          )}
         </div>
         <div className="topbar-row-2">
           <ModeToggle mode={tokenisation.mode} onChange={tokenisation.setMode} />
@@ -1573,60 +1674,65 @@ export default function MintApp({
               onSelectFolder={handleSelectFolder}
               showFolderOption={platform.supportedFeatures.has('folder-access')}
             />
-            {showDownloadButton && (
+            {!isMobile && secondaryActions}
+            {!isMobile && !bwallet.inWallet && (
               <a
-                href="https://github.com/b0ase/bcorp-mint/releases"
+                href="https://github.com/b0ase/bcorp-mint"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="secondary"
-                style={{ textDecoration: 'none' }}
+                className="fullscreen-btn"
+                title="View on GitHub"
+                style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                Download Desktop
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
               </a>
             )}
-            <button className="secondary" onClick={() => setShowPortfolio(true)}>
-              Portfolio{portfolio.summary.total > 0 ? ` (${portfolio.summary.total})` : ''}
-            </button>
-            <button className="secondary" onClick={() => setShowVault(true)}>
-              Vault
-            </button>
-            {PatentInscriptionPanel && (
-              <button className="secondary" onClick={() => setShowPatentInscription(true)}>
-                Bit Trust
+            {!isMobile && (
+              <button
+                className="fullscreen-btn"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                {isFullscreen ? '\u2716' : '\u26F6'}
               </button>
             )}
-            <button onClick={handlePrint} disabled={!currentIssue || enabledImages.length === 0 || isExporting}>
-              {isExporting ? 'Printing\u2026' : 'Print'}
-            </button>
-            <a
-              href="https://github.com/b0ase/bcorp-mint"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="fullscreen-btn"
-              title="View on GitHub"
-              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-              </svg>
-            </a>
-            <button
-              className="fullscreen-btn"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            >
-              {isFullscreen ? '\u2716' : '\u26F6'}
-            </button>
           </div>
         </div>
       </header>
+
+      {isMobile && mobileMenuOpen && (
+        <div className="mobile-sheet-backdrop" onClick={() => setMobileMenuOpen(false)}>
+          <div className="mobile-sheet" role="menu" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sheet-handle" />
+            {secondaryActions}
+            {!bwallet.inWallet && (
+              <a
+                href="https://github.com/b0ase/bcorp-mint"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ghost"
+                style={{ textDecoration: 'none', textAlign: 'center' }}
+              >
+                View on GitHub
+              </a>
+            )}
+            <button className="ghost" onClick={() => setMobileMenuOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
 
       <div className="main">
         <LeftPanel
           mode={tokenisation.mode}
           images={images}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={(id) => {
+            setSelectedId(id);
+            // Picking from the library on a phone: show the canvas and its controls.
+            if (isMobile) setMobilePane('controls');
+          }}
           onToggleImage={toggleImage}
           currentIssue={currentIssue}
           isImageInIssue={isImageInIssue}
@@ -2189,6 +2295,27 @@ export default function MintApp({
           )}
         </section>
 
+        {isMobile && (
+          <div className="mobile-pane-tabs" role="tablist" aria-label="Workspace panes">
+            <button
+              role="tab"
+              aria-selected={mobilePane === 'library'}
+              className={`mobile-pane-tab ${mobilePane === 'library' ? 'active' : ''}`}
+              onClick={() => setMobilePane('library')}
+            >
+              Library{images.length > 0 ? ` (${images.length})` : ''}
+            </button>
+            <button
+              role="tab"
+              aria-selected={mobilePane === 'controls'}
+              className={`mobile-pane-tab ${mobilePane === 'controls' ? 'active' : ''}`}
+              onClick={() => setMobilePane('controls')}
+            >
+              Controls
+            </button>
+          </div>
+        )}
+
         {(tokenisation.mode === 'currency' || tokenisation.mode === 'stocks' || tokenisation.mode === 'bonds') ? (
           <MintPanel
             mode={tokenisation.mode}
@@ -2615,7 +2742,7 @@ export default function MintApp({
         )}
       </div>
 
-      <PageStrip
+      {(!isMobile || spreads.length > 1) && <PageStrip
         spreads={spreads}
         allImages={images}
         activeIndex={currentSpreadIndex}
@@ -2629,7 +2756,7 @@ export default function MintApp({
         isAnimating={isAnimating}
         animateProgress={animateProgress}
         onAnimate={handleAnimate}
-      />
+      />}
 
       {showLogoDesigner && (
         <LogoDesigner

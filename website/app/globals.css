@@ -1,6 +1,47 @@
 @import "tailwindcss";
 
-/* PWA safe area for bottom nav */
+/* The shared/ components (Hash, Sign, BottomNav, Toast, ...) use Tailwind classes
+   too. They live outside website/, so Tailwind's automatic source detection does
+   not see them: tell it where to scan or their utilities are never generated. */
+@source "../../shared";
+
+/* Full-height document. 100% not 100vh, so the frame follows the dynamic
+   viewport on phones and the iframe height inside bWallet. */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #030303;
+  color-scheme: dark;
+}
+
+/* PWA safe area for the bottom nav */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* App frame: a column of [page][section bar]; the page scrolls, the bar does not move. */
+.app-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.app-frame-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Inside bWallet the wallet's own bars already handle the safe areas. */
+.app-frame--in-wallet {
+  padding: 0;
 }

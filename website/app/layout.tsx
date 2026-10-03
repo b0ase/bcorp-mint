@@ -1,6 +1,7 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Orbitron, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import RegisterServiceWorker from './sw-register';
 
 const orbitron = Orbitron({
   subsets: ['latin'],
@@ -19,6 +20,21 @@ export const metadata: Metadata = {
   title: 'Bitcoin Mint — Design, Sign & Seal on Bitcoin',
   description:
     'Design currency, sign documents, seal with on-chain proof, and manage your identity vault — all on BSV. E2E encrypted vault, co-signing, IP threads, and BSV-20 token minting.',
+  applicationName: 'Bitcoin Mint',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'bMint',
+    statusBarStyle: 'black-translucent',
+  },
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  formatDetection: { telephone: false },
   openGraph: {
     title: 'Bitcoin Mint — Design, Sign & Seal on Bitcoin',
     description:
@@ -37,6 +53,16 @@ export const metadata: Metadata = {
   },
 };
 
+// viewport-fit=cover so the app can pad with env(safe-area-inset-*) on notched
+// phones; inside bWallet's frame those insets resolve to 0 (bApp standard, 2.2).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#030303',
+  colorScheme: 'dark',
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -45,12 +71,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${orbitron.variable} ${ibmPlexMono.variable}`}>
       <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        {/* bApp manifest (bitcoin-apps-suite/bapp-standard, section 6) */}
+        <link rel="bapp-manifest" href="/bapp.json" />
       </head>
-      <body className="bg-black text-white antialiased">{children}</body>
+      <body className="bg-black text-white antialiased">
+        {children}
+        <RegisterServiceWorker />
+      </body>
     </html>
   );
 }
