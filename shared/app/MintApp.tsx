@@ -53,7 +53,7 @@ import { usePortfolio } from '@shared/hooks/usePortfolio';
 import type { OwnedAsset, AttestationProof } from '@shared/lib/types';
 import { useQREditor } from '@shared/hooks/useQREditor';
 import { isMobileViewport, useViewport } from '@shared/hooks/useViewport';
-import { connectBWallet, shortIdentityKey, useBWallet } from '@shared/lib/bwallet';
+import { useBWallet } from '@shared/lib/bwallet';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -194,20 +194,6 @@ export default function MintApp({
   // On phones the workspace is one column: canvas on top, then one pane at a time.
   const [mobilePane, setMobilePane] = useState<'library' | 'controls'>('controls');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // bWallet identity (BRC-100 identity key). Session only, never persisted.
-  const [bwIdentity, setBwIdentity] = useState<string | null>(null);
-  const [bwConnecting, setBwConnecting] = useState(false);
-  const handleConnectBWallet = async () => {
-    setBwConnecting(true);
-    try {
-      const { identityKey } = await connectBWallet();
-      setBwIdentity(identityKey);
-    } catch (err) {
-      console.warn('[bWallet] connect failed:', err);
-    } finally {
-      setBwConnecting(false);
-    }
-  };
 
   // -----------------------------------------------------------------------
   // Core state
@@ -1012,13 +998,30 @@ export default function MintApp({
   // Stamp handlers
   // -----------------------------------------------------------------------
 
+  /** Can a stamp or mint be written to chain right now? Desktop: the legacy keystore. Web: a connected BRC-100 wallet or a local key. */
+  const canInscribe = async (): Promise<boolean> => {
+    try {
+      if (platform.keystoreHasKey) return await platform.keystoreHasKey();
+      if (platform.walletCanInscribe) return await platform.walletCanInscribe();
+    } catch {
+      /* fall through */
+    }
+    return false;
+  };
+
   const handleHashAndInscribe = async () => {
     if (!selectedImage || isStamping) return;
     setIsStamping(true);
     try {
+      // Desktop images carry a path. Web images only have their object URL, so fetch the
+      // original bytes back from it; hashing an empty File would stamp the wrong fingerprint.
       const handle: FileHandle = selectedImage.path
         ? { type: 'path', path: selectedImage.path, name: selectedImage.name }
-        : { type: 'file', file: new File([], selectedImage.name), name: selectedImage.name };
+        : {
+            type: 'file',
+            file: new File([await (await fetch(selectedImage.url)).blob()], selectedImage.name),
+            name: selectedImage.name,
+          };
       const { hash, size } = await platform.hashFile(handle);
       const timestamp = new Date().toISOString();
 
@@ -1040,7 +1043,7 @@ export default function MintApp({
 
       // Inscribe if wallet has a key
       try {
-        const hasKey = platform.keystoreHasKey ? await platform.keystoreHasKey() : false;
+        const hasKey = await canInscribe();
         if (hasKey) {
           const { txid } = await platform.inscribeStamp({ path: stampPath, hash, timestamp });
           await platform.updateStampReceipt(receipt.id, { txid });
@@ -1106,7 +1109,7 @@ export default function MintApp({
         await platform.saveStampReceipt(JSON.stringify(receipt));
 
         try {
-          const hasKey = platform.keystoreHasKey ? await platform.keystoreHasKey() : false;
+          const hasKey = await canInscribe();
           if (hasKey) {
             const { txid } = await platform.inscribeStamp({ path: pagePath, hash, timestamp });
             await platform.updateStampReceipt(receipt.id, { txid });
@@ -1190,7 +1193,7 @@ export default function MintApp({
           await platform.saveStampReceipt(JSON.stringify(receipt));
 
           try {
-            const hasKey = platform.keystoreHasKey ? await platform.keystoreHasKey() : false;
+            const hasKey = await canInscribe();
             if (hasKey) {
               const { txid } = await platform.inscribeStamp({
                 path: piecePath, hash, timestamp,
@@ -1232,7 +1235,7 @@ export default function MintApp({
           await platform.saveStampReceipt(JSON.stringify(receipt));
 
           try {
-            const hasKey = platform.keystoreHasKey ? await platform.keystoreHasKey() : false;
+            const hasKey = await canInscribe();
             if (hasKey) {
               const { txid } = await platform.inscribeStamp({
                 path: piecePath, hash, timestamp,
@@ -1603,21 +1606,9 @@ export default function MintApp({
     </>
   );
 
-  const walletChip = bwallet.inWallet ? (
-    // Inside bWallet the wallet is the host: identity comes from the BRC-100 provider,
-    // no passwords, no provider picker (bApp standard, section 3).
-    <button
-      className="wallet-status"
-      onClick={bwIdentity ? undefined : handleConnectBWallet}
-      disabled={bwConnecting}
-      title={bwIdentity ?? 'Connect your bWallet identity'}
-    >
-      <span className={`wallet-dot ${bwIdentity ? 'connected' : ''}`} />
-      <span className="wallet-info">
-        {bwConnecting ? 'Connecting\u2026' : bwIdentity ? shortIdentityKey(bwIdentity) : 'Connect bWallet'}
-      </span>
-    </button>
-  ) : (
+  // The wallet chip. The web wallet manager lists bWallet (BRC-100) when the page runs
+  // inside the wallet or a provider is injected, and selects it by default there.
+  const walletChip = (
     <WalletSelector
       walletState={walletMgr.walletState}
       onSwitchProvider={walletMgr.switchProvider}

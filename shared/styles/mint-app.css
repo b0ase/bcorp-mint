@@ -4898,3 +4898,18 @@ select:focus {
     row-gap: 6px;
   }
 }
+
+/* bWallet provider mark in the wallet chip and dropdown */
+.wallet-provider-icon--b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #ffd24d;
+  color: #010101;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+}

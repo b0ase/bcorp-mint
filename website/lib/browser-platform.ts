@@ -1,6 +1,14 @@
 import type { MintPlatform, FileHandle, PlatformFeature, MasterKeyInfo, DerivedChild, WalletManifest } from '@shared/lib/platform';
 import type { StampReceipt, WalletState, WalletProviderType } from '@shared/lib/types';
 import * as bridge from './mint-bridge';
+import { getActiveActionProvider, getActiveProvider } from './providers/active';
+import { isBWalletAvailable } from '@shared/lib/bwallet';
+
+/** Stamps, mints and signatures go through the active BRC-100 wallet when there is one. */
+async function describe(prefix: string, detail: string): Promise<string> {
+  const s = `${prefix} ${detail}`.trim();
+  return s.length > 50 ? s.slice(0, 50) : s.padEnd(5, '.');
+}
 
 function fileHandle(file: File): FileHandle {
   return { type: 'file', file, name: file.name };
@@ -134,14 +142,27 @@ export const browserPlatform: MintPlatform = {
   },
 
   // --- Wallet ---
+  // The React wallet manager (use-web-wallet-manager.ts) owns connection state and
+  // publishes the active provider; these reflect it for code that only has the platform.
 
   async walletConnect() {
-    // Browser uses HandCash OAuth via redirect — return default state
-    // The actual auth flow is handled by /api/auth/handcash
-    return defaultWalletState;
+    return this.walletStatus();
   },
   async walletStatus() {
-    // Check if we have a local master key
+    const active = getActiveProvider();
+    if (active) {
+      const status = await active.getStatus();
+      return {
+        ...defaultWalletState,
+        provider: active.type === 'bwallet' ? 'yours' : (active.type as WalletProviderType),
+        connected: status.connected,
+        handle: status.handle,
+        balance: status.balance,
+        masterAddress: status.address,
+        availableProviders: await this.walletListProviders(),
+      };
+    }
+    // Local keystore
     const hasMaster = await bridge.keystoreHasMaster();
     if (hasMaster) {
       try {
@@ -150,42 +171,87 @@ export const browserPlatform: MintPlatform = {
           ...defaultWalletState,
           connected: true,
           masterAddress: info.address,
+          availableProviders: await this.walletListProviders(),
         };
       } catch {
         return defaultWalletState;
       }
     }
-    return defaultWalletState;
+    return { ...defaultWalletState, availableProviders: await this.walletListProviders() };
   },
   async walletDisconnect() {
-    // No-op in browser for now
+    const active = getActiveProvider();
+    if (active) await active.disconnect();
   },
   async walletListProviders() {
-    return [{ type: 'local' as WalletProviderType, available: true, label: 'Local Wallet' }];
+    return [
+      { type: 'local' as WalletProviderType, available: true, label: 'Local Wallet' },
+      { type: 'yours' as WalletProviderType, available: isBWalletAvailable(), label: 'bWallet' },
+    ];
   },
   async walletSwitchProvider() {
-    return defaultWalletState;
+    return this.walletStatus();
+  },
+  async walletCanInscribe() {
+    if (getActiveActionProvider()) return true;
+    return bridge.keystoreHasMaster();
   },
 
   // --- Inscription ---
 
   async inscribeStamp(opts) {
+    const wallet = getActiveActionProvider();
+    if (wallet?.createAction) {
+      const { txid } = await wallet.createAction({
+        description: await describe('Mint stamp', opts.path),
+        outputs: [{ lockingScript: bridge.buildStampOpReturnHex(opts), satoshis: 0, outputDescription: 'STAMP proof' }],
+        labels: ['bmint', 'stamp'],
+      });
+      return { txid };
+    }
     return bridge.inscribeStamp(opts);
   },
 
   // --- Token minting (BSV-21 via 1Sat Ordinals) ---
 
   async mintStampToken(opts) {
+    const wallet = getActiveActionProvider();
+    if (wallet?.createAction) {
+      const address = await wallet.getAddress('mint token', opts.path);
+      const { txid } = await wallet.createAction({
+        description: await describe('Mint token', bridge.bsv21Symbol(opts.name)),
+        outputs: [
+          {
+            lockingScript: await bridge.buildTokenInscriptionHex(opts.name, address),
+            satoshis: 1,
+            outputDescription: 'BSV-21 token',
+            basket: 'bmint tokens',
+          },
+        ],
+        labels: ['bmint', 'bsv21'],
+      });
+      return { tokenId: `${txid}_0` };
+    }
     return bridge.mintStampToken(opts);
   },
 
   async batchMintTokens(pieces) {
-    return bridge.batchMintTokens(pieces);
+    if (!getActiveActionProvider()) return bridge.batchMintTokens(pieces);
+    for (let i = 0; i < pieces.length; i++) {
+      try {
+        await this.mintStampToken!(pieces[i]);
+      } catch (err) {
+        console.error(`Batch mint failed at piece ${i}:`, err);
+      }
+      if (i < pieces.length - 1) await new Promise((r) => setTimeout(r, 200));
+    }
   },
 
   // --- Message signing ---
 
   async signMessage(message: string) {
+    const active = getActiveProvider();
+    if (active?.signMessage) return active.signMessage(message);
     return bridge.signMessage(message);
   },
 };

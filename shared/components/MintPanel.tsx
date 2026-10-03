@@ -203,44 +203,73 @@ export default function MintPanel({
     finally { setIsExporting(false); }
   };
 
+  /** SHA-256 of the exported PNG bytes (browser). The desktop path hashes the saved file. */
+  const hashDataUrl = async (dataUrl: string): Promise<string> => {
+    const b64 = dataUrl.split(',')[1] ?? '';
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  /** Can a stamp or mint be written to chain right now (legacy desktop key, BRC-100 wallet, or funded local key)? */
+  const canWriteToChain = async (): Promise<boolean> => {
+    try {
+      if (platform.keystoreHasKey) return !!(await platform.keystoreHasKey());
+      if (platform.walletCanInscribe) return await platform.walletCanInscribe();
+    } catch {
+      /* fall through */
+    }
+    return false;
+  };
+
   // Stamp & Inscribe the current design
   const handleStampDesign = async () => {
-    if (!platform.isDesktop) { setStampResult('Available in desktop app'); return; }
     setIsStamping(true);
     setStampResult('');
     try {
       const dataUrl = onExportPng();
       if (!dataUrl) throw new Error('Export failed');
-      // Save to temp and hash
-      const filePath = await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-stamp' });
-      if (!filePath) { setIsStamping(false); return; }
-      const { hash } = await platform.hashFile({ type: 'path', path: filePath, name: filePath.split('/').pop() || 'file' });
       const timestamp = new Date().toISOString();
       const stampPath = `$STAMP/${doc.name || 'DESIGN'}`;
+      let hash: string;
+      let sourceFile: string;
+      if (platform.isDesktop) {
+        // Save to temp and hash the file
+        const filePath = await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-stamp' });
+        if (!filePath) { setIsStamping(false); return; }
+        hash = (await platform.hashFile({ type: 'path', path: filePath, name: filePath.split('/').pop() || 'file' })).hash;
+        sourceFile = filePath.split('/').pop() || 'mint.png';
+      } else {
+        // Browser: hash the PNG bytes directly; nothing is written anywhere.
+        hash = await hashDataUrl(dataUrl);
+        sourceFile = `${doc.name || 'mint-stamp'}.png`;
+      }
       const receipt = {
         id: crypto.randomUUID(), path: stampPath, hash, algorithm: 'sha256' as const,
-        sourceFile: filePath.split('/').pop() || 'mint.png', sourceSize: 0,
+        sourceFile, sourceSize: 0,
         timestamp, txid: null, tokenId: null, metadata: {}
       };
       await platform.saveStampReceipt(JSON.stringify(receipt));
-      // Try to inscribe
+      // Try to inscribe: a connected wallet (bWallet / MetaNet) or a funded local key
       try {
-        const hasKey = await platform.keystoreHasKey?.();
-        if (hasKey) {
+        if (await canWriteToChain()) {
           const { txid } = await platform.inscribeStamp({ path: stampPath, hash, timestamp });
           await platform.updateStampReceipt(receipt.id, { txid });
           setStampResult(`Inscribed: ${txid.slice(0, 12)}...`);
         } else {
-          setStampResult(`Hashed: ${hash.slice(0, 16)}... (no key)`);
+          setStampResult(`Hashed: ${hash.slice(0, 16)}... (connect a wallet to inscribe)`);
         }
-      } catch { setStampResult(`Hashed: ${hash.slice(0, 16)}... (local only)`); }
+      } catch (err) {
+        setStampResult(`Hashed: ${hash.slice(0, 16)}... (not inscribed: ${err instanceof Error ? err.message : err})`);
+      }
     } catch (err) { setStampResult(`Failed: ${err instanceof Error ? err.message : err}`); }
     finally { setIsStamping(false); }
   };
 
   // Mint token from current design
   const handleMintToken = async () => {
-    if (!platform.isDesktop) { setStampResult('Available in desktop app'); return; }
     setIsStamping(true);
     setStampResult('');
     try {
@@ -248,9 +277,15 @@ export default function MintPanel({
       if (!dataUrl) throw new Error('Export failed');
       const match = dataUrl.match(/^data:(.+);base64,(.*)$/);
       if (!match) throw new Error('Invalid data URL');
-      const filePath = await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-token' });
-      if (!filePath) { setIsStamping(false); return; }
-      const { hash } = await platform.hashFile({ type: 'path', path: filePath, name: filePath.split('/').pop() || 'file' });
+      let hash: string;
+      if (platform.isDesktop) {
+        const filePath = await platform.exportPng({ dataUrl, defaultName: doc.name || 'mint-token' });
+        if (!filePath) { setIsStamping(false); return; }
+        hash = (await platform.hashFile({ type: 'path', path: filePath, name: filePath.split('/').pop() || 'file' })).hash;
+      } else {
+        if (!(await canWriteToChain())) throw new Error('Connect a wallet (bWallet or Local Wallet) to mint');
+        hash = await hashDataUrl(dataUrl);
+      }
       const result = await platform.mintStampToken?.({
         path: `$STAMP/${doc.name || 'TOKEN'}`, hash,
         name: doc.name || 'TOKEN',

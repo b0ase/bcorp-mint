@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveUserHandle } from '@/lib/auth';
+import { resolveUserHandle, resolveUnifiedUserId } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
 type Params = { params: Promise<{ id: string }> };
@@ -15,14 +15,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const { data: identity } = await supabaseAdmin
-    .from('user_identities')
-    .select('unified_user_id')
-    .eq('provider', 'handcash')
-    .eq('provider_user_id', handle)
-    .maybeSingle();
-
-  if (!identity) {
+  const unifiedUserId = await resolveUnifiedUserId(request);
+  if (!unifiedUserId) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
@@ -30,7 +24,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     .from('mint_cloud_vault')
     .select('encrypted_bundle')
     .eq('id', id)
-    .eq('user_id', identity.unified_user_id)
+    .eq('user_id', unifiedUserId)
     .maybeSingle();
 
   if (error || !data) {
@@ -51,14 +45,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const { data: identity } = await supabaseAdmin
-    .from('user_identities')
-    .select('unified_user_id')
-    .eq('provider', 'handcash')
-    .eq('provider_user_id', handle)
-    .maybeSingle();
-
-  if (!identity) {
+  const unifiedUserId = await resolveUnifiedUserId(request);
+  if (!unifiedUserId) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
@@ -66,7 +54,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     .from('mint_cloud_vault')
     .delete()
     .eq('id', id)
-    .eq('user_id', identity.unified_user_id);
+    .eq('user_id', unifiedUserId);
 
   if (error) {
     console.error('[mint-vault] Delete failed:', error);

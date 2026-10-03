@@ -43,7 +43,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 };
 
 export default function SignPage() {
-  const { handle, loading: authLoading, login } = useAuth();
+  const { handle, loading: authLoading, login, loginLabel } = useAuth();
   const api = useApiClient();
   const [created, setCreated] = useState<Envelope[]>([]);
   const [toSign, setToSign] = useState<Envelope[]>([]);
@@ -109,7 +109,7 @@ export default function SignPage() {
         <FileText size={40} style={{ color: 'var(--muted)', marginBottom: 8 }} />
         <h2 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--accent)', textTransform: 'uppercase', margin: 0 }}>Sign</h2>
         <p className="small" style={{ color: 'var(--muted)', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
-          Connect your HandCash wallet to manage documents and signing envelopes.
+          Connect your wallet to manage documents and signing envelopes.
         </p>
         <button onClick={login} style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', borderRadius: 8,
@@ -118,7 +118,7 @@ export default function SignPage() {
           textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer',
         }}>
           <Wallet size={14} />
-          Connect HandCash
+          {loginLabel}
         </button>
       </div>
     );

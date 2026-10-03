@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useMemo } from 'react';
+import { useOptionalAuth } from './auth-context';
 
 interface ApiClient {
   get: (path: string, opts?: RequestInit) => Promise<Response>;
@@ -45,10 +46,13 @@ function buildClient(baseUrl: string, authToken: string | null): ApiClient {
 }
 
 /**
- * Website API client — relative URLs, cookies auto-sent.
+ * Website API client — relative URLs. HandCash sessions ride on the httpOnly cookie;
+ * a bWallet session is a Bearer token (cookies are partitioned inside the wallet frame).
  */
 export function WebApiClientProvider({ children }: { children: React.ReactNode }) {
-  const client = useMemo(() => buildClient('', null), []);
+  const auth = useOptionalAuth();
+  const bearer = auth?.method === 'bwallet' ? auth.authToken : null;
+  const client = useMemo(() => buildClient('', bearer), [bearer]);
   return <ApiClientContext.Provider value={client}>{children}</ApiClientContext.Provider>;
 }
 

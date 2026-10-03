@@ -222,11 +222,7 @@ async function fetchSourceTx(txHash: string) {
 
 // --- Inscription ---
 
-export async function inscribeStamp(opts: {
-  path: string;
-  hash: string;
-  timestamp: string;
-}): Promise<{ txid: string }> {
+export async function inscribeStamp(opts: StampFields): Promise<{ txid: string }> {
   const masterHex = await getDecryptedMasterKey();
   const { deriveChildKey } = await import('./wallet-derivation');
   const childKey = await deriveChildKey(masterHex, 'stamp', opts.path);
@@ -266,12 +262,8 @@ export async function inscribeStamp(opts: {
       unlockingScriptTemplate: new P2PKH().unlock(childKey),
     });
 
-    // OP_RETURN: STAMP | path | sha256 | timestamp
-    const opReturn = `STAMP | ${opts.path} | ${opts.hash} | ${opts.timestamp}`;
-    const opReturnBytes = Array.from(new TextEncoder().encode(opReturn));
-    const pushLen = opReturnBytes.length;
-    const scriptHex = [0x00, 0x6a, pushLen, ...opReturnBytes]
-      .map(b => b.toString(16).padStart(2, '0')).join('');
+    // OP_RETURN: STAMP | path | sha256 | timestamp [| PARENT | INDEX | TOTAL]
+    const scriptHex = buildStampOpReturnHex(opts);
     tx.addOutput({
       satoshis: 0,
       lockingScript: LockingScript.fromHex(scriptHex),
@@ -295,13 +287,70 @@ export async function inscribeStamp(opts: {
   }
 }
 
+
+// --- Script builders (shared by the local keystore path and BRC-100 wallets) ---
+
+export type StampFields = {
+  path: string;
+  hash: string;
+  timestamp: string;
+  parentHash?: string;
+  pieceIndex?: number;
+  totalPieces?: number;
+};
+
+/** The STAMP record: `STAMP | path | sha256 | timestamp [| PARENT:hash | INDEX:n | TOTAL:n]`. */
+export function stampOpReturnText(opts: StampFields): string {
+  const parts = ['STAMP', opts.path, opts.hash, opts.timestamp];
+  if (opts.parentHash) parts.push(`PARENT:${opts.parentHash}`);
+  if (opts.pieceIndex !== undefined) parts.push(`INDEX:${opts.pieceIndex}`);
+  if (opts.totalPieces !== undefined) parts.push(`TOTAL:${opts.totalPieces}`);
+  return parts.join(' | ');
+}
+
+/** OP_FALSE OP_RETURN <push> with the correct PUSHDATA opcode for the payload size. */
+export function opReturnHex(fields: (string | Uint8Array)[]): string {
+  const bytes: number[] = [0x00, 0x6a];
+  for (const field of fields) {
+    const data = typeof field === 'string' ? new TextEncoder().encode(field) : field;
+    if (data.length < 76) bytes.push(data.length);
+    else if (data.length < 256) bytes.push(0x4c, data.length);
+    else bytes.push(0x4d, data.length & 0xff, (data.length >> 8) & 0xff);
+    bytes.push(...data);
+  }
+  return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function buildStampOpReturnHex(opts: StampFields): string {
+  return opReturnHex([stampOpReturnText(opts)]);
+}
+
+/** BSV-21 ticker from a stamp name: A-Z0-9, at most 10 characters. */
+export function bsv21Symbol(name: string): string {
+  return name.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 10) || 'STAMP';
+}
+
+/** BSV-21 deploy+mint inscription (1Sat Ordinal) locked to `address`, as locking script hex. */
+export async function buildTokenInscriptionHex(name: string, address: string): Promise<string> {
+  const tokenMeta: Record<string, string> = {
+    p: 'bsv-20',
+    op: 'deploy+mint',
+    sym: bsv21Symbol(name),
+    amt: '1',
+    dec: '0',
+  };
+  const content = new TextEncoder().encode(JSON.stringify(tokenMeta));
+  const script = await buildOrdinalInscriptionScript('application/bsv-20', content, address);
+  return script.toHex();
+}
+
 // --- BSV-21 Token Minting (1Sat Ordinal inscription) ---
 
 /**
  * Build a 1Sat Ordinal inscription locking script with BSV-21 token metadata.
  * Format: OP_FALSE OP_IF "ord" OP_1 <content-type> OP_0 <content> OP_ENDIF <P2PKH>
  */
-async function buildOrdinalInscriptionScript(
+export async function buildOrdinalInscriptionScript(
   contentType: string,
   content: Uint8Array,
   address: any
@@ -348,23 +397,9 @@ export async function mintStampToken(opts: {
 
   const { Transaction, P2PKH } = await import('@bsv/sdk');
 
-  // Build BSV-21 token metadata
-  const symbol = opts.name.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 10) || 'STAMP';
-  const tokenMeta: Record<string, string> = {
-    p: 'bsv-20',
-    op: 'deploy+mint',
-    sym: symbol,
-    amt: '1',
-    dec: '0',
-  };
-
-  const enc = new TextEncoder();
-  const contentBytes = enc.encode(JSON.stringify(tokenMeta));
-  const tokenLockingScript = await buildOrdinalInscriptionScript(
-    'application/bsv-20',
-    contentBytes,
-    address
-  );
+  // BSV-21 deploy+mint inscription locked to the derived address
+  const { LockingScript } = await import('@bsv/sdk');
+  const tokenLockingScript = LockingScript.fromHex(await buildTokenInscriptionHex(opts.name, address.toString()));
 
   const tx = new Transaction();
   tx.addInput({

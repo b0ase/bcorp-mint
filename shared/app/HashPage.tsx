@@ -38,7 +38,7 @@ export default function HashPage() {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
-  const { handle, login, logout } = useAuth();
+  const { handle, login, logout, method, loginLabel } = useAuth();
   const api = useApiClient();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +91,17 @@ export default function HashPage() {
     setInscribing(true);
     setError(null);
     try {
+      if (method === 'bwallet') {
+        // bApp path: the wallet funds, prompts, signs and broadcasts (BRC-100 createAction).
+        const { inscribeOpReturnViaBWallet } = await import('@shared/lib/bwallet');
+        const ts = new Date().toISOString();
+        const { txid } = await inscribeOpReturnViaBWallet(
+          ['BCORP_MINT_HASH', `ts:${ts}`, ...files.map((f) => `${f.filename}:${f.sha256}`)],
+          `Mint hash x${files.length}`,
+        );
+        setTxid(txid);
+        return;
+      }
       const res = await api.post('/api/inscribe', {
         hashes: files.map((f) => ({
           filename: f.filename,
@@ -161,7 +172,7 @@ export default function HashPage() {
             color: 'var(--accent)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}>
             <Wallet size={14} />
-            Connect HandCash
+            {loginLabel}
           </button>
         )}
 

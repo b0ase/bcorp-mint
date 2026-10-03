@@ -96,6 +96,8 @@ export interface MintPlatform {
   walletDisconnect(): Promise<void>;
   walletListProviders(): Promise<Array<{ type: WalletProviderType; available: boolean; label: string }>>;
   walletSwitchProvider(type: string): Promise<WalletState>;
+  /** Optional. True when inscribeStamp / mintStampToken can write to chain right now (a connected BRC-100 wallet or a funded local key). */
+  walletCanInscribe?(): Promise<boolean>;
 
   // --- Inscription ---
   inscribeStamp(opts: {

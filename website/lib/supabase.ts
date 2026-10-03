@@ -117,4 +117,68 @@ export async function mapHandCashUser(profile: { handle: string, displayName?: s
     return newUser;
 }
 
+/**
+ * Maps a bWallet identity (BRC-100 identity key) to a persistent unified user record.
+ * `provider_user_id` is the identity key: handles can be renamed, keys cannot. The
+ * display name follows the current $handle, else a shortened key.
+ */
+export async function mapBWalletUser(identity: { identityKey: string; handle: string | null; paymail: string | null }) {
+    const displayName = identity.handle ?? `${identity.identityKey.slice(0, 6)}…${identity.identityKey.slice(-4)}`;
+
+    const { data: existing, error: lookupError } = await supabaseAdmin
+        .from('user_identities')
+        .select('unified_user_id')
+        .eq('provider', 'bwallet')
+        .eq('provider_user_id', identity.identityKey)
+        .maybeSingle();
+
+    if (lookupError) {
+        console.error('[Supabase] Error checking bWallet identity:', lookupError);
+        throw lookupError;
+    }
+
+    if (existing) {
+        const [{ data: user }] = await Promise.all([
+            supabaseAdmin
+                .from('unified_users')
+                .update({ display_name: displayName, updated_at: new Date().toISOString() })
+                .eq('id', existing.unified_user_id)
+                .select()
+                .single(),
+            supabaseAdmin
+                .from('user_identities')
+                .update({ provider_handle: identity.handle })
+                .eq('provider', 'bwallet')
+                .eq('provider_user_id', identity.identityKey),
+        ]);
+        return user;
+    }
+
+    const { data: newUser, error: createUserError } = await supabaseAdmin
+        .from('unified_users')
+        .insert({ display_name: displayName })
+        .select()
+        .single();
+
+    if (createUserError || !newUser) {
+        console.error('[Supabase] Error creating unified user:', createUserError);
+        throw createUserError;
+    }
+
+    const { error: linkError } = await supabaseAdmin
+        .from('user_identities')
+        .insert({
+            unified_user_id: newUser.id,
+            provider: 'bwallet',
+            provider_user_id: identity.identityKey,
+            provider_handle: identity.handle,
+        });
+
+    if (linkError) {
+        console.error('[Supabase] Error linking bWallet identity:', linkError);
+    }
+
+    return newUser;
+}
+
 export default supabase;

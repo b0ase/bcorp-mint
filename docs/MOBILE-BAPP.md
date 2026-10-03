@@ -48,17 +48,38 @@ Spec: https://github.com/bitcoin-apps-suite/bapp-standard. bWallet source:
 - Detection (`shared/lib/bwallet.ts`): the wallet's user agent carries `bWallet/1
   YoursWalletMobile/1`; in-frame the iframe keeps the system UA, so the ancestor origin
   (`capacitor://localhost` / `https://localhost`) is checked too. It is a layout hint only.
-- Inside the wallet: no section bar, no Download Desktop / GitHub, and the wallet chip becomes
-  **Connect bWallet**, which fetches the BRC-100 identity key through `window.CWI` (full
-  screen) or `@bsv/sdk`'s `WalletClient('auto')` (XDM over postMessage, in-frame). The key is
-  kept in React state for the session only. Payments and inscriptions still go through the
-  Mint's existing providers; routing them through the wallet's `createAction` is the next
-  step.
+- Inside the wallet: no section bar, no Download Desktop / GitHub. The wallet chip offers
+  **bWallet** (BRC-100) as the default provider; the web wallet manager
+  (`website/lib/use-web-wallet-manager.ts`) lists Local Wallet, bWallet, HandCash and MetaNet
+  Desktop and publishes the active one to the platform layer (`website/lib/providers/active.ts`).
+- **Connect** (`shared/lib/bwallet.ts`, `website/lib/providers/bwallet-wallet.ts`): the identity
+  key via `window.CWI` (full screen, extension) or `@bsv/sdk`'s `WalletClient('auto')` (XDM over
+  postMessage, in-frame), then the `$handle`: bWallet handles are paymail aliases at
+  `bwallet.space`, resolved from the identity key through the wallet's paymail server
+  (`GET pay.bwallet.space/api/paymail/lookup?key=…`, proxied by `/api/bwallet/handle`). Nothing is
+  persisted; the identity lives in React state.
+- **Stamps, mints and signatures** go through the wallet when it is the active provider:
+  `inscribeStamp` → `createAction` with an OP_RETURN output, `mintStampToken` → `createAction`
+  with the 1-sat BSV-21 inscription locked to the user's ordinals address (or a wallet-derived
+  key), `signMessage` → `createSignature` under `[1,'mint sign']` with counterparty `anyone`.
+  The wallet funds, prompts, signs and broadcasts. With Local Wallet selected the old keystore
+  path (`website/lib/mint-bridge.ts`) is used.
+- **Login without passwords** (`/api/auth/bwallet/challenge` + `/verify`): the server issues a
+  signed nonce bound to the origin, the wallet signs `bapp login|v1|origin=…|nonce=…` with
+  `createSignature({ protocolID: [2,'bapp login'], keyID: '1', counterparty: 'anyone' })`, and
+  the server verifies with `ProtoWallet('anyone')`, maps the identity to a unified user
+  (`user_identities.provider = 'bwallet'`, `provider_user_id` = identity key) and returns an
+  HMAC session token. The browser keeps it per tab and sends it as `Authorization: Bearer`
+  (cookies are partitioned inside the wallet frame). `lib/auth.ts` resolves either session;
+  `resolveUnifiedUserId()` is the provider-agnostic lookup for owner-scoped tables. Set
+  `MINT_SESSION_SECRET` in production.
+- Hash and Sign use the same auth context: inside bWallet the button says Connect bWallet and
+  Hash inscribes through the wallet instead of `/api/inscribe` (HandCash).
 - `website/public/bapp.json` is the bApp manifest (spec section 6, still **Proposed** in the
   wallet). `developer.identityKey` and `signature` are placeholders: sign the manifest with The
   Bitcoin Corporation's identity key (`protocolID [2, 'bapp manifest']`, `keyID '1'`,
   counterparty `anyone`, canonical sorted-key JSON without `signature`) before submitting
   the listing. Add `token` once `$bMint` has a BSV-21 token id.
-- Known limit: HandCash OAuth uses cookies, and iOS partitions iframe storage, so the
-  Hash/Sign HandCash login does not persist in-frame. The bApp standard's answer is wallet
-  identity (challenge/response with `createSignature`) instead of a cookie session.
+- Known limits: HandCash OAuth still uses cookies, so it is offered only outside the wallet
+  frame. Envelope payouts to signers (`/api/envelopes`) still use HandCash's pay API; a bWallet
+  sender can create and sign envelopes but not fund signers from the server.
